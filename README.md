@@ -4,10 +4,8 @@ AutoTabML is an innovative application designed to automate the generation of ma
 
 ## Try the Application
 The AutoTabML Application is hosted on HuggingFace Spaces for anyone to go and test this amazing functionality.
-You can go to the [AutoTabML](https://huggingface.co/spaces/singhtech/AutoTabML) and try it out!!
-
+[<img src="https://github.com/Sakalya100/AutoTabML/blob/main/Sample%20Data/5229488.png" width="200px;"/>](https://huggingface.co/spaces/singhtech/AutoTabML)
 ## Features
-
 - **Automated Code Generation**: Generate Python code for machine learning tasks based on your tabular dataset and problem description.
 - **EDA and Feature Engineering**: Perform comprehensive Exploratory Data Analysis (EDA) and feature engineering.
 - **Model Recommendation**: Get suggestions for the most suitable machine learning models for your problem.
