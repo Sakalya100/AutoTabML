@@ -2,6 +2,10 @@
 
 AutoTabML is an innovative application designed to automate the generation of machine learning code for tabular data. Utilizing CrewAI and the Groq Llama 70B model, AutoTabML simplifies the process of building and debugging machine learning models for both regression and classification problems. With this tool, you can generate working code, debug errors, and run your code without writing a single line of code manually.
 
+## Try the Application
+The AutoTabML Application is hosted on HuggingFace Spaces for anyone to go and test this amazing functionality.
+You can go to the [AutoTabML](https://huggingface.co/spaces/singhtech/AutoTabML) and try it out!!
+
 ## Features
 
 - **Automated Code Generation**: Generate Python code for machine learning tasks based on your tabular dataset and problem description.
@@ -92,7 +96,68 @@ https://github.com/Sakalya100/AutoTabML/assets/70064084/6ffcc9c5-4a8e-4d8b-b9f6-
 4. **Modify and Debug**: Use the provided text areas to suggest code modifications or paste error messages for debugging.
 5. **Run the Code**: Execute the generated code and view the results, including any plots or outputs generated during execution.
 
-### Contributors
+---
+## Contributions
+
+We welcome contributions to AutoTabML! Whether you're fixing bugs, adding new features, improving documentation, or providing examples, your help is greatly appreciated.
+
+### How to Contribute
+
+1. **Fork the Repository**: Click the "Fork" button at the top-right corner of this repository to create a copy of the repository under your own GitHub account.
+
+2. **Clone Your Fork**: Clone your fork to your local machine using the following command:
+
+    ```bash
+    git clone https://github.com/Sakalya100/AutoTabML.git
+    cd AutoTabML
+    ```
+
+3. **Create a Branch**: Create a new branch for your changes:
+
+    ```bash
+    git checkout -b feature-or-bugfix-name
+    ```
+
+4. **Make Your Changes**: Implement your changes in the new branch.
+
+5. **Test Your Changes**: Ensure your changes are tested and working as expected. Run the application to verify.
+
+6. **Commit Your Changes**: Commit your changes with a clear and concise commit message:
+
+    ```bash
+    git add .
+    git commit -m "Description of your changes"
+    ```
+
+7. **Push to Your Fork**: Push your changes to your forked repository:
+
+    ```bash
+    git push origin feature-or-bugfix-name
+    ```
+
+8. **Create a Pull Request**: Go to the original repository and click the "New Pull Request" button. Choose your fork and the branch you made changes in. Provide a descriptive title and a detailed description of your changes.
+
+### Opening Issues
+
+If you find a bug or have an idea for a new feature, please open an issue:
+
+1. **Go to the Issues Tab**: Navigate to the "Issues" tab in the repository.
+
+2. **New Issue**: Click the "New Issue" button.
+
+3. **Describe the Issue**: Provide a clear and detailed description of the issue or feature request. Include steps to reproduce the bug if applicable.
+
+4. **Submit**: Submit the issue.
+
+### Pull Request Guidelines
+
+- **Describe Your Changes**: Provide a clear and detailed description of what you have done and why.
+- **Reference Issues**: If your pull request addresses an issue, include a reference to the issue number.
+- **Update Documentation**: If applicable, update the documentation to reflect your changes.
+- **Review Process**: Be prepared to engage in the code review process. Address any feedback and make necessary revisions.
+
+
+## Contributors
 
 [<img src="https://github.com/shalusingh-tech.png" width="60px;"/>](https://github.com/shalusingh-tech)  [<img src="https://github.com/Sakalya100.png" width="60px;"/>](https://github.com/Sakalya100)     
 
