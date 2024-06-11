@@ -25,12 +25,15 @@ AutoTabML leverages multiple agents, each specializing in different aspects of t
 - **Compiler Agent**: Extracts and compiles the Python code.
 
 ## Technology Used
-- Python
-- CrewAI
-- Groq
-- Streamlit
+[<img src="https://user-images.githubusercontent.com/25181517/183423507-c056a6f9-1ba8-4312-a350-19bcbc5a8697.png" width="50px;"/>](https://github.com/shalusingh-tech) [<img src="https://user-images.githubusercontent.com/7164864/217935870-c0bc60a3-6fc0-4047-b011-7b4c59488c91.png" width="60px;"/>](https://github.com/shalusingh-tech)  [<img src="https://github.com/joaomdmoura/crewAI/blob/main/docs/crewai_logo.png" width="60px;"/>](https://github.com/shalusingh-tech)  [<img src="https://github.com/groq/groq-api-cookbook/blob/main/images/groq-logo.png" width="50px;"/>](https://github.com/shalusingh-tech)  
 
 ## Demo
+
+### Classification Demo
+https://github.com/Sakalya100/AutoTabML/assets/70064084/e157cd32-eb3f-44f1-a6da-b71e8367e3e7
+
+### Regression Demo
+https://github.com/Sakalya100/AutoTabML/assets/70064084/6ffcc9c5-4a8e-4d8b-b9f6-0eae93b39c33
 
 
 ## Getting Started
@@ -91,7 +94,7 @@ AutoTabML leverages multiple agents, each specializing in different aspects of t
 
 ### Contributors
 
-- **Sakalya Mitra**   - **Shalu Singh**
+[<img src="https://github.com/shalusingh-tech.png" width="60px;"/>](https://github.com/shalusingh-tech)  [<img src="https://github.com/Sakalya100.png" width="60px;"/>](https://github.com/Sakalya100)     
 
 ## License
 
