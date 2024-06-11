@@ -1,3 +1,4 @@
+[<img src="https://github.com/Sakalya100/AutoTabML/blob/main/Sample%20Data/AutoTabML%20Automated%20Code%20generation%20Using%20ML.png" width="5000px;"/>](https://github.com/Sakalya100)
 # AutoTabML - Automated Machine Learning Code Generator for Tabular Data
 
 AutoTabML is an innovative application designed to automate the generation of machine learning code for tabular data. Utilizing CrewAI and the Groq Llama 70B model, AutoTabML simplifies the process of building and debugging machine learning models for both regression and classification problems. With this tool, you can generate working code, debug errors, and run your code without writing a single line of code manually.
