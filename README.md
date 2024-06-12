@@ -158,7 +158,7 @@ If you find a bug or have an idea for a new feature, please open an issue:
 
 ## Contributors
 
-[<img src="https://github.com/Sakalya100.png" width="60px;"/>](https://github.com/Sakalya100)  [<img src="https://github.com/shalusingh-tech.png" width="60px;"/>](https://github.com/shalusingh-tech)      
+[<img src="https://github.com/Sakalya100.png" width="60px;"/>](https://github.com/Sakalya100)  [<img src="https://github.com/shalusingh-tech.png" width="60px;"/>](https://github.com/shalusingh-tech)   [<img src="https://github.com/pmp438.png" width="60px;"/>](https://github.com/pmp438)  [<img src="https://github.com/vedant22p.png" width="60px;"/>](https://github.com/vedant22p)     
 
 ## License
 
