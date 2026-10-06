@@ -4,11 +4,16 @@
  * Metaphor: a run grows a bioluminescent coral from the dark seabed toward the light at the surface.
  * Every visual is driven by real RunView fields; nothing is decorative-only:
  *
- *   experiment            -> a branch sprouting from its real parent (ExpView.parentId)
+ *   experiment            -> a branch sprouting from its real parent (ExpView.parentId), tangent-continuous with
+ *                            its stem; radii follow the pipe model over the real topology (more descendants → thicker)
  *   oriented CV mean      -> branch tip height (normalised over the run's kept-score range)
- *   keep                  -> glows, thickens, keeps growing
- *   discard               -> a short upward side-shoot on the parent's stem that withers into drifting particles
- *   crash                 -> spark burst, no branch
+ *   keep                  -> a living limb: unfurls twigs and glowing leaves; the best lineage is warm gold
+ *   discard               -> a side-shoot on the parent's stem (length by near-miss closeness) that buds, then
+ *                            bleaches and sheds its leaves — bare, dry twigs remain
+ *   crash                 -> spark burst, then a small charred stub
+ *   running               -> a bud extending from the stem
+ *   (twigs and leaves are deterministic decoration OF a real branch — their count/reach come from its vigour,
+ *    see lib/scene/twigs.ts — never extra experiments)
  *   best's cv.se          -> translucent halo around the best tip (the noise band)
  *   stop.saturation       -> the water surface: hazy and far until `stopped`, then settles at
  *                            bestMean + saturation.value (the fitted asymptote) — fallback bestMean + se
@@ -56,11 +61,22 @@ export interface ReefNode {
   /** World position of the branch tip. y = height from score. */
   tip: [number, number, number];
   /** Branch base: kept branches start at the parent's tip (roots on the seabed); side-shoots (discard/crash/running)
-   *  attach along the parent's stem — see branchControls/pointOnBranch in layout.ts. */
+   *  attach along the parent's stem — see nodeControls/bezierPoint in layout.ts. */
   base: [number, number, number];
   /** 0..1 score within the run's range (null for crash/running without a score). */
   score01: number | null;
   isBest: boolean;
+  /** Inner Bézier control points of the branch (base → c1 → c2 → tip). c1 leaves along the parent's tangent, so a
+   *  branch grows out of its stem smoothly instead of being stuck on. Absent in layouts from older builds. */
+  c1?: [number, number, number];
+  c2?: [number, number, number];
+  /** Pipe-model radii (da Vinci: a stem's cross-section ≈ the sum of what it carries). */
+  rBase?: number;
+  rTip?: number;
+  /** 0..1 vigour from the data: kept → score within the run's range, discard → near-miss closeness to its parent. */
+  vigour?: number;
+  /** Where the branch sits on its parent's curve (1 = the parent's tip, 0 for roots). */
+  attachT?: number;
 }
 
 export interface ReefLayout {

@@ -1,9 +1,8 @@
 "use client";
 
-/* eslint-disable react-hooks/immutability -- R3F idiom: three.js materials/objects are mutated
-   imperatively inside useFrame (outside React render); refs seed initial transforms only. */
+/* eslint-disable react-hooks/immutability -- R3F idiom: three.js objects and camera state are mutated imperatively
+   inside useFrame (outside React render); refs seed initial transforms only. */
 
-import { OrbitControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PerspectiveCamera, Vector3 } from "three";
@@ -12,9 +11,10 @@ import type { ReefLayout, SceneChapter } from "@/lib/scene/contract";
 import { CROWN_Y } from "@/lib/scene/layout";
 import type { ColumnKind } from "@/lib/schema";
 import { Halo, SelectionRing, Shell } from "./artifacts";
-import { Branch } from "./branch";
+import { CrashBurst } from "./crash";
 import { Backdrop, GodRays, MarineSnow, Nutrients, Seabed, Surface } from "./environment";
-import { damp, makeUniforms, now, ReefContext, type ReefCtx } from "./shared";
+import { damp, makeUniforms, now, ReefContext, springStep, type ReefCtx } from "./shared";
+import { ReefTree } from "./tree";
 
 export interface NodeInfo {
   title: string;
@@ -42,7 +42,7 @@ export interface ReefWorldProps {
   /** false → static, fully grown state (reduced motion). */
   animate?: boolean;
   interactive?: boolean;
-  /** OrbitControls (drag to orbit). Thumbnails and the landing hero drive the camera themselves. */
+  /** Drag to orbit. Thumbnails and the landing hero drive the camera themselves. */
   controls?: boolean;
   autoRotate?: boolean;
   selectedId?: string | null;
@@ -77,8 +77,19 @@ function boundsOf(layout: ReefLayout): Bounds {
   const top = Math.max(maxY, layout.surfaceY ?? 0, layout.testY ?? 0) + 0.4;
   const shell: [number, number, number] = [maxX + 1.7, 0, cz + Math.max(1.2, (maxZ - minZ) * 0.35)];
   const halfW = Math.max(maxX - minX, maxZ - minZ, shell[0] - minX) / 2 + 1.2;
-  // Aim a little below the middle: the seabed, shell and labels need room above the panel's legend.
   return { center: [cx, top / 2 - 0.6, cz], top, halfW, shell };
+}
+
+/** Coarsen bounds so a live run's camera/environment targets only move in deliberate steps (hysteresis). */
+function useStableBounds(b: Bounds): Bounds {
+  const [stable, setStable] = useState(b);
+  const moved =
+    Math.abs(stable.top - b.top) > 0.35 ||
+    Math.abs(stable.halfW - b.halfW) > 0.35 ||
+    Math.hypot(stable.center[0] - b.center[0], stable.center[2] - b.center[2]) > 0.3 ||
+    Math.hypot(stable.shell[0] - b.shell[0], stable.shell[2] - b.shell[2]) > 0.3;
+  if (moved) setStable(b); // derived state: React re-renders immediately with the new value
+  return moved ? b : stable;
 }
 
 export function ReefWorld({
@@ -105,8 +116,8 @@ export function ReefWorld({
     ctx.u.uTime.value = animate ? s.clock.elapsedTime + 20 : 26;
   });
 
-  // Nodes present on first mount grow in a quick stagger; later ones grow as they arrive.
-  const [initial] = useState(() => new Set(layout.nodes.filter((n) => n.status !== "running").map((n) => n.id)));
+  // Crashes present on first mount don't replay their burst.
+  const [initial] = useState(() => new Set(layout.nodes.map((n) => n.id)));
   const [hovered, setHovered] = useState<string | null>(null);
   useEffect(() => {
     onHover?.(hovered);
@@ -119,7 +130,7 @@ export function ReefWorld({
     };
   }, [hovered, interactive]);
 
-  const b = useMemo(() => boundsOf(frameLayout ?? layout), [frameLayout, layout]);
+  const b = useStableBounds(useMemo(() => boundsOf(frameLayout ?? layout), [frameLayout, layout]));
   // Reduced motion renders on demand: redraw when anything the frame depends on changes.
   const invalidate = useThree((st) => st.invalidate);
   useEffect(() => {
@@ -138,29 +149,20 @@ export function ReefWorld({
     return () => clearTimeout(t);
   }, []);
   const nutrientsOn = chapter === "intro" || chapter === "nutrients" || (phase === "running" && layout.nodes.length <= 1) || early;
+  const rayTop = Math.max(b.top, CROWN_Y + 4) + 6;
 
   return (
     <ReefContext.Provider value={ctx}>
       <Backdrop />
-      <GodRays center={b.center} top={Math.max(b.top, CROWN_Y + 4) + 6} />
+      <GodRays center={b.center} top={rayTop} />
       <Seabed />
       <Surface surfaceY={layout.surfaceY} hiddenY={Math.max(b.top, CROWN_Y) + 6.5} center={b.center} />
       <MarineSnow center={b.center} />
       <Nutrients kinds={columnKinds} active={nutrientsOn} root={root} />
 
-      {layout.nodes.map((n) => (
-        <Branch
-          key={n.id}
-          node={n}
-          bestId={layout.bestId}
-          delay={initial.has(n.id) ? Math.min(2.4, n.index * 0.065) : 0}
-          settled={initial.has(n.id)}
-          highlighted={n.id === hovered || n.id === selectedId}
-          interactive={interactive}
-          onHover={setHovered}
-          onClick={onSelect}
-        />
-      ))}
+      <ReefTree layout={layout} hoveredId={hovered} selectedId={selectedId} interactive={interactive} onHover={setHovered} onSelect={onSelect} />
+      {animate &&
+        layout.nodes.filter((n) => n.status === "crash" && !initial.has(n.id)).map((n) => <CrashBurst key={n.id} id={n.id} at={n.tip} />)}
 
       {best && best.status === "keep" && <Halo position={best.tip} radius={layout.haloRadius} />}
       {interactive && selected && <SelectionRing position={selected.tip} />}
@@ -185,6 +187,7 @@ export function ReefWorld({
         chapter={chapter}
         bounds={b}
         layout={layout}
+        frameLayout={frameLayout}
         currentId={currentId}
         focusId={focusId}
         controls={controls}
@@ -195,26 +198,47 @@ export function ReefWorld({
   );
 }
 
-/** Projects 3D anchors to screen and moves the caller's DOM labels — no extra React roots, no re-renders. */
+/**
+ * Projects 3D anchors to screen and moves the caller's DOM labels — no React re-renders. Positions are smoothed and
+ * labels fade (instead of popping) when their anchor appears, disappears, goes behind the camera or off screen.
+ */
 function Projector({ root, anchors }: { root: HTMLElement; anchors: Record<LabelKey, [number, number, number] | null> }) {
   const v = useMemo(() => new Vector3(), []);
-  useFrame(({ camera, size }) => {
+  const st = useMemo(() => new WeakMap<HTMLElement, { x: number; y: number; o: number }>(), []);
+  useFrame(({ camera, size }, rawDt) => {
+    const dt = Math.min(rawDt, 0.1);
     for (const el of root.querySelectorAll<HTMLElement>("[data-label]")) {
       const p = anchors[el.dataset.label as LabelKey];
-      if (!p) {
-        el.style.visibility = "hidden";
-        continue;
+      let s = st.get(el);
+      let x = s?.x ?? 0, y = s?.y ?? 0, show = false;
+      if (p) {
+        v.set(p[0], p[1], p[2]).project(camera);
+        x = ((v.x + 1) / 2) * size.width;
+        y = ((1 - v.y) / 2) * size.height;
+        const m = 24;
+        show = v.z < 1 && x > -m && x < size.width + m && y > -m && y < size.height + m;
       }
-      v.set(p[0], p[1], p[2]).project(camera);
-      const behind = v.z > 1;
-      el.style.visibility = behind ? "hidden" : "";
-      el.style.transform = `translate3d(${((v.x + 1) / 2) * size.width}px, ${((1 - v.y) / 2) * size.height}px, 0)`;
+      if (!s) {
+        s = { x, y, o: 0 };
+        st.set(el, s);
+      }
+      if (s.o < 0.03) {
+        s.x = x;
+        s.y = y;
+      } else {
+        s.x = damp(s.x, x, 16, dt);
+        s.y = damp(s.y, y, 16, dt);
+      }
+      s.o = damp(s.o, show ? 1 : 0, show ? 7 : 12, dt);
+      el.style.visibility = s.o < 0.01 ? "hidden" : "";
+      el.style.opacity = s.o.toFixed(3);
+      el.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
     }
   });
   return null;
 }
 
-const OVERVIEW_DIR = new Vector3(0.62, 0.2, 1).normalize();
+const OVERVIEW_AZ = Math.atan2(0.62, 1);
 
 /** Points the camera must keep in frame: every branch end, the shell, and the surface/pearl once they exist. */
 function fitPoints(layout: ReefLayout, bounds: Bounds, withShell = true): Vector3[] {
@@ -226,6 +250,8 @@ function fitPoints(layout: ReefLayout, bounds: Bounds, withShell = true): Vector
   if (layout.surfaceY != null) pts.push(new Vector3(bounds.center[0], layout.surfaceY + 0.2, bounds.center[2]));
   return pts;
 }
+
+const dirAt = (az: number, elev: number) => new Vector3(Math.sin(az) * Math.cos(elev), Math.sin(elev), Math.cos(az) * Math.cos(elev));
 
 /**
  * Distance along `dir` (target → camera) at which every point fits: its vertical extent fills at most `fillV` of the
@@ -245,6 +271,13 @@ function fitDistance(pts: Vector3[], target: Vector3, dir: Vector3, tanV: number
   return d;
 }
 
+/** Rotation-invariant fit: the worst case over azimuths, so an orbiting camera never breathes in and out. */
+function fitAround(pts: Vector3[], target: Vector3, elev: number, tanV: number, aspect: number, fillV: number, fillH: number): number {
+  let d = 0;
+  for (let i = 0; i < 12; i++) d = Math.max(d, fitDistance(pts, target, dirAt((i / 12) * Math.PI * 2, elev), tanV, aspect, fillV, fillH));
+  return d;
+}
+
 function centerOf(pts: Vector3[]): Vector3 {
   const lo = new Vector3(Infinity, Infinity, Infinity);
   const hi = new Vector3(-Infinity, -Infinity, -Infinity);
@@ -255,13 +288,23 @@ function centerOf(pts: Vector3[]): Vector3 {
   return lo.add(hi).multiplyScalar(0.5);
 }
 
-/** Seconds of quiet after a user drag before auto-framing resumes. */
-const USER_HOLD_S = 3.5;
+interface CamGoal {
+  target: Vector3;
+  dist: number;
+  elev: number;
+}
 
+/**
+ * The camera is (target, distance, elevation, azimuth). The first three follow critically damped springs toward a
+ * goal computed only when the layout/chapter changes (never per frame), with hysteresis on the distance so a growing
+ * reef doesn't make it pump. Azimuth belongs to the user (drag, with inertia) or a slow auto-rotate — the rig never
+ * pulls it back.
+ */
 function CameraRig({
   chapter,
   bounds,
   layout,
+  frameLayout,
   currentId,
   focusId,
   controls,
@@ -271,6 +314,8 @@ function CameraRig({
   chapter: SceneChapter;
   bounds: Bounds;
   layout: ReefLayout;
+  /** The complete run (replays): framing it once means the camera never pumps while the reef grows into it. */
+  frameLayout: ReefLayout | null;
   currentId: string | null;
   focusId: string | null;
   controls: boolean;
@@ -279,128 +324,177 @@ function CameraRig({
 }) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const size = useThree((s) => s.size);
+  const gl = useThree((s) => s.gl);
   const aspect = size.width / Math.max(1, size.height);
-  const ctrl = useRef<React.ComponentRef<typeof OrbitControls>>(null);
-  const look = useRef(new Vector3(...bounds.center));
-  const azimuth = useRef(0);
-  const user = useRef({ dragging: false, last: -Infinity });
-
   const tanV = Math.tan((((camera.fov ?? 38) / 2) * Math.PI) / 180);
-  // The hero (intro) frames the reef alone; the shell may sit off to the side.
-  const pts = useMemo(() => fitPoints(layout, bounds, chapter !== "intro"), [layout, bounds, chapter]);
-  const ceilY = (layout.surfaceY ?? Math.max(bounds.top, CROWN_Y) + 6.5) - 0.6;
 
   // Wide hero layouts carry text on the left: shift the intro reef toward the right via a view offset.
   useEffect(() => {
     if (!camera.isPerspectiveCamera) return;
-    // Hero canvases bleed above the fold, so the intro reef sits low in its frame (negative offsetY moves content down).
     if (chapter === "intro")
       camera.setViewOffset(size.width, size.height, aspect > 1.25 ? -size.width * 0.24 : 0, -size.height * (aspect < 0.75 ? 0.1 : 0.2), size.width, size.height);
     else camera.clearViewOffset();
     return () => camera.clearViewOffset();
   }, [camera, chapter, aspect, size.width, size.height]);
 
-  // Close-up chapters aim at one thing; overview/intro/ceiling auto-fit the whole current reef.
   const tipOf = (id: string | null | undefined) => {
     const n = (id ? layout.nodes.find((m) => m.id === id) : undefined) ?? layout.nodes.at(-1);
     return n ? new Vector3(...n.tip) : new Vector3(...bounds.center);
   };
+  const mutationTarget = chapter === "mutation" ? (currentId ?? layout.nodes.at(-1)?.id ?? null) : null;
 
-  const placed = useRef(false);
-  const goalPos = useRef(new Vector3());
-  const goalTarget = useRef(new Vector3());
-  useFrame((_, rawDt) => {
-    const dt = Math.min(rawDt, 0.1);
-    const u = user.current;
-    const held = u.dragging || performance.now() / 1000 - u.last < USER_HOLD_S;
-    if (held && placed.current) return;
-
-    // Keep the camera's current azimuth (user orbit / autoRotate); chapters set the elevation.
-    const cur = camera.position.clone().sub(look.current);
-    // Intro starts from the other side so the shell sits behind the reef rather than in front of the camera.
-    if (!placed.current) azimuth.current = chapter === "intro" ? -0.7 : Math.atan2(OVERVIEW_DIR.x, OVERVIEW_DIR.z);
-    else if (controls) azimuth.current = Math.atan2(cur.x, cur.z);
-    if (!controls && autoRotate) azimuth.current += dt * 0.07;
-    const dirAt = (elev: number) => new Vector3(Math.sin(azimuth.current) * Math.cos(elev), Math.sin(elev), Math.cos(azimuth.current) * Math.cos(elev));
-
-    const target = goalTarget.current;
-    const pos = goalPos.current;
-    const fitV = 0.72;
+  const rawGoal = useMemo<CamGoal>(() => {
+    const pts = fitPoints(frameLayout ?? layout, bounds, chapter !== "intro");
     switch (chapter) {
       case "mutation":
-      case "selection": {
-        target.copy(tipOf(chapter === "mutation" ? currentId : layout.bestId));
-        pos.copy(target).addScaledVector(dirAt(0.12), 6);
-        break;
-      }
-      case "test": {
-        target.set(bounds.shell[0], (layout.testY ?? 1.5) * 0.5 + 0.4, bounds.shell[2]);
-        pos.copy(target).addScaledVector(dirAt(0.2), Math.max(6, (layout.testY ?? 2) * 1.6 + 3));
-        break;
-      }
+      case "selection":
+        return { target: tipOf(chapter === "mutation" ? mutationTarget : layout.bestId), dist: 6, elev: 0.12 };
+      case "test":
+        return { target: new Vector3(bounds.shell[0], (layout.testY ?? 1.5) * 0.5 + 0.4, bounds.shell[2]), dist: Math.max(6, (layout.testY ?? 2) * 1.6 + 3), elev: 0.2 };
       case "nutrients": {
-        target.set(bounds.center[0], 1.4, bounds.center[2]);
-        const dir = dirAt(0.12);
-        pos.copy(target).addScaledVector(dir, fitDistance(pts, target, dir, tanV, aspect, 0.8, 0.9) * 1.15);
-        break;
+        const target = new Vector3(bounds.center[0], 1.4, bounds.center[2]);
+        return { target, dist: fitAround(pts, target, 0.12, tanV, aspect, 0.8, 0.9) * 1.15, elev: 0.12 };
       }
       case "ceiling": {
         const y = layout.surfaceY ?? bounds.top;
-        target.set(bounds.center[0], y - 0.6, bounds.center[2]);
-        const dir = dirAt(-0.42);
-        pos.copy(target).addScaledVector(dir, fitDistance(pts, target, dir, tanV, aspect, 1.6, 0.9) * 0.75);
-        break;
+        const target = new Vector3(bounds.center[0], y - 0.6, bounds.center[2]);
+        return { target, dist: fitAround(pts, target, -0.42, tanV, aspect, 1.6, 0.9) * 0.75, elev: -0.42 };
       }
       default: {
-        // overview / intro: the whole current reef, ~72% of the frame height.
         const intro = chapter === "intro";
-        const dir = dirAt(intro ? -0.08 : 0.2);
-        target.copy(centerOf(pts));
+        const elev = intro ? -0.08 : 0.2;
+        const target = centerOf(pts);
         const f = focusId ? layout.nodes.find((n) => n.id === focusId) : undefined;
         if (f && !intro) target.lerp(new Vector3(...f.tip), 0.55);
-        // Portrait heroes fit by height only (side-shoots may crop) so the reef stays large behind the text.
         const fillH = intro && aspect < 0.75 ? 1.8 : 0.86;
-        const d = fitDistance(pts, target, dir, tanV, aspect, intro ? (aspect < 0.75 ? 0.55 : 0.46) : fitV, fillH);
-        pos.copy(target).addScaledVector(dir, f && !intro ? d * 0.72 : d);
+        const d = fitAround(pts, target, elev, tanV, aspect, intro ? (aspect < 0.75 ? 0.55 : 0.46) : 0.72, fillH);
+        return { target, dist: f && !intro ? d * 0.72 : d, elev };
       }
     }
-    // The camera always stays under water (the surface is only ever seen from below).
-    pos.y = Math.min(pos.y, ceilY);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tipOf reads layout/bounds
+  }, [layout, frameLayout, bounds, chapter, focusId, mutationTarget, tanV, aspect]);
 
-    if (!placed.current) {
-      camera.position.copy(pos);
-      look.current.copy(target);
-      placed.current = true;
-    } else {
-      const lam = animate ? 1.8 : 1000;
-      camera.position.set(damp(camera.position.x, pos.x, lam, dt), damp(camera.position.y, pos.y, lam, dt), damp(camera.position.z, pos.z, lam, dt));
-      look.current.set(damp(look.current.x, target.x, lam, dt), damp(look.current.y, target.y, lam, dt), damp(look.current.z, target.z, lam, dt));
-    }
-    if (ctrl.current) ctrl.current.target.copy(look.current);
-    else camera.lookAt(look.current);
+  // Hysteresis: within a chapter, ignore small changes so incremental growth doesn't make the camera pump.
+  const [held, setHeld] = useState<{ chapter: SceneChapter; focus: string | null; g: CamGoal }>({ chapter, focus: focusId, g: rawGoal });
+  const sameShot = held.chapter === chapter && held.focus === focusId;
+  const significant =
+    !sameShot || rawGoal.dist > held.g.dist * 1.02 || rawGoal.dist < held.g.dist * 0.86 || rawGoal.target.distanceTo(held.g.target) > 0.25 || Math.abs(rawGoal.elev - held.g.elev) > 1e-6;
+  if (significant && held.g !== rawGoal) setHeld({ chapter, focus: focusId, g: rawGoal });
+  const goal = significant ? rawGoal : held.g;
+
+  const ceilY = (layout.surfaceY ?? Math.max(bounds.top, CROWN_Y) + 6.5) - 0.6;
+  const st = useRef({
+    placed: false,
+    az: chapter === "intro" ? -0.7 : OVERVIEW_AZ,
+    vAz: 0,
+    spin: 0,
+    elevUser: 0,
+    vEl: 0,
+    drag: null as null | { x: number; y: number; t: number },
+    lastUser: -Infinity,
+    tx: 0, ty: 0, tz: 0, vx: 0, vy: 0, vz: 0,
+    d: 10, vd: 0,
+    e: 0.2, ve: 0,
+    ceil: ceilY,
+    chapter,
   });
 
-  if (!controls) return null;
-  return (
-    <OrbitControls
-      ref={ctrl}
-      makeDefault
-      enableDamping
-      dampingFactor={0.08}
-      enablePan={false}
-      enableZoom={false}
-      minPolarAngle={Math.PI * 0.2}
-      maxPolarAngle={Math.PI * 0.6}
-      rotateSpeed={0.6}
-      autoRotate={autoRotate && chapter === "overview" && !focusId}
-      autoRotateSpeed={0.35}
-      onStart={() => {
-        user.current.dragging = true;
-      }}
-      onEnd={() => {
-        user.current.dragging = false;
-        user.current.last = performance.now() / 1000;
-      }}
-    />
-  );
+  // Drag to orbit (with inertia). Owned here, so nothing else ever writes the camera.
+  useEffect(() => {
+    if (!controls) return;
+    const el = gl.domElement;
+    const s = st.current;
+    const down = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      s.drag = { x: e.clientX, y: e.clientY, t: performance.now() };
+      s.vAz = 0;
+      s.vEl = 0;
+    };
+    const move = (e: PointerEvent) => {
+      if (!s.drag) return;
+      const t = performance.now();
+      const dt = Math.max(1, t - s.drag.t) / 1000;
+      const dAz = -(e.clientX - s.drag.x) * 0.0065;
+      const dEl = (e.clientY - s.drag.y) * 0.0045;
+      s.az += dAz;
+      s.elevUser = Math.min(0.75, Math.max(-0.45, s.elevUser + dEl));
+      s.vAz = dAz / dt;
+      s.vEl = dEl / dt;
+      s.drag = { x: e.clientX, y: e.clientY, t };
+      s.lastUser = t / 1000;
+    };
+    const up = () => {
+      if (!s.drag) return;
+      if (performance.now() - s.drag.t > 80) {
+        s.vAz = 0;
+        s.vEl = 0;
+      }
+      s.drag = null;
+      s.lastUser = performance.now() / 1000;
+    };
+    el.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [controls, gl]);
+
+  const look = useMemo(() => new Vector3(), []);
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1);
+    const s = st.current;
+    const elevGoal = goal.elev;
+    if (s.chapter !== chapter) {
+      // A new chapter re-frames: the user's tilt eases back to the chapter's, their heading is kept.
+      s.chapter = chapter;
+      s.elevUser = 0;
+    }
+    if (!s.placed) {
+      s.tx = goal.target.x;
+      s.ty = goal.target.y;
+      s.tz = goal.target.z;
+      s.d = goal.dist;
+      s.e = elevGoal;
+      s.ceil = ceilY;
+      s.placed = true;
+    }
+    // Inertia after a flick; a slow auto-rotate that eases in once the user has let go for a while.
+    if (!s.drag) {
+      s.az += s.vAz * dt;
+      s.elevUser = Math.min(0.75, Math.max(-0.45, s.elevUser + s.vEl * dt));
+      s.vAz *= Math.exp(-4 * dt);
+      s.vEl *= Math.exp(-6 * dt);
+    }
+    const idle = !s.drag && performance.now() / 1000 - s.lastUser > 3;
+    s.spin = damp(s.spin, autoRotate && idle ? 0.07 : 0, 0.8, dt);
+    s.az += s.spin * dt;
+
+    const o = { v: 0 };
+    const w = animate ? 2.1 : 1e4;
+    s.tx = springStep(s.tx, s.vx, goal.target.x, w, dt, o);
+    s.vx = o.v;
+    s.ty = springStep(s.ty, s.vy, goal.target.y, w, dt, o);
+    s.vy = o.v;
+    s.tz = springStep(s.tz, s.vz, goal.target.z, w, dt, o);
+    s.vz = o.v;
+    s.d = springStep(s.d, s.vd, goal.dist, w * 0.9, dt, o);
+    s.vd = o.v;
+    s.e = springStep(s.e, s.ve, elevGoal, w, dt, o);
+    s.ve = o.v;
+    s.ceil = animate ? damp(s.ceil, ceilY, 1.5, dt) : ceilY;
+
+    const elev = Math.min(0.95, Math.max(-0.5, s.e + s.elevUser));
+    const dir = dirAt(s.az, elev);
+    camera.position.set(s.tx + dir.x * s.d, s.ty + dir.y * s.d, s.tz + dir.z * s.d);
+    // The camera always stays under water (the surface is only ever seen from below).
+    if (camera.position.y > s.ceil) camera.position.y = s.ceil;
+    camera.lookAt(look.set(s.tx, s.ty, s.tz));
+  });
+
+  return null;
 }

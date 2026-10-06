@@ -67,3 +67,15 @@ export const now = () => (typeof performance !== "undefined" ? performance.now()
 
 /** Frame-rate independent exponential approach. */
 export const damp = (from: number, to: number, lambda: number, dt: number) => from + (to - from) * (1 - Math.exp(-lambda * dt));
+
+/**
+ * One step of a critically damped spring (exact solution, stable for any dt): no overshoot, no oscillation.
+ * Returns the new position and writes the new velocity to `out.v`.
+ */
+export function springStep(x: number, v: number, goal: number, omega: number, dt: number, out: { v: number }): number {
+  const e = Math.exp(-omega * dt);
+  const d = x - goal;
+  const k = (v + omega * d) * dt;
+  out.v = (v - omega * k) * e;
+  return goal + (d + k) * e;
+}

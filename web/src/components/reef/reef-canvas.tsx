@@ -56,7 +56,11 @@ export default function ReefCanvas({
 
   const layout = useMemo(() => layoutReef(view, domainView), [view, domainView]);
   const frameLayout = useMemo(() => (domainView ? layoutReef(domainView) : null), [domainView]);
-  const kinds = useMemo(() => columnKinds(view.profile ? view : (domainView ?? view)), [view, domainView]);
+  // Value-stable: playback hands us a new view every tick, but the profile's column kinds rarely change.
+  const kindsNow = columnKinds(view.profile ? view : (domainView ?? view));
+  const kindsKey = kindsNow.join(",");
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- kindsKey is the value identity of kindsNow
+  const kinds = useMemo(() => kindsNow, [kindsKey]);
   const labels = useMemo(() => (interactive ? sceneLabels(view) : null), [view, interactive]);
   const [hovered, setHovered] = useState<string | null>(null);
   const onHover = useCallback((id: string | null) => setHovered(id), []);
@@ -74,7 +78,8 @@ export default function ReefCanvas({
     <div ref={ref} className={className} role="img" aria-label={summary} style={{ background: "#03060d" }}>
       {webgl && (
         <Canvas
-          dpr={[1, 1.75]}
+          // Fill-rate bound at retina sizes (bloom + MSAA + full-screen water): 1.5x is visually indistinguishable here.
+          dpr={[1, full ? 1.5 : 1.25]}
           frameloop={!running ? "never" : reduced ? "demand" : "always"}
           gl={{ antialias: !full, powerPreference: "high-performance", alpha: false, stencil: false }}
           camera={{ fov: 38, near: 0.1, far: 220, position: [10, 6, 14] }}
@@ -103,7 +108,7 @@ export default function ReefCanvas({
           />
           {full && (
             <EffectComposer multisampling={4} enableNormalPass={false}>
-              <Bloom mipmapBlur intensity={0.8} luminanceThreshold={0.55} luminanceSmoothing={0.3} radius={0.7} />
+              <Bloom mipmapBlur intensity={0.75} luminanceThreshold={0.5} luminanceSmoothing={0.35} radius={0.72} resolutionScale={0.5} />
               <Vignette offset={0.28} darkness={0.72} />
             </EffectComposer>
           )}

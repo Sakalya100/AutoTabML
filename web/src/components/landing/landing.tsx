@@ -44,13 +44,42 @@ const mq = (q: string) => ({
 });
 const narrowQ = mq("(max-width: 767px)");
 
+/**
+ * The replay ticks every ~140 ms; only the reef and the HUD read it. Keeping the playback state here means a tick
+ * re-renders these two, not the whole landing page (which was ~120 ms of React work per second in dev).
+ */
+function PlaybackLayer({
+  events,
+  full,
+  chapter,
+  target,
+  narrow,
+  reduced,
+}: {
+  events: AnyEvent[];
+  full: ReturnType<typeof buildView>;
+  chapter: SceneChapter;
+  target: number | null;
+  narrow: boolean;
+  reduced: boolean;
+}) {
+  const { view } = useReplayPlayback(events, null, { target, loop: true, reduced, speed: 1 });
+  return (
+    <>
+      <ReefStage Reef={ReefCanvas} view={view} full={full} chapter={chapter} quality={narrow ? "lite" : "full"} reduced={reduced} />
+      <div className="lp-hud-wrap" data-chapter={chapter}>
+        <Hud view={view} total={full.experiments.length} compact={narrow} />
+      </div>
+    </>
+  );
+}
+
 export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingFacts }) {
   const reduced = useReducedMotion() ?? false;
   const narrow = useSyncExternalStore(narrowQ.sub, narrowQ.get, () => false);
   const [active, setActive] = useState(SECTIONS[0].id);
   const chapter: SceneChapter = SECTIONS.find((s) => s.id === active)?.chapter ?? "intro";
 
-  const { view } = useReplayPlayback(events, null, { target: facts.cursors[chapter], loop: true, reduced, speed: 1 });
   const full = useMemo(() => buildView(events), [events]);
 
   // Active chapter = the section crossing the middle band of the viewport. Plain document scroll; no hijacking.
@@ -75,11 +104,8 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
   return (
     <MotionConfig reducedMotion="user">
       <div ref={root} data-landing className="lp-root" data-theme="dark">
-        <ReefStage Reef={ReefCanvas} view={view} full={full} chapter={chapter} quality={narrow ? "lite" : "full"} reduced={reduced} />
+        <PlaybackLayer events={events} full={full} chapter={chapter} target={facts.cursors[chapter]} narrow={narrow} reduced={reduced} />
         <Rail items={SECTIONS} active={active} />
-        <div className="lp-hud-wrap" data-chapter={chapter}>
-          <Hud view={view} total={full.experiments.length} compact={narrow} />
-        </div>
 
         {/* 0 — HERO */}
         <section id="grow" data-section className="lp-section lp-hero">

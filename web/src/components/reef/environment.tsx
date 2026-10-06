@@ -4,7 +4,7 @@
    imperatively inside useFrame (outside React render); refs seed initial transforms only. */
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BackSide, BufferAttribute, BufferGeometry, DoubleSide, type Mesh, type Points } from "three";
 import { REEF } from "@/lib/scene/contract";
 import type { ColumnKind } from "@/lib/schema";
@@ -38,8 +38,13 @@ export function Backdrop() {
   );
 }
 
+/** Light shafts: a unit cone scaled to the reef (tweened — the geometry is never rebuilt as a live reef grows). */
 export function GodRays({ center, top }: { center: [number, number, number]; top: number }) {
-  const { lite } = useReef();
+  const { lite, animate } = useReef();
+  const ref = useRef<Mesh>(null);
+  const cur = useRef({ h: top + 2, x: center[0], z: center[2] });
+  // Transforms are owned by useFrame; props only seed them (re-applying props on re-render would pop).
+  const [init] = useState(() => ({ pos: [center[0], (top + 2) / 2 - 0.5, center[2]] as [number, number, number], scale: [1, top + 2, 1] as [number, number, number] }));
   const mat = useShaderMaterial({
     vertexShader: raysVert,
     fragmentShader: raysFrag,
@@ -47,10 +52,21 @@ export function GodRays({ center, top }: { center: [number, number, number]; top
     additive: true,
     uniforms: { uColor: { value: col(REEF.surfaceLight) }, uIntensity: { value: lite ? 0.09 : 0.11 } },
   });
-  const h = top + 2;
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1);
+    const c = cur.current;
+    const k = animate ? 1.2 : 1e4;
+    c.h = damp(c.h, top + 2, k, dt);
+    c.x = damp(c.x, center[0], k, dt);
+    c.z = damp(c.z, center[2], k, dt);
+    if (ref.current) {
+      ref.current.scale.y = c.h;
+      ref.current.position.set(c.x, c.h / 2 - 0.5, c.z);
+    }
+  });
   return (
-    <mesh material={mat} position={[center[0], h / 2 - 0.5, center[2]]} renderOrder={2}>
-      <cylinderGeometry args={[2.2, 11, h, lite ? 48 : 96, 1, true]} />
+    <mesh ref={ref} material={mat} position={init.pos} scale={init.scale} renderOrder={2}>
+      <cylinderGeometry args={[2.2, 11, 1, lite ? 48 : 96, 1, true]} />
     </mesh>
   );
 }
@@ -88,9 +104,8 @@ export function Surface({ surfaceY, hiddenY, center }: { surfaceY: number | null
       uCenter: { value: center },
     },
   });
-  useEffect(() => {
-    mat.uniforms.uCenter.value = center;
-  }, [mat, center]);
+  const cxz = useRef<[number, number, number]>([center[0], 0, center[2]]);
+  const [init] = useState<[number, number, number]>(() => [center[0], surfaceY ?? hiddenY, center[2]]);
 
   useFrame((s, dt) => {
     const st = state.current;
@@ -105,13 +120,16 @@ export function Surface({ surfaceY, hiddenY, center }: { surfaceY: number | null
       if (surfaceY != null && st.settledAt === -1 && Math.abs(st.y - target) < 0.06) st.settledAt = s.clock.elapsedTime;
       if (surfaceY == null) st.settledAt = -1;
     }
+    const k = animate ? 1.2 : 1e4;
+    cxz.current = [damp(cxz.current[0], center[0], k, d), 0, damp(cxz.current[2], center[2], k, d)];
+    mat.uniforms.uCenter.value = cxz.current;
     mat.uniforms.uReveal.value = st.reveal;
     mat.uniforms.uPulse.value = st.settledAt >= 0 ? s.clock.elapsedTime - st.settledAt : -1;
-    if (ref.current) ref.current.position.y = st.y;
+    if (ref.current) ref.current.position.set(cxz.current[0], st.y, cxz.current[2]);
   });
 
   return (
-    <mesh ref={ref} material={mat} rotation-x={-Math.PI / 2} position={[center[0], state.current.y, center[2]]} renderOrder={3}>
+    <mesh ref={ref} material={mat} rotation-x={-Math.PI / 2} position={init} renderOrder={3}>
       <planeGeometry args={[80, 80, 1, 1]} />
     </mesh>
   );
@@ -153,6 +171,8 @@ export function MarineSnow({ center }: { center: [number, number, number] }) {
 export function Nutrients({ kinds, active, root }: { kinds: ColumnKind[]; active: boolean; root: [number, number, number] }) {
   const { lite, animate } = useReef();
   const streams = Math.min(kinds.length, lite ? 16 : 40);
+  // The caller derives `kinds` from each playback view: key the geometry by value, not array identity.
+  const kindsKey = kinds.join(",");
   const per = lite ? 10 : 26;
   const ref = useRef<Points>(null);
   const geo = useMemo(() => {
@@ -184,7 +204,8 @@ export function Nutrients({ kinds, active, root }: { kinds: ColumnKind[]; active
     g.setAttribute("aPhase", new BufferAttribute(phase, 2));
     g.setAttribute("aColor", new BufferAttribute(color, 3));
     return g;
-  }, [streams, per, kinds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- kindsKey is the value identity of kinds
+  }, [streams, per, kindsKey]);
   useEffect(() => () => geo.dispose(), [geo]);
   const mat = useShaderMaterial({
     vertexShader: nutrientVert,

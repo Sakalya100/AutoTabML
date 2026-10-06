@@ -5,8 +5,8 @@
 
 import { Billboard, Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useRef } from "react";
-import { DoubleSide, type Group, type Mesh } from "three";
+import { useRef, useState } from "react";
+import { DoubleSide, Vector3, type Group, type Mesh } from "three";
 import { REEF } from "@/lib/scene/contract";
 import { glowFrag, glowVert, pearlFrag, shellFrag, shellVert } from "./shaders";
 import { col, damp, useReef, useShaderMaterial } from "./shared";
@@ -17,6 +17,10 @@ export function Halo({ position, radius }: { position: [number, number, number];
   const g = useRef<Group>(null);
   const ring = useRef<Mesh>(null);
   const shown = useRef(animate ? 0 : 1);
+  // The halo glides when a new best takes over (props only seed the transform).
+  const [init] = useState(() => [...position] as [number, number, number]);
+  const pos = useRef(new Vector3(...position));
+  const rad = useRef(radius);
   const sphere = useShaderMaterial({
     vertexShader: glowVert,
     fragmentShader: glowFrag,
@@ -32,13 +36,18 @@ export function Halo({ position, radius }: { position: [number, number, number];
   });
   useFrame((s, dt) => {
     const t = s.clock.elapsedTime;
-    shown.current = animate ? damp(shown.current, 1, 1.5, Math.min(dt, 0.1)) : 1;
-    const breathe = animate ? 1 + 0.06 * Math.sin(t * 1.3) : 1;
-    g.current?.scale.setScalar(radius * breathe * shown.current);
+    const d = Math.min(dt, 0.1);
+    shown.current = animate ? damp(shown.current, 1, 1.5, d) : 1;
+    const k = animate ? 2.2 : 1e4;
+    pos.current.set(damp(pos.current.x, position[0], k, d), damp(pos.current.y, position[1], k, d), damp(pos.current.z, position[2], k, d));
+    rad.current = damp(rad.current, radius, k, d);
+    const breathe = animate ? 1 + 0.045 * Math.sin(t * 1.1) : 1;
+    g.current?.position.copy(pos.current);
+    g.current?.scale.setScalar(rad.current * breathe * shown.current);
     if (ring.current && animate) ring.current.rotation.set(1.2 + 0.15 * Math.sin(t * 0.4), t * 0.25, 0.3);
   });
   return (
-    <group ref={g} position={position}>
+    <group ref={g} position={init}>
       <mesh material={sphere} renderOrder={8}>
         <sphereGeometry args={[1, 32, 24]} />
       </mesh>
@@ -52,6 +61,9 @@ export function Halo({ position, radius }: { position: [number, number, number];
 export function SelectionRing({ position }: { position: [number, number, number] }) {
   const { animate } = useReef();
   const ref = useRef<Mesh>(null);
+  const bb = useRef<Group>(null);
+  const [init] = useState(() => [...position] as [number, number, number]);
+  const shown = useRef(animate ? 0 : 1);
   const mat = useShaderMaterial({
     vertexShader: glowVert,
     fragmentShader: glowFrag,
@@ -59,13 +71,22 @@ export function SelectionRing({ position }: { position: [number, number, number]
     side: DoubleSide,
     uniforms: { uColor: { value: col("#ffffff") }, uIntensity: { value: 0.9 }, uCore: { value: 1 }, uPower: { value: 1 } },
   });
-  useFrame((s) => {
+  useFrame((s, rawDt) => {
+    const dt = Math.min(rawDt, 0.1);
+    const k = animate ? 5 : 1e4;
+    // Glide to a new pick and grow in, rather than appearing ahead of a branch that is still growing.
+    shown.current = animate ? damp(shown.current, 1, 3, dt) : 1;
+    if (bb.current) {
+      const p = bb.current.position;
+      p.set(damp(p.x, position[0], k, dt), damp(p.y, position[1], k, dt), damp(p.z, position[2], k, dt));
+    }
     if (!ref.current) return;
-    const k = animate ? 1 + 0.1 * Math.sin(s.clock.elapsedTime * 4) : 1;
-    ref.current.scale.setScalar(k);
+    const pulse = animate ? 1 + 0.06 * Math.sin(s.clock.elapsedTime * 2.4) : 1;
+    ref.current.scale.setScalar(pulse * (0.6 + 0.4 * shown.current));
+    mat.uniforms.uIntensity.value = 0.9 * shown.current;
   });
   return (
-    <Billboard position={position}>
+    <Billboard ref={bb} position={init}>
       <mesh ref={ref} material={mat} renderOrder={9}>
         <torusGeometry args={[0.3, 0.014, 6, 64]} />
       </mesh>
@@ -91,6 +112,8 @@ export function Shell({
   testY: number | null;
 }) {
   const { animate } = useReef();
+  const root = useRef<Group>(null);
+  const [init] = useState(() => [...position] as [number, number, number]);
   const lid = useRef<Group>(null);
   const pearl = useRef<Group>(null);
   const st = useRef({ open: open && !animate ? 1 : 0, y: open && !animate && testY != null ? testY : 0.02 });
@@ -131,6 +154,11 @@ export function Shell({
       c.open = open ? 1 : 0;
       c.y = open && testY != null ? testY : 0.02;
     }
+    if (root.current) {
+      const k = animate ? 1.4 : 1e4;
+      const p = root.current.position;
+      p.set(damp(p.x, position[0], k, dt), damp(p.y, position[1], k, dt), damp(p.z, position[2], k, dt));
+    }
     shellMat.uniforms.uOpen.value = c.open;
     // Closed shells breathe very slightly; opening swings the lid back on its hinge.
     if (lid.current) lid.current.rotation.x = -c.open * 1.15 - (animate && !open ? 0.04 + 0.04 * Math.sin(t * 1.2) : 0);
@@ -141,7 +169,7 @@ export function Shell({
 
   const r = 0.62;
   return (
-    <group position={position}>
+    <group ref={root} position={init}>
       {/* lower valve */}
       <mesh material={shellMat} scale={[1, 0.38, 0.86]}>
         <sphereGeometry args={[r, 40, 16, 0, Math.PI * 2, HALF, HALF]} />

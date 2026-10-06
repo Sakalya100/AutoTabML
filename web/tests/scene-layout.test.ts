@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { parseEventsJsonl } from "@/lib/events";
 import { buildView } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
-import { layoutReef, MIN_KEPT_RISE, MIN_SHOOT_RISE, pointOnBranch, reefScale, SEABED_Y, SHOOT_LEN, hash01, shootVigour } from "@/lib/scene/layout";
+import { bezierPoint, bezierTangent, layoutReef, MAX_RADIUS, MIN_KEPT_RISE, MIN_RADIUS, MIN_SHOOT_RISE, nodeControls, reefScale, SEABED_Y, SHOOT_LEN, shootVigour } from "@/lib/scene/layout";
+import { tipLeaves, twigSpecs } from "@/lib/scene/twigs";
 
 const dir = path.join(__dirname, "../public/replays/breast_cancer");
 const events = parseEventsJsonl(readFileSync(path.join(dir, "events.jsonl"), "utf8"));
@@ -31,7 +32,7 @@ describe("layoutReef (breast_cancer replay)", () => {
         // The attach point lies on the parent's curve: some t in [0,1] reproduces it.
         let best = Infinity;
         for (let i = 0; i <= 400; i++) {
-          const q = pointOnBranch(p.base, p.tip, hash01(p.id), i / 400);
+          const q = bezierPoint(nodeControls(p), i / 400);
           best = Math.min(best, Math.hypot(q[0] - n.base[0], q[1] - n.base[1], q[2] - n.base[2]));
         }
         expect(best).toBeLessThan(0.02);
@@ -118,4 +119,64 @@ describe("layoutReef (breast_cancer replay)", () => {
       if (x.status !== "running") expect(n.tip).toEqual(byId.get(n.id)!.tip);
     }
   });
+
+  it("grows branches out of their stems with tangent continuity, bending toward the light", () => {
+    const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    for (const n of layout.nodes) {
+      const c = nodeControls(n);
+      expect(n.c1 && n.c2).toBeTruthy();
+      const start = bezierTangent(c, 0);
+      if (!n.parentId) {
+        expect(start[1]).toBeGreaterThan(0.99); // the trunk rises straight out of the seabed
+        continue;
+      }
+      const p = byId.get(n.parentId)!;
+      const pt = bezierTangent(nodeControls(p), n.attachT ?? 1);
+      // Kept limbs continue their parent's direction; side-shoots leave at an angle but never against the stem.
+      expect(dot(start, pt)).toBeGreaterThan(n.status === "keep" ? 0.55 : -0.05);
+      // Arrival leans up (phototropism).
+      expect(bezierTangent(c, 1)[1]).toBeGreaterThan(0);
+    }
+  });
+
+  it("tapers by the pipe model: a stem is at least as thick as what it carries", () => {
+    for (const n of layout.nodes) {
+      expect(n.rBase!).toBeGreaterThanOrEqual(n.rTip!);
+      expect(n.rTip!).toBeGreaterThanOrEqual(MIN_RADIUS);
+      expect(n.rBase!).toBeLessThanOrEqual(MAX_RADIUS);
+      const kids = layout.nodes.filter((k) => k.parentId === n.id);
+      // Leonardo: cross-section of the stem ≈ the sum of its branches' (within the radius cap).
+      if (kids.length && n.rBase! < MAX_RADIUS) expect(n.rBase! ** 2).toBeGreaterThanOrEqual(kids.reduce((a, k) => a + k.rBase! ** 2, 0) - 1e-9);
+      // A kept limb starts no thicker than the tip it grows from: no step at the junction.
+      for (const k of kids) if ((k.attachT ?? 0) >= 1) expect(k.rBase!).toBeLessThanOrEqual(n.rTip! + 1e-9);
+    }
+    const root = layout.nodes.find((n) => !n.parentId)!;
+    expect(root.rBase).toBe(Math.max(...layout.nodes.map((n) => n.rBase!)));
+    // Plain JSON (the replays gallery computes layouts on the server).
+    expect(JSON.parse(JSON.stringify(layout))).toEqual(layout);
+  });
+
+  it("decorates real branches with deterministic, data-driven twigs (never extra experiments)", () => {
+    for (const n of layout.nodes) {
+      const a = twigSpecs(n);
+      expect(twigSpecs(n)).toEqual(a);
+      if (n.status === "crash" || n.status === "running") expect(a).toHaveLength(0);
+      for (const [i, t] of a.entries()) {
+        expect(t.parent).toBeLessThan(i);
+        expect(t.t).toBeGreaterThan(0);
+        expect(t.t).toBeLessThan(1);
+        expect(t.level).toBeLessThanOrEqual(3);
+      }
+      expect(twigSpecs(n, true).length).toBeLessThanOrEqual(a.length);
+    }
+    // Vigour drives the crown: a near-miss discard carries at least as many twigs as a dud.
+    const disc = layout.nodes.filter((n) => n.status === "discard");
+    const hi = disc.reduce((a, b) => (b.vigour! > a.vigour! ? b : a));
+    const lo = disc.reduce((a, b) => (b.vigour! < a.vigour! ? b : a));
+    expect(twigSpecs(hi).length).toBeGreaterThanOrEqual(twigSpecs(lo).length);
+    // Kept branches leaf out; discards bud a couple of leaves that fall as they wither; crashes carry none.
+    expect(tipLeaves({ status: "keep", vigour: 1 })).toBeGreaterThan(tipLeaves({ status: "discard", vigour: 1 }));
+    expect(tipLeaves({ status: "crash", vigour: 0 })).toBe(0);
+  });
 });
+
