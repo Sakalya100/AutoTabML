@@ -14,7 +14,7 @@
     {
       "name": "breast_cancer",
       "title": "Breast Cancer \u2014 offline heuristic proposer (no LLM)",
-      "dataset": "breast_cancer (569 rows, 30 features, 4 classes)",
+      "dataset": "breast_cancer (569 rows, 30 features, 2 classes)",
       "metric": "roc_auc",
       "proposer": "heuristic",
       "n_experiments": 37,
@@ -25,7 +25,7 @@
     {
       "name": "iris_with_missing",
       "title": "Iris With Missing \u2014 offline heuristic proposer (no LLM)",
-      "dataset": "iris_with_missing (150 rows, 4 features, 4 classes)",
+      "dataset": "iris_with_missing (150 rows, 4 features, 3 classes)",
       "metric": "log_loss",
       "proposer": "heuristic",
       "n_experiments": 21,
@@ -36,7 +36,7 @@
     {
       "name": "wine",
       "title": "Wine \u2014 offline heuristic proposer (no LLM)",
-      "dataset": "wine (178 rows, 13 features, 4 classes)",
+      "dataset": "wine (178 rows, 13 features, 3 classes)",
       "metric": "log_loss",
       "proposer": "heuristic",
       "n_experiments": 15,

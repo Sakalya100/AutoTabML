@@ -24,7 +24,8 @@ def entry(name: str, rec: RunRecord) -> dict[str, object]:
     n_feat = len(p.columns)
     shape = f"{p.n_rows} rows, {n_feat} features"
     if p.problem_type.value != "regression":
-        shape += f", {len(p.target_summary.get('counts', p.target_summary))} classes"
+        n_classes = p.target_summary.get("n_classes") or len(p.target_summary.get("class_counts", {}))
+        shape += f", {n_classes} classes"
     kept = sum(1 for e in rec.experiments if e.status.value == "keep")
     stop = (rec.stop or {}).get("reason", "?")
     who = "offline heuristic proposer (no LLM)" if rec.proposer == "heuristic" else rec.proposer
