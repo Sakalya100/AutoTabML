@@ -1,0 +1,843 @@
+{
+  "$defs": {
+    "CVScore": {
+      "properties": {
+        "mean": {
+          "title": "Mean",
+          "type": "number"
+        },
+        "se": {
+          "title": "Se",
+          "type": "number"
+        },
+        "folds": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Folds",
+          "type": "array"
+        }
+      },
+      "required": [
+        "mean",
+        "se",
+        "folds"
+      ],
+      "title": "CVScore",
+      "type": "object"
+    },
+    "ColumnKind": {
+      "enum": [
+        "numeric",
+        "categorical",
+        "boolean",
+        "datetime",
+        "text",
+        "id",
+        "constant"
+      ],
+      "title": "ColumnKind",
+      "type": "string"
+    },
+    "ColumnProfile": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "dtype": {
+          "title": "Dtype",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ColumnKind"
+        },
+        "missing_frac": {
+          "title": "Missing Frac",
+          "type": "number"
+        },
+        "n_unique": {
+          "title": "N Unique",
+          "type": "integer"
+        },
+        "examples": {
+          "items": {},
+          "title": "Examples",
+          "type": "array"
+        },
+        "stats": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stats"
+        },
+        "top_values": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top Values"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Flags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "dtype",
+        "kind",
+        "missing_frac",
+        "n_unique"
+      ],
+      "title": "ColumnProfile",
+      "type": "object"
+    },
+    "DataProfile": {
+      "properties": {
+        "n_rows": {
+          "title": "N Rows",
+          "type": "integer"
+        },
+        "n_cols": {
+          "title": "N Cols",
+          "type": "integer"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "problem_type": {
+          "$ref": "#/$defs/ProblemType"
+        },
+        "metric": {
+          "$ref": "#/$defs/Metric"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/ColumnProfile"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "target_summary": {
+          "additionalProperties": true,
+          "title": "Target Summary",
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "sample_rows": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Sample Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "n_rows",
+        "n_cols",
+        "target",
+        "problem_type",
+        "metric",
+        "columns",
+        "target_summary"
+      ],
+      "title": "DataProfile",
+      "type": "object"
+    },
+    "Decision": {
+      "enum": [
+        "keep",
+        "discard",
+        "crash"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "DecisionMade": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "decision",
+          "default": "decision",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "title": "Exp Id",
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/Decision"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "best_exp_id": {
+          "title": "Best Exp Id",
+          "type": "string"
+        },
+        "best_cv_mean": {
+          "title": "Best Cv Mean",
+          "type": "number"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "decision",
+        "reason",
+        "best_exp_id",
+        "best_cv_mean"
+      ],
+      "title": "DecisionMade",
+      "type": "object"
+    },
+    "ExperimentScored": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "experiment_scored",
+          "default": "experiment_scored",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "title": "Exp Id",
+          "type": "string"
+        },
+        "cv": {
+          "$ref": "#/$defs/CVScore"
+        },
+        "select_score": {
+          "title": "Select Score",
+          "type": "number"
+        },
+        "fit_time_s": {
+          "title": "Fit Time S",
+          "type": "number"
+        },
+        "loc": {
+          "title": "Loc",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "cv",
+        "select_score",
+        "fit_time_s",
+        "loc"
+      ],
+      "title": "ExperimentScored",
+      "type": "object"
+    },
+    "ExperimentStarted": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "experiment_started",
+          "default": "experiment_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "title": "Exp Id",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Id"
+        },
+        "idea": {
+          "$ref": "#/$defs/Idea"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "parent_id",
+        "idea"
+      ],
+      "title": "ExperimentStarted",
+      "type": "object"
+    },
+    "Idea": {
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "rationale": {
+          "default": "",
+          "title": "Rationale",
+          "type": "string"
+        },
+        "category": {
+          "$ref": "#/$defs/IdeaCategory"
+        },
+        "radical": {
+          "default": false,
+          "title": "Radical",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title",
+        "category"
+      ],
+      "title": "Idea",
+      "type": "object"
+    },
+    "IdeaCategory": {
+      "enum": [
+        "baseline",
+        "preprocessing",
+        "feature_engineering",
+        "model_family",
+        "hyperparameters",
+        "ensembling",
+        "simplification",
+        "repair"
+      ],
+      "title": "IdeaCategory",
+      "type": "string"
+    },
+    "LLMCall": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "llm_call",
+          "default": "llm_call",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exp Id"
+        },
+        "usage": {
+          "$ref": "#/$defs/LLMUsage"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "usage"
+      ],
+      "title": "LLMCall",
+      "type": "object"
+    },
+    "LLMUsage": {
+      "properties": {
+        "purpose": {
+          "enum": [
+            "draft",
+            "propose",
+            "implement",
+            "repair"
+          ],
+          "title": "Purpose",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "input_tokens": {
+          "default": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "default": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "default": 0.0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "latency_s": {
+          "default": 0.0,
+          "title": "Latency S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "purpose",
+        "model"
+      ],
+      "title": "LLMUsage",
+      "type": "object"
+    },
+    "Metric": {
+      "enum": [
+        "roc_auc",
+        "log_loss",
+        "accuracy",
+        "f1_macro",
+        "rmse",
+        "mae",
+        "r2"
+      ],
+      "title": "Metric",
+      "type": "string"
+    },
+    "ProblemType": {
+      "enum": [
+        "binary",
+        "multiclass",
+        "regression"
+      ],
+      "title": "ProblemType",
+      "type": "string"
+    },
+    "RunFinished": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "run_finished",
+          "default": "run_finished",
+          "title": "Type",
+          "type": "string"
+        },
+        "best_exp_id": {
+          "title": "Best Exp Id",
+          "type": "string"
+        },
+        "dev_cv_mean": {
+          "title": "Dev Cv Mean",
+          "type": "number"
+        },
+        "select_score": {
+          "title": "Select Score",
+          "type": "number"
+        },
+        "test_score": {
+          "title": "Test Score",
+          "type": "number"
+        },
+        "optimism_gap": {
+          "title": "Optimism Gap",
+          "type": "number"
+        },
+        "n_experiments": {
+          "title": "N Experiments",
+          "type": "integer"
+        },
+        "total_cost_usd": {
+          "title": "Total Cost Usd",
+          "type": "number"
+        },
+        "wall_time_s": {
+          "title": "Wall Time S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "run_id",
+        "best_exp_id",
+        "dev_cv_mean",
+        "select_score",
+        "test_score",
+        "optimism_gap",
+        "n_experiments",
+        "total_cost_usd",
+        "wall_time_s"
+      ],
+      "title": "RunFinished",
+      "type": "object"
+    },
+    "RunStarted": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "run_started",
+          "default": "run_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "task": {
+          "$ref": "#/$defs/TaskSpec"
+        },
+        "profile": {
+          "$ref": "#/$defs/DataProfile"
+        },
+        "config": {
+          "additionalProperties": true,
+          "title": "Config",
+          "type": "object"
+        },
+        "proposer": {
+          "title": "Proposer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "task",
+        "profile",
+        "config",
+        "proposer"
+      ],
+      "title": "RunStarted",
+      "type": "object"
+    },
+    "SandboxFinished": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "sandbox_finished",
+          "default": "sandbox_finished",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "title": "Exp Id",
+          "type": "string"
+        },
+        "attempt": {
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "duration_s": {
+          "title": "Duration S",
+          "type": "number"
+        },
+        "error_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Kind"
+        },
+        "error_tail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Tail"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "attempt",
+        "ok",
+        "duration_s"
+      ],
+      "title": "SandboxFinished",
+      "type": "object"
+    },
+    "Stopped": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "stopped",
+          "default": "stopped",
+          "title": "Type",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "ceiling",
+            "max_experiments",
+            "max_cost",
+            "max_time",
+            "user",
+            "proposer_failure"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "report": {
+          "additionalProperties": true,
+          "title": "Report",
+          "type": "object"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "reason",
+        "report",
+        "summary"
+      ],
+      "title": "Stopped",
+      "type": "object"
+    },
+    "TaskSpec": {
+      "properties": {
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "problem_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProblemType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Metric"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "seed": {
+          "default": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "cv_folds": {
+          "default": 5,
+          "title": "Cv Folds",
+          "type": "integer"
+        },
+        "cv_repeats": {
+          "default": 2,
+          "title": "Cv Repeats",
+          "type": "integer"
+        },
+        "select_frac": {
+          "default": 0.15,
+          "title": "Select Frac",
+          "type": "number"
+        },
+        "test_frac": {
+          "default": 0.15,
+          "title": "Test Frac",
+          "type": "number"
+        },
+        "experiment_timeout_s": {
+          "default": 120.0,
+          "title": "Experiment Timeout S",
+          "type": "number"
+        },
+        "experiment_memory_mb": {
+          "default": 2048,
+          "title": "Experiment Memory Mb",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "TaskSpec",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "decision": "#/$defs/DecisionMade",
+      "experiment_scored": "#/$defs/ExperimentScored",
+      "experiment_started": "#/$defs/ExperimentStarted",
+      "llm_call": "#/$defs/LLMCall",
+      "run_finished": "#/$defs/RunFinished",
+      "run_started": "#/$defs/RunStarted",
+      "sandbox_finished": "#/$defs/SandboxFinished",
+      "stopped": "#/$defs/Stopped"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/RunStarted"
+    },
+    {
+      "$ref": "#/$defs/ExperimentStarted"
+    },
+    {
+      "$ref": "#/$defs/LLMCall"
+    },
+    {
+      "$ref": "#/$defs/SandboxFinished"
+    },
+    {
+      "$ref": "#/$defs/ExperimentScored"
+    },
+    {
+      "$ref": "#/$defs/DecisionMade"
+    },
+    {
+      "$ref": "#/$defs/Stopped"
+    },
+    {
+      "$ref": "#/$defs/RunFinished"
+    }
+  ]
+}
