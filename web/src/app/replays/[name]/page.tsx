@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RunView } from "@/components/run-view";
 import { listReplays, loadReplay } from "@/lib/replays";
@@ -25,7 +24,7 @@ export default async function ReplayPage({ params, searchParams }: PageProps<"/r
       mode="replay"
       events={events}
       record={record}
-      autoplay={sp.at !== "end"}
+      initialSimulate={sp.simulate !== undefined}
       title={info.title}
       subtitle={
         <span className="text-sm">
@@ -36,10 +35,6 @@ export default async function ReplayPage({ params, searchParams }: PageProps<"/r
               · <span title={info.blurb}>hand-written fixture, not a recorded engine run</span>
             </>
           )}
-          {" · "}
-          <Link href={`/replays/${name}?at=end`} className="underline decoration-rule-strong underline-offset-4 hover:decoration-ink">
-            skip to the end
-          </Link>
         </span>
       }
     />

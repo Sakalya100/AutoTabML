@@ -37,7 +37,11 @@ export function LiveRun({ id }: { id: string }) {
         setError(res.status === 404 ? "This run doesn't exist, or it has expired (runs are kept for 24 hours)." : "Could not load this run.");
         return null;
       }
-      const body = (await res.json()) as { meta: PublicRunMeta; events: AnyEvent[]; record: RunRecord | null };
+      const body = (await res.json()) as {
+        meta: PublicRunMeta;
+        events: AnyEvent[];
+        record: RunRecord | null;
+      };
       if (cancelled) return null;
       setMeta(body.meta);
       addEvents(body.events);
@@ -151,11 +155,6 @@ export function LiveRun({ id }: { id: string }) {
         </div>
       )}
       {meta.status === "cancelled" && <p className="text-sm text-ink-3">This run was cancelled. Everything recorded up to that point is shown below.</p>}
-      {active && events.length === 0 && (
-        <p className="text-sm text-ink-3">
-          {meta.runner === "vercel-sandbox" ? "Creating a sandbox and installing the engine — this takes a minute or two…" : "Starting the engine and profiling your data…"}
-        </p>
-      )}
     </div>
   );
 
@@ -171,11 +170,21 @@ export function LiveRun({ id }: { id: string }) {
         </span>
       }
       liveBar={bar}
+      active={active}
+      endedAs={meta.status === "cancelled" || meta.status === "failed" ? meta.status : null}
+      emptyHint={meta.runner === "vercel-sandbox" ? "Creating a sandbox and installing the engine — a minute or two" : "Starting the engine and profiling your data"}
       plannedExperiments={meta.maxExperiments}
     />
   );
 }
 
 function statusText(s: PublicRunMeta["status"]): string {
-  return { queued: "queued", starting: "starting", running: "running", finished: "finished", failed: "failed", cancelled: "cancelled" }[s];
+  return {
+    queued: "queued",
+    starting: "starting",
+    running: "running",
+    finished: "finished",
+    failed: "failed",
+    cancelled: "cancelled",
+  }[s];
 }

@@ -9,7 +9,10 @@ import { REEF, type SceneChapter } from "@/lib/scene/contract";
 import { ceilingScore } from "@/lib/scene/layout";
 import { useWebGLAvailable } from "@/lib/scene/webgl";
 
-const ReefCanvas = dynamic(() => import("./reef/reef-canvas"), { ssr: false, loading: () => <ReefSkeleton /> });
+const ReefCanvas = dynamic(() => import("./reef/reef-canvas"), {
+  ssr: false,
+  loading: () => <ReefSkeleton />,
+});
 
 type Moment = "ceiling" | "test" | null;
 
@@ -20,10 +23,31 @@ interface Props {
   /** The user's pick (the camera eases toward it); playback follow does not move the camera. */
   focusId: string | null;
   onSelect: (id: string) => void;
+  /** Height classes for the frame (defaults to the tall hero size). */
+  heightClass?: string;
+  /** Narrow column: hide the caption and the interaction hint. */
+  compact?: boolean;
+  autoRotate?: boolean;
+  quality?: "full" | "lite";
+  className?: string;
+  /** Overrides the phase pill (e.g. "cancelled"). */
+  statusText?: string;
 }
 
 /** The hero of the run page: the living reef, with a legend and the two narrative moments of a run. */
-export function ReefPanel({ view, domainView, selectedId, focusId, onSelect }: Props) {
+export function ReefPanel({
+  view,
+  domainView,
+  selectedId,
+  focusId,
+  onSelect,
+  heightClass = "h-[clamp(360px,62vh,640px)]",
+  compact,
+  autoRotate = true,
+  quality = "full",
+  className = "",
+  statusText,
+}: Props) {
   const webgl = useWebGLAvailable();
 
   // Phase transitions seen while watching (not on a cold load at the end) become short camera "moments".
@@ -48,8 +72,11 @@ export function ReefPanel({ view, domainView, selectedId, focusId, onSelect }: P
   const ceil = ceilingScore(view);
 
   return (
-    <section aria-label="The reef: every experiment as a branch" className="relative isolate overflow-hidden rounded-2xl border border-rule bg-[#03060d] shadow-[0_30px_80px_-40px_rgba(3,6,13,0.6)]">
-      <div className="relative h-[clamp(360px,62vh,640px)]">
+    <section
+      aria-label="The reef: every experiment as a branch"
+      className={`relative isolate overflow-hidden rounded-2xl border border-rule bg-[#03060d] shadow-[0_30px_80px_-40px_rgba(3,6,13,0.6)] ${className}`}
+    >
+      <div className={`relative ${heightClass}`}>
         {webgl ? (
           <ReefCanvas
             view={view}
@@ -58,9 +85,9 @@ export function ReefPanel({ view, domainView, selectedId, focusId, onSelect }: P
             focusId={focusId}
             onSelect={onSelect}
             chapter={chapter}
-            quality="full"
+            quality={quality}
             interactive
-            autoRotate
+            autoRotate={autoRotate}
             className="absolute inset-0"
           />
         ) : (
@@ -72,22 +99,21 @@ export function ReefPanel({ view, domainView, selectedId, focusId, onSelect }: P
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4 sm:p-5">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8fb3c7]">The reef</p>
-            <p className="mt-1 hidden max-w-[34ch] text-[13px] leading-snug text-[#c9dde8] sm:block">
+            <p className={`mt-1 hidden max-w-[34ch] text-[13px] leading-snug text-[#c9dde8] ${compact ? "xl:block" : "sm:block"}`}>
               Each branch is an experiment, grown from its parent. Height is the CV score.
             </p>
           </div>
-          <PhasePill view={view} />
+          <PhasePill view={view} override={statusText} />
         </div>
 
-        <Legend />
+        <Legend compact={compact} />
 
         <AnimatePresence>
           {moment === "ceiling" && (
             <Moment key="ceiling" kicker="Stop rule fired" title="The ceiling reveals itself">
               {ceil != null && (
                 <>
-                  Fitted asymptote ≈ <span className="font-mono">{formatScore(metric, ceil)}</span> {metricInfo(metric).label}. More experiments are
-                  not expected to beat the noise.
+                  Fitted asymptote ≈ <span className="font-mono">{formatScore(metric, ceil)}</span> {metricInfo(metric).label}. More experiments are not expected to beat the noise.
                 </>
               )}
             </Moment>
@@ -125,9 +151,17 @@ function Moment({ kicker, title, children, top }: { kicker: string; title: strin
   );
 }
 
-function PhasePill({ view }: { view: RunView }) {
+function PhasePill({ view, override }: { view: RunView; override?: string }) {
   const text =
-    view.phase === "finished" ? "finished · test opened" : view.phase === "stopped" ? "ceiling reached" : view.current ? `growing ${view.current.id}` : view.phase === "running" ? "deciding" : "starting";
+    (override ?? view.phase === "finished")
+      ? "finished · test opened"
+      : view.phase === "stopped"
+        ? "ceiling reached"
+        : view.current
+          ? `growing ${view.current.id}`
+          : view.phase === "running"
+            ? "deciding"
+            : "starting";
   const live = view.phase === "running";
   return (
     <AnimatePresence mode="popLayout" initial={false}>
@@ -141,7 +175,12 @@ function PhasePill({ view }: { view: RunView }) {
       >
         <span className="relative flex size-2">
           {live && <span className="absolute inline-flex size-full animate-ping rounded-full opacity-60" style={{ background: REEF.keep }} />}
-          <span className="relative inline-flex size-2 rounded-full" style={{ background: view.phase === "running" ? REEF.keep : view.phase === "empty" ? "#55606f" : REEF.best }} />
+          <span
+            className="relative inline-flex size-2 rounded-full"
+            style={{
+              background: view.phase === "running" ? REEF.keep : view.phase === "empty" ? "#55606f" : REEF.best,
+            }}
+          />
         </span>
         {text}
       </motion.span>
@@ -149,7 +188,11 @@ function PhasePill({ view }: { view: RunView }) {
   );
 }
 
-const LEGEND: { label: string; color: string; kind: "dot" | "ring" | "line" }[] = [
+const LEGEND: {
+  label: string;
+  color: string;
+  kind: "dot" | "ring" | "line";
+}[] = [
   { label: "kept", color: REEF.keep, kind: "dot" },
   { label: "best lineage", color: REEF.best, kind: "dot" },
   { label: "discarded (bleached)", color: REEF.discard, kind: "dot" },
@@ -158,9 +201,9 @@ const LEGEND: { label: string; color: string; kind: "dot" | "ring" | "line" }[] 
   { label: "ceiling", color: REEF.surfaceLight, kind: "line" },
 ];
 
-function Legend() {
+function Legend({ compact }: { compact?: boolean }) {
   return (
-    <ul className="pointer-events-none absolute bottom-3 left-4 right-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#a9c2d0] sm:left-5">
+    <ul className={`pointer-events-none absolute bottom-3 left-4 right-4 flex-wrap ${compact ? "hidden sm:flex" : "flex"} gap-x-4 gap-y-1 text-[11px] text-[#a9c2d0] sm:left-5`}>
       {LEGEND.map((l) => (
         <li key={l.label} className="flex items-center gap-1.5">
           {l.kind === "dot" && <span className="size-2 rounded-full" style={{ background: l.color, boxShadow: `0 0 8px ${l.color}` }} />}
@@ -169,15 +212,25 @@ function Legend() {
           {l.label}
         </li>
       ))}
-      <li className="ml-auto hidden text-[#6f8a99] sm:block">drag to orbit · click a branch</li>
+      <li className={`ml-auto hidden text-[#6f8a99] ${compact ? "2xl:block" : "sm:block"}`}>drag to orbit · click a branch</li>
     </ul>
   );
 }
 
 export function ReefSkeleton() {
   return (
-    <div className="absolute inset-0 overflow-hidden" style={{ background: "radial-gradient(90% 70% at 50% 0%, #0d3346 0%, #071a2b 35%, #03060d 75%)" }}>
-      <div className="absolute inset-x-0 top-0 h-1/2 animate-pulse opacity-40" style={{ background: "linear-gradient(180deg, rgba(191,246,255,0.18), transparent)" }} />
+    <div
+      className="absolute inset-0 overflow-hidden"
+      style={{
+        background: "radial-gradient(90% 70% at 50% 0%, #0d3346 0%, #071a2b 35%, #03060d 75%)",
+      }}
+    >
+      <div
+        className="absolute inset-x-0 top-0 h-1/2 animate-pulse opacity-40"
+        style={{
+          background: "linear-gradient(180deg, rgba(191,246,255,0.18), transparent)",
+        }}
+      />
     </div>
   );
 }
