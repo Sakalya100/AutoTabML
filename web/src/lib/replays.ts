@@ -16,7 +16,7 @@ export interface ReplayInfo {
 }
 
 const dir = () => path.join(process.cwd(), "public", "replays");
-const NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 export async function listReplays(): Promise<ReplayInfo[]> {
   try {

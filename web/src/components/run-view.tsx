@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnyEvent, EventType } from "@/lib/events";
 import { fmtCost, fmtDuration } from "@/lib/format";
@@ -11,6 +12,7 @@ import { DataProfilePanel } from "./data-profile";
 import { DetailPanel } from "./detail-panel";
 import { EvolutionChart } from "./evolution-chart";
 import { Ledger } from "./ledger";
+import { ReefPanel } from "./reef-panel";
 import { FinalScores, StopReport } from "./stop-report";
 
 interface Props {
@@ -104,16 +106,8 @@ export function RunView({ mode, events, record, title, subtitle, autoplay, liveB
 
       {liveBar}
 
-      <section className="mt-6" aria-label="Evolution chart">
-        <EvolutionChart
-          view={view}
-          domainView={full}
-          plannedExperiments={replay ? (full?.experiments.length ?? null) : planned}
-          selectedId={selectedId}
-          onSelect={(id) => {
-            setPinned(id);
-          }}
-        />
+      <div className="mt-6">
+        <ReefPanel view={view} domainView={full} selectedId={selectedId} focusId={pinned} onSelect={setPinned} />
         {replay && (
           <ReplayControls
             cursor={shown}
@@ -135,19 +129,47 @@ export function RunView({ mode, events, record, title, subtitle, autoplay, liveB
             onSpeed={setSpeed}
           />
         )}
+      </div>
+
+      <section className="mt-8" aria-label="Evolution chart">
+        <EvolutionChart
+          view={view}
+          domainView={full}
+          plannedExperiments={replay ? (full?.experiments.length ?? null) : planned}
+          selectedId={selectedId}
+          onSelect={(id) => {
+            setPinned(id);
+          }}
+        />
       </section>
 
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
         <Ledger view={view} selectedId={selectedId} onSelect={setPinned} />
         <div className="lg:sticky lg:top-4">
-          <DetailPanel key={selected?.id ?? "none"} view={view} exp={selected} live={mode === "live"} />
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={selected?.id ?? "none"}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: [0.25, 1, 0.5, 1] }}
+            >
+              <DetailPanel view={view} exp={selected} live={mode === "live"} />
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
-      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <motion.div
+        key={view.phase === "stopped" || view.phase === "finished" ? "stopped" : "open"}
+        initial={view.stop ? { opacity: 0, y: 16 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
+      >
         <StopReport view={view} />
         <FinalScores view={view} />
-      </div>
+      </motion.div>
 
       <div className="mt-12">
         <DataProfilePanel profile={view.profile ?? full?.profile ?? null} />
