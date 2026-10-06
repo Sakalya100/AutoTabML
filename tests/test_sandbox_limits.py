@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from autotabml.contracts import TaskSpec
-from autotabml.data import load_source
-from autotabml.harness import Harness
+from autotinker.contracts import TaskSpec
+from autotinker.data import load_source
+from autotinker.harness import Harness
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
 B = "\ndef build_pipeline(profile):\n"
@@ -77,4 +77,4 @@ def test_env_is_scrubbed(h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_cwd_is_fresh_temp_dir(h: Harness) -> None:
     code = "import os" + B + "    raise RuntimeError('CWD=' + os.getcwd() + ' LS=' + repr(os.listdir('.')))\n"
     r = h._sandbox(code, "cv", "cwd")
-    assert r.error_tail and "autotabml-sbx-" in r.error_tail and "LS=[]" in r.error_tail
+    assert r.error_tail and "autotinker-sbx-" in r.error_tail and "LS=[]" in r.error_tail

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from autotabml.evolve.stopping import HistoryPoint, StopRule, fit_saturation
+from autotinker.evolve.stopping import HistoryPoint, StopRule, fit_saturation
 
 
 def history(curve: list[float], se: float, radical_tail: int = 0) -> list[HistoryPoint]:

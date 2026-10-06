@@ -3,7 +3,7 @@
 //
 // This is a FIXTURE, not a real engine run: the numbers are hand-picked to be realistic for iris
 // (5x2 repeated CV, log_loss), and run.json + events.jsonl are generated from one table so they agree.
-// Real replays will be produced by the Python engine (`autotabml evolve ... --out <dir>`) and dropped
+// Real replays will be produced by the Python engine (`autotinker evolve ... --out <dir>`) and dropped
 // into public/replays/<name>/ by hand; then add them to public/replays/index.json.
 //
 // Usage: node scripts/make-fixture-replay.mjs

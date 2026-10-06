@@ -3,15 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from autotabml.agent.heuristic import HeuristicProposer
-from autotabml.agent.llm import ScriptedLLM
-from autotabml.agent.proposer import LLMProposer
-from autotabml.contracts import Decision
-from autotabml.evolve.gate import NaiveGate, StatGate
-from autotabml.evolve.loop import count_loc, evolve, run_single
-from autotabml.evolve.stopping import StopRule
-from autotabml.obs.events import parse_event
-from autotabml.obs.record import RunRecord
+from autotinker.agent.heuristic import HeuristicProposer
+from autotinker.agent.llm import ScriptedLLM
+from autotinker.agent.proposer import LLMProposer
+from autotinker.contracts import Decision
+from autotinker.evolve.gate import NaiveGate, StatGate
+from autotinker.evolve.loop import count_loc, evolve, run_single
+from autotinker.evolve.stopping import StopRule
+from autotinker.obs.events import parse_event
+from autotinker.obs.record import RunRecord
 from tests.conftest import FakeHarness
 
 STARTER = "def build_pipeline(profile):\n    return 'starter'  # fake-score: 0.50\n"
@@ -163,7 +163,7 @@ def test_run_predict_and_export(tmp_path: Path) -> None:
     import numpy as np
     import pandas as pd
 
-    from autotabml.api import Run
+    from autotinker.api import Run
 
     rng = np.random.default_rng(0)
     n = 90
@@ -187,8 +187,8 @@ def test_run_predict_and_export(tmp_path: Path) -> None:
 
 
 def test_auth_error_stops_immediately(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    from autotabml.agent.llm import LLMAuthError, is_fatal_llm_error
-    from autotabml.agent.proposer import ProposalFailed
+    from autotinker.agent.llm import LLMAuthError, is_fatal_llm_error
+    from autotinker.agent.proposer import ProposalFailed
 
     try:
         try:

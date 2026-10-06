@@ -1,5 +1,5 @@
 /**
- * Metric orientation and display. Mirrors `Metric` in src/autotabml/contracts.py:
+ * Metric orientation and display. Mirrors `Metric` in src/autotinker/contracts.py:
  * every stored score is *oriented* (higher is better); minimised metrics (log_loss, rmse, mae) are stored negated.
  * Never show an oriented number to a user — convert with `toRaw` first.
  */

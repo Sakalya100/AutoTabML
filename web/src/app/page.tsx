@@ -16,7 +16,7 @@ export default async function Home() {
           Models that grow <span className="text-best italic">themselves.</span>
         </h1>
         <p className="mt-6 max-w-[54ch] text-lg text-ink-2">
-          AutoTabML evolves a readable ML pipeline, experiment by experiment, until the gains are just noise.
+          AutoTinker evolves a readable ML pipeline, experiment by experiment, until the gains are just noise.
         </p>
         <div className="mt-8 flex gap-3">
           <Link href="/replays" className="rounded-full bg-ink px-6 py-3 text-paper">

@@ -1,6 +1,6 @@
 /**
  * Event-stream helpers. The wire format is JSONL: one event object per line, discriminated by `type`
- * (see src/autotabml/obs/events.py). Types come from the generated src/lib/schema.ts.
+ * (see src/autotinker/obs/events.py). Types come from the generated src/lib/schema.ts.
  */
 import type { RunEvent } from "./schema";
 

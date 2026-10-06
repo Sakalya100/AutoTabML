@@ -17,14 +17,14 @@ export default function NewRunPage() {
           Upload a CSV, pick the column to predict, and watch the agent work. Small public runs are capped at {MAX_EXPERIMENTS_PUBLIC} experiments.
         </p>
         {enabled ? (
-          <NewRunForm maxExperiments={MAX_EXPERIMENTS_PUBLIC} serverKey={!!process.env.AUTOTABML_SERVER_ANTHROPIC_KEY} />
+          <NewRunForm maxExperiments={MAX_EXPERIMENTS_PUBLIC} serverKey={!!process.env.AUTOTINKER_SERVER_ANTHROPIC_KEY} />
         ) : (
           <p className="mt-8 rounded-md border border-rule bg-paper-2 p-4 text-sm text-ink-2">
             Live runs are switched off on this deployment.{" "}
             <Link href="/replays" className="underline underline-offset-4">
               Watch a replay
             </Link>{" "}
-            or run AutoTabML locally.
+            or run AutoTinker locally.
           </p>
         )}
       </div>

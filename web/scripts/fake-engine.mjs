@@ -1,5 +1,5 @@
 // Stand-in for the Python engine, for UI/pipeline development without Python:
-//   AUTOTABML_PYTHON_CMD="node scripts/fake-engine.mjs" npm run dev
+//   AUTOTINKER_PYTHON_CMD="node scripts/fake-engine.mjs" npm run dev
 // Accepts (and ignores) the real CLI arguments, streams the bundled iris fixture's events to stdout with a
 // delay, and writes its run.json to --out. It is NOT the engine: the numbers are the fixture's, whatever CSV you upload.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";

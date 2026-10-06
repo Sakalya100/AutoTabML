@@ -159,7 +159,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
               </span>
             </h1>
             <p className="lp-sub lp-in lp-measure" style={{ "--d": "560ms", maxWidth: "36ch" } as CSSProperties}>
-              AutoTabML evolves a readable ML pipeline, keeps only what beats the noise, and knows when to stop.
+              AutoTinker evolves a readable ML pipeline, keeps only what beats the noise, and knows when to stop.
             </p>
             <div className="lp-ctas lp-in" style={{ "--d": "700ms" } as CSSProperties}>
               <MagneticLink href={replayHref}>Watch a run</MagneticLink>
@@ -222,13 +222,13 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
           <Reveal delay={0.15} className="w-full">
             <pre className="lp-code">
               <code>
-                <span className="lp-k">from</span> autotabml <span className="lp-k">import</span> AutoTabML{"\n"}
-                run = AutoTabML().evolve(<span className="lp-s">&quot;data.csv&quot;</span>, target=<span className="lp-s">&quot;y&quot;</span>){"\n"}
+                <span className="lp-k">from</span> autotinker <span className="lp-k">import</span> AutoTinker{"\n"}
+                run = AutoTinker().evolve(<span className="lp-s">&quot;data.csv&quot;</span>, target=<span className="lp-s">&quot;y&quot;</span>){"\n"}
                 run.best.code <span className="lp-c"># the winning solution.py</span>
               </code>
             </pre>
             <p className="lp-shell">
-              Or from the shell: <code>uv run autotabml evolve data.csv --target y</code>
+              Or from the shell: <code>uv run autotinker evolve data.csv --target y</code>
               <br />
               Offline by default — no API key needed.
             </p>

@@ -2,9 +2,9 @@
  * Local runner (default in dev): spawns the Python engine as a child process on this machine and turns its
  * stdout JSONL into stored events.
  *
- *   <AUTOTABML_PYTHON_CMD> -m autotabml evolve <csv> --target <t> --llm <spec> --max-experiments N --out <dir> --events-stdout
+ *   <AUTOTINKER_PYTHON_CMD> -m autotinker evolve <csv> --target <t> --llm <spec> --max-experiments N --out <dir> --events-stdout
  *
- * AUTOTABML_PYTHON_CMD defaults to `uv run --project <repo root> python` (repo root = parent of web/). It is split
+ * AUTOTINKER_PYTHON_CMD defaults to `uv run --project <repo root> python` (repo root = parent of web/). It is split
  * on whitespace, so paths in it must not contain spaces. Generated pipelines are sandboxed by the engine's own
  * harness, not by this process — only run this runner on a machine you trust with the uploaded data.
  */
@@ -23,10 +23,10 @@ interface Live {
   cancelled: boolean;
 }
 // On globalThis so `next dev` hot reloads don't lose track of running children (cancel would break).
-const g = globalThis as unknown as { __autotabmlLocalRuns?: Map<string, Live> };
-const live = (g.__autotabmlLocalRuns ??= new Map());
+const g = globalThis as unknown as { __autotinkerLocalRuns?: Map<string, Live> };
+const live = (g.__autotinkerLocalRuns ??= new Map());
 
-const ENV_ALLOW = /^(PATH|HOME|USER|LANG|LC_[A-Z]+|TMPDIR|TEMP|TMP|SHELL|UV_[A-Z_]+|PYTHON[A-Z_]*|VIRTUAL_ENV|CONDA_[A-Z_]+|SYSTEMROOT|OMP_NUM_THREADS|AUTOTABML_ENGINE_[A-Z_]+)$/;
+const ENV_ALLOW = /^(PATH|HOME|USER|LANG|LC_[A-Z]+|TMPDIR|TEMP|TMP|SHELL|UV_[A-Z_]+|PYTHON[A-Z_]*|VIRTUAL_ENV|CONDA_[A-Z_]+|SYSTEMROOT|OMP_NUM_THREADS|AUTOTINKER_ENGINE_[A-Z_]+)$/;
 
 export function activeLocalRuns(): number {
   return live.size;
@@ -37,12 +37,12 @@ export function repoRoot(): string {
 }
 
 export function pythonCommand(): string[] {
-  const raw = process.env.AUTOTABML_PYTHON_CMD?.trim() || `uv run --project ${repoRoot()} python`;
+  const raw = process.env.AUTOTINKER_PYTHON_CMD?.trim() || `uv run --project ${repoRoot()} python`;
   return raw.split(/\s+/);
 }
 
 function dataRoot(): string {
-  return process.env.AUTOTABML_DATA_DIR ?? path.join(process.cwd(), ".data");
+  return process.env.AUTOTINKER_DATA_DIR ?? path.join(process.cwd(), ".data");
 }
 
 async function findRunJson(outDir: string): Promise<string | null> {
@@ -82,7 +82,7 @@ export class LocalRunner implements Runner {
     for (const [k, v] of Object.entries(process.env)) if (ENV_ALLOW.test(k)) env[k] = v;
     env.PYTHONUNBUFFERED = "1";
     if (apiKey) env.ANTHROPIC_API_KEY = apiKey;
-    else if (meta.llm === "anthropic" && process.env.AUTOTABML_SERVER_ANTHROPIC_KEY) env.ANTHROPIC_API_KEY = process.env.AUTOTABML_SERVER_ANTHROPIC_KEY;
+    else if (meta.llm === "anthropic" && process.env.AUTOTINKER_SERVER_ANTHROPIC_KEY) env.ANTHROPIC_API_KEY = process.env.AUTOTINKER_SERVER_ANTHROPIC_KEY;
     const secrets = [apiKey, env.ANTHROPIC_API_KEY];
 
     // argv only — never the env, which may hold the key.
@@ -122,7 +122,7 @@ export class LocalRunner implements Runner {
       }
     });
 
-    const maxS = Number(process.env.AUTOTABML_RUN_TIMEOUT_S ?? 3600);
+    const maxS = Number(process.env.AUTOTINKER_RUN_TIMEOUT_S ?? 3600);
     const timer = setTimeout(() => {
       console.warn(`[run ${meta.id}] exceeded ${maxS}s, killing`);
       killTree(child, "SIGTERM");
@@ -147,7 +147,7 @@ export class LocalRunner implements Runner {
       let patch: Partial<RunMeta>;
       if (entry.cancelled) patch = { status: "cancelled", error: "Cancelled by user." };
       else if (spawnError)
-        patch = { status: "failed", error: `Could not start the engine (${spawnError.message}). Is uv installed and AUTOTABML_PYTHON_CMD correct?` };
+        patch = { status: "failed", error: `Could not start the engine (${spawnError.message}). Is uv installed and AUTOTINKER_PYTHON_CMD correct?` };
       else if (code === 0) patch = { status: "finished" };
       else patch = { status: "failed", error: `The engine exited with ${code !== null ? `code ${code}` : `signal ${signal}`}.`, errorTail };
       await store.updateMeta(meta.id, { ...patch, finishedAt: new Date().toISOString() });

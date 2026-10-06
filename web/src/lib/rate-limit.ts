@@ -31,13 +31,13 @@ export class RateLimiter {
   }
 }
 
-const g = globalThis as unknown as { __autotabmlRunLimiter?: RateLimiter };
+const g = globalThis as unknown as { __autotinkerRunLimiter?: RateLimiter };
 export function runLimiter(): RateLimiter {
-  g.__autotabmlRunLimiter ??= new RateLimiter(
-    Number(process.env.AUTOTABML_RUNS_PER_IP_PER_HOUR ?? 3),
+  g.__autotinkerRunLimiter ??= new RateLimiter(
+    Number(process.env.AUTOTINKER_RUNS_PER_IP_PER_HOUR ?? 3),
     60 * 60 * 1000,
   );
-  return g.__autotabmlRunLimiter;
+  return g.__autotinkerRunLimiter;
 }
 
 export function clientIp(req: Request): string {

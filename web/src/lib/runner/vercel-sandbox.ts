@@ -7,7 +7,7 @@
  *
  *   POST /api/runs ─► after(): Sandbox.create → install engine → upload CSV + run.sh + forward.py
  *                     → lock the firewall down → runCommand({ detached: true }) → return
- *   in the sandbox:   python -m autotabml evolve … --events-stdout | python forward.py
+ *   in the sandbox:   python -m autotinker evolve … --events-stdout | python forward.py
  *                     forward.py POSTs batches of JSONL to /api/runs/<id>/ingest (Bearer per-run token),
  *                     then posts the exit code, a redacted stderr tail and run.json.
  *   UI:               GET /api/runs/<id>/stream tails the Store (Redis in production), never the sandbox.
@@ -16,10 +16,10 @@
  * BYOK: the Anthropic key never enters the sandbox. The firewall's credentials brokering injects the
  * `x-api-key` header on requests to api.anthropic.com; the engine only sees a placeholder env var.
  *
- * Env: AUTOTABML_PUBLIC_URL (or VERCEL_PROJECT_PRODUCTION_URL / VERCEL_URL) — the URL the sandbox posts events to;
- *      AUTOTABML_SANDBOX_PACKAGE — pip spec for the engine (default: the GitHub v2 branch);
- *      AUTOTABML_SANDBOX_TIMEOUT_MS — session timeout (default 45 min = the Hobby maximum; Pro allows up to 24 h);
- *      AUTOTABML_SANDBOX_VCPUS (default 2; 2 GB RAM per vCPU). Auth: VERCEL_OIDC_TOKEN (automatic on Vercel).
+ * Env: AUTOTINKER_PUBLIC_URL (or VERCEL_PROJECT_PRODUCTION_URL / VERCEL_URL) — the URL the sandbox posts events to;
+ *      AUTOTINKER_SANDBOX_PACKAGE — pip spec for the engine (default: the GitHub v2 branch);
+ *      AUTOTINKER_SANDBOX_TIMEOUT_MS — session timeout (default 45 min = the Hobby maximum; Pro allows up to 24 h);
+ *      AUTOTINKER_SANDBOX_VCPUS (default 2; 2 GB RAM per vCPU). Auth: VERCEL_OIDC_TOKEN (automatic on Vercel).
  * Deployment Protection must allow the ingest route (or set a protection-bypass secret) for previews.
  */
 import { randomBytes } from "node:crypto";
@@ -30,19 +30,19 @@ import type { RunMeta } from "../store/types";
 import { engineArgs, type Runner, type StartOptions } from "./types";
 
 const WORKDIR = "/vercel/sandbox";
-const DEFAULT_PACKAGE = "autotabml @ git+https://github.com/Sakalya100/AutoTabML@v2";
+const DEFAULT_PACKAGE = "autotinker @ git+https://github.com/Sakalya100/AutoTabML@v2";
 const INSTALL_HOSTS = ["pypi.org", "files.pythonhosted.org", "github.com", "*.githubusercontent.com", "astral.sh", "*.astral.sh"];
 
 function publicUrl(): string {
-  const raw = process.env.AUTOTABML_PUBLIC_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
-  if (!raw) throw new Error("AUTOTABML_PUBLIC_URL is not set; the sandbox has nowhere to send events");
+  const raw = process.env.AUTOTINKER_PUBLIC_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  if (!raw) throw new Error("AUTOTINKER_PUBLIC_URL is not set; the sandbox has nowhere to send events");
   return raw.startsWith("http") ? raw.replace(/\/$/, "") : `https://${raw}`;
 }
 
 // Runs inside the sandbox. stdlib only. Reads JSONL on stdin, POSTs batches; `--final` posts exit + record.
 const FORWARD_PY = String.raw`
 import json, os, sys, time, urllib.request
-URL = os.environ["AUTOTABML_INGEST_URL"]; TOKEN = os.environ["AUTOTABML_INGEST_TOKEN"]
+URL = os.environ["AUTOTINKER_INGEST_URL"]; TOKEN = os.environ["AUTOTINKER_INGEST_TOKEN"]
 def post(body, kind):
     for i in range(5):
         try:
@@ -74,22 +74,22 @@ export class VercelSandboxRunner implements Runner {
     const appHost = new URL(publicUrl()).host;
     await store.updateMeta(meta.id, { status: "starting", ingestTokenSha256: sha256(token) });
 
-    const timeout = Number(process.env.AUTOTABML_SANDBOX_TIMEOUT_MS ?? 45 * 60 * 1000);
+    const timeout = Number(process.env.AUTOTINKER_SANDBOX_TIMEOUT_MS ?? 45 * 60 * 1000);
     let sandbox: Sandbox | null = null;
     try {
       // Install phase: only package indexes and GitHub are reachable.
       sandbox = await Sandbox.create({
-        name: `autotabml-${meta.id}`,
-        resources: { vcpus: Number(process.env.AUTOTABML_SANDBOX_VCPUS ?? 2) },
+        name: `autotinker-${meta.id}`,
+        resources: { vcpus: Number(process.env.AUTOTINKER_SANDBOX_VCPUS ?? 2) },
         timeout,
         persistent: false,
         networkPolicy: { allow: INSTALL_HOSTS },
-        tags: { app: "autotabml", run: meta.id },
+        tags: { app: "autotinker", run: meta.id },
       });
       await store.updateMeta(meta.id, { sandboxName: sandbox.name });
 
       // The default image (vercel/sandbox/universal) ships Python 3.14; the ML stack is pinned to 3.12 via uv.
-      const pkg = process.env.AUTOTABML_SANDBOX_PACKAGE || DEFAULT_PACKAGE;
+      const pkg = process.env.AUTOTINKER_SANDBOX_PACKAGE || DEFAULT_PACKAGE;
       const install = await sandbox.runCommand({
         cmd: "bash",
         args: ["-lc", `python3 -m pip install -q --user uv && ~/.local/bin/uv venv -q --python 3.12 ${WORKDIR}/.venv && ~/.local/bin/uv pip install -q --python ${WORKDIR}/.venv/bin/python "${pkg}"`],
@@ -117,7 +117,7 @@ code=$?
 
       // Run phase: lock egress down to our ingest host (+ Anthropic with the key brokered at the firewall).
       const allow: Record<string, { transform?: { headers: Record<string, string> }[] }[]> = { [appHost]: [] };
-      const key = apiKey || (meta.llm === "anthropic" ? process.env.AUTOTABML_SERVER_ANTHROPIC_KEY : undefined);
+      const key = apiKey || (meta.llm === "anthropic" ? process.env.AUTOTINKER_SERVER_ANTHROPIC_KEY : undefined);
       if (meta.llm === "anthropic" && key) allow["api.anthropic.com"] = [{ transform: [{ headers: { "x-api-key": key } }] }];
       await sandbox.update({ networkPolicy: { allow } as NetworkPolicy });
 
@@ -127,8 +127,8 @@ code=$?
         cwd: WORKDIR,
         detached: true,
         env: {
-          AUTOTABML_INGEST_URL: `${publicUrl()}/api/runs/${meta.id}/ingest`,
-          AUTOTABML_INGEST_TOKEN: token,
+          AUTOTINKER_INGEST_URL: `${publicUrl()}/api/runs/${meta.id}/ingest`,
+          AUTOTINKER_INGEST_TOKEN: token,
           PYTHONUNBUFFERED: "1",
           // Placeholder so the SDK client initialises; the real key is injected by the firewall.
           ...(meta.llm === "anthropic" ? { ANTHROPIC_API_KEY: "brokered-by-vercel-firewall" } : {}),

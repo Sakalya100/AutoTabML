@@ -22,7 +22,7 @@ export interface Runner {
 
 /** The engine CLI arguments after `python`. Shared by both runners so they run the same command. */
 export function engineArgs(o: { csvPath: string; target: string; llmSpec: string; maxExperiments: number; outDir: string; description?: string }): string[] {
-  const args = ["-m", "autotabml", "evolve", o.csvPath, "--target", o.target, "--llm", o.llmSpec, "--max-experiments", String(o.maxExperiments), "--out", o.outDir, "--max-cost", process.env.AUTOTABML_MAX_COST_USD || "1", "--events-stdout"];
-  if (o.description && process.env.AUTOTABML_PASS_DESCRIPTION !== "0") args.push("--description", o.description);
+  const args = ["-m", "autotinker", "evolve", o.csvPath, "--target", o.target, "--llm", o.llmSpec, "--max-experiments", String(o.maxExperiments), "--out", o.outDir, "--max-cost", process.env.AUTOTINKER_MAX_COST_USD || "1", "--events-stdout"];
+  if (o.description && process.env.AUTOTINKER_PASS_DESCRIPTION !== "0") args.push("--description", o.description);
   return args;
 }

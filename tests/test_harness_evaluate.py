@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from autotabml.contracts import HarnessProtocol, Metric, ProblemType, TaskSpec
-from autotabml.data import load_source
-from autotabml.harness import CONTRACT_DOC, STARTER_SOLUTION, Harness
+from autotinker.contracts import HarnessProtocol, Metric, ProblemType, TaskSpec
+from autotinker.data import load_source
+from autotinker.harness import CONTRACT_DOC, STARTER_SOLUTION, Harness
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
 

@@ -13,7 +13,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from autotabml.obs.record import RunRecord
+from autotinker.obs.record import RunRecord
 
 ROOT = Path(__file__).resolve().parent.parent
 REPLAYS = ROOT / "web/public/replays"

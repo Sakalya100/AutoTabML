@@ -40,6 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# AutoTabML dev data (runs, uploads)
+# AutoTinker dev data (runs, uploads)
 /.data/
 !.env.example

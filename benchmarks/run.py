@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 from sklearn import datasets as skd
 
-from autotabml import AutoTabML
+from autotinker import AutoTinker
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -42,7 +42,7 @@ def run_one(name: str, system: str, llm: str, max_exp: int, workdir: Path) -> di
     load, target = DATASETS[name]
     df = load()
     gate = "naive" if system == "evolve_naive" else "stat"
-    at = AutoTabML(llm=llm, workdir=workdir, gate=gate)
+    at = AutoTinker(llm=llm, workdir=workdir, gate=gate)
     t0 = time.time()
     if system == "starter":
         run = at.evolve(df, target, max_experiments=1, until="budget", run_id=f"{name}-{system}")

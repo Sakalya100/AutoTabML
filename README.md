@@ -1,6 +1,8 @@
-# AutoTabML
+# AutoTinker
 
-**A self-improving agent for tabular ML.** AutoTabML writes a readable scikit-learn pipeline, runs it in a sandbox, and keeps improving it until it can show the remaining gains are just noise. You get code you own, a full record of every experiment, and an honest estimate of how well the result will do on unseen data.
+*Thinks of an idea. Tries it. Keeps what works.*
+
+**A self-improving agent for tabular ML.** AutoTinker writes a readable scikit-learn pipeline, runs it in a sandbox, and keeps improving it until it can show the remaining gains are just noise. You get code you own, a full record of every experiment, and an honest estimate of how well the result will do on unseen data.
 
 It takes the loop from Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) (a fixed harness, one file the agent may edit, keep or revert, repeat) and applies it to tabular data. It also adds the two things that loop lacks:
 
@@ -9,7 +11,7 @@ It takes the loop from Karpathy's [autoresearch](https://github.com/karpathy/aut
 
 A locked test split is scored **once**, at the very end. The **optimism gap** (selection score minus test score) shows how much the loop fooled itself.
 
-> v2 is a ground-up rewrite. The 2024 v1 (a Streamlit + CrewAI code generator) is in the git history before the `v2` branch.
+> Formerly **AutoTabML**. v2 is a ground-up rewrite under the new name; the 2024 v1 (a Streamlit + CrewAI code generator) is in the git history before the `v2` branch.
 
 ---
 
@@ -17,24 +19,24 @@ A locked test split is scored **once**, at the very end. The **optimism gap** (s
 
 ```bash
 uv sync                                  # Python 3.11+
-uv run autotabml evolve examples/data/housing_regression.csv --target price
+uv run autotinker evolve examples/data/housing_regression.csv --target price
 ```
 
-Without `ANTHROPIC_API_KEY` set, AutoTabML uses an **offline heuristic proposer**. It mutates the pipeline from a fixed bank of ideas, needs no LLM, and labels its runs that way. With a key:
+Without `ANTHROPIC_API_KEY` set, AutoTinker uses an **offline heuristic proposer**. It mutates the pipeline from a fixed bank of ideas, needs no LLM, and labels its runs that way. With a key:
 
 ```bash
 export ANTHROPIC_API_KEY=...
-uv run autotabml evolve data.csv --target churn --llm anthropic:claude-sonnet-5-5 \
+uv run autotinker evolve data.csv --target churn --llm anthropic:claude-sonnet-5-5 \
     --description "monthly churn for a telecom" --max-experiments 60 --max-cost 3
-uv run autotabml replay runs/<run-id>/run.json      # the ledger and stop report
+uv run autotinker replay runs/<run-id>/run.json      # the ledger and stop report
 ```
 
 ### SDK
 
 ```python
-from autotabml import AutoTabML
+from autotinker import AutoTinker
 
-at = AutoTabML(llm="anthropic:claude-sonnet-5-5")          # or "heuristic", "openai:…", "groq:…"
+at = AutoTinker(llm="anthropic:claude-sonnet-5-5")          # or "heuristic", "openai:…", "groq:…"
 run = at.evolve("train.csv", target="price", until="ceiling", max_cost_usd=3, on_event=print)
 
 run.leaderboard      # every experiment: idea, CV mean ± SE, select score, decision, reason
@@ -113,7 +115,7 @@ uv sync && uv run pytest -q && uv run ruff check src tests && uv run mypy
 cd web && npm ci && npm run lint && npm test && npm run build
 ```
 
-The layout: `src/autotabml/{data,harness,agent,evolve,obs}`, `api.py` (SDK), `cli.py`; `web/` (Next.js); `benchmarks/`; `schema/` (generated JSON Schemas); [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The layout: `src/autotinker/{data,harness,agent,evolve,obs}`, `api.py` (SDK), `cli.py`; `web/` (Next.js); `benchmarks/`; `schema/` (generated JSON Schemas); [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Contributors
 

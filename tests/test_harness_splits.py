@@ -6,9 +6,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from autotabml.contracts import ProblemType, TaskSpec
-from autotabml.data import load_source, resolve_task
-from autotabml.harness.splits import make_splits, persist_splits
+from autotinker.contracts import ProblemType, TaskSpec
+from autotinker.data import load_source, resolve_task
+from autotinker.harness.splits import make_splits, persist_splits
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
 

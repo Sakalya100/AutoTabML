@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from autotabml.data import DataSourceError, load_dataframe, load_source
+from autotinker.data import DataSourceError, load_dataframe, load_source
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
 
@@ -53,12 +53,12 @@ def test_optional_packages_give_helpful_error() -> None:
     try:
         import openml  # noqa: F401
     except ImportError:
-        with pytest.raises(DataSourceError, match="autotabml\\[openml\\]"):
+        with pytest.raises(DataSourceError, match="autotinker\\[openml\\]"):
             load_source("openml:61")
     try:
         import kagglehub  # noqa: F401
     except ImportError:
-        with pytest.raises(DataSourceError, match="autotabml\\[kaggle\\]"):
+        with pytest.raises(DataSourceError, match="autotinker\\[kaggle\\]"):
             load_source("kaggle:owner/dataset")
 
 

@@ -11,9 +11,9 @@ const body = Instrument_Sans({ variable: "--font-body", subsets: ["latin"] });
 const code = JetBrains_Mono({ variable: "--font-code", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "AutoTabML — a tabular ML agent that knows when to stop", template: "%s · AutoTabML" },
+  title: { default: "AutoTinker — a tabular ML agent that knows when to stop", template: "%s · AutoTinker" },
   description:
-    "AutoTabML evolves a readable ML pipeline for your table, keeps only statistically real gains, stops at the problem's ceiling, and reports how much it overfit.",
+    "AutoTinker evolves a readable ML pipeline for your table, keeps only statistically real gains, stops at the problem's ceiling, and reports how much it overfit.",
 };
 
 // Runs before paint so there is no light/dark flash. Stored choice wins; otherwise follow the system.
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="border-b border-rule">
           <div className="mx-auto flex max-w-[1240px] items-center gap-6 px-4 py-3 sm:px-6">
             <Link href="/" className="font-display text-[1.6rem] leading-none tracking-tight">
-              AutoTab<span className="italic text-best">ML</span>
+              Auto<span className="italic text-best">Tinker</span>
             </Link>
             <nav className="ml-auto flex items-center gap-1 text-sm sm:gap-2">
               <Link href="/replays" className="rounded px-2 py-1.5 text-ink-2 hover:text-ink">
@@ -48,7 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="flex-1">{children}</div>
         <footer className="border-t border-rule">
           <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-6 text-sm text-ink-3 sm:px-6">
-            <span>AutoTabML v2 · MIT</span>
+            <span>AutoTinker v2 · MIT</span>
             <a href={GITHUB_URL} className="hover:text-ink">
               Source
             </a>

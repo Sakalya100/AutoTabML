@@ -6,13 +6,13 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from autotabml.cli import app
-from autotabml.obs.events import parse_event
+from autotinker.cli import app
+from autotinker.obs.events import parse_event
 
 DATA = Path(__file__).resolve().parents[1] / "examples" / "data" / "iris_na_classification.csv"
 
 try:
-    import autotabml.harness as _h
+    import autotinker.harness as _h
 
     HAVE_HARNESS = hasattr(_h, "Harness")
 except ImportError:
@@ -36,9 +36,9 @@ def test_schema(tmp_path: Path) -> None:
 
 
 def test_replay_of_fake_run(tmp_path: Path) -> None:
-    from autotabml.agent.heuristic import HeuristicProposer
-    from autotabml.evolve.loop import evolve
-    from autotabml.evolve.stopping import StopRule
+    from autotinker.agent.heuristic import HeuristicProposer
+    from autotinker.evolve.loop import evolve
+    from autotinker.evolve.stopping import StopRule
     from tests.conftest import FakeHarness
 
     evolve(

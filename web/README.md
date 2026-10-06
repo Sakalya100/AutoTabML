@@ -1,6 +1,6 @@
-# AutoTabML web
+# AutoTinker web
 
-The hosted demo and observability UI for AutoTabML v2: watch a recorded run evolve, or upload a CSV and watch a live one. One Next.js (App Router) project; its route handlers are the backend. The Python engine always runs **out of process** through a pluggable runner. The UI is only a client of the engine's JSONL event stream (`src/autotabml/obs/events.py`).
+The hosted demo and observability UI for AutoTinker v2: watch a recorded run evolve, or upload a CSV and watch a live one. One Next.js (App Router) project; its route handlers are the backend. The Python engine always runs **out of process** through a pluggable runner. The UI is only a client of the engine's JSONL event stream (`src/autotinker/obs/events.py`).
 
 ## Develop
 
@@ -13,17 +13,17 @@ npm run dev            # http://localhost:3000
 Replays work with nothing else installed. Live runs use the **local runner**, which needs [`uv`](https://docs.astral.sh/uv/) and the Python package in the repo root (`uv sync` there once). The runner spawns:
 
 ```
-uv run --project <repo root> python -m autotabml evolve <csv> --target <t> --llm <spec> \
+uv run --project <repo root> python -m autotinker evolve <csv> --target <t> --llm <spec> \
   --max-experiments N --max-cost <usd> --out web/.data/runs/<id>/out --events-stdout [--description …]
 ```
 
-and stores stdout events in `web/.data/runs/<id>/events.jsonl`. Override the command with `AUTOTABML_PYTHON_CMD`. To work on the UI without Python, set `AUTOTABML_PYTHON_CMD="node scripts/fake-engine.mjs"`. It replays the hand-written fixture in `scripts/fixtures/` as if it were live. **It is not the engine.**
+and stores stdout events in `web/.data/runs/<id>/events.jsonl`. Override the command with `AUTOTINKER_PYTHON_CMD`. To work on the UI without Python, set `AUTOTINKER_PYTHON_CMD="node scripts/fake-engine.mjs"`. It replays the hand-written fixture in `scripts/fixtures/` as if it were live. **It is not the engine.**
 
 | script | what it does |
 |---|---|
 | `npm run lint` / `npm run typecheck` / `npm run build` | ESLint, `tsc --noEmit`, production build |
 | `npm test` | vitest: event parsing, metric orientation, stores, upload validation, run-state reducer |
-| `npm run gen:types` | regenerate `src/lib/schema.ts` from `../schema/*.schema.json` (run after `python -m autotabml.obs.schema`) |
+| `npm run gen:types` | regenerate `src/lib/schema.ts` from `../schema/*.schema.json` (run after `python -m autotinker.obs.schema`) |
 | `npm run validate:replays` | validate `public/replays/*` against the JSON Schemas (ajv) plus cross-file checks |
 | `node scripts/make-fixture-replay.mjs` | rebuild the hand-written iris fixture replay |
 
@@ -48,9 +48,9 @@ From the repo root: `uv run python benchmarks/export_replays.py runs/<run-dir>:<
 
 - **Root Directory:** `web`. Framework preset: Next.js.
 - **Store:** set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The file store does not work on serverless.
-- **Runner:** `vercel-sandbox` is chosen automatically on Vercel. Set `AUTOTABML_PUBLIC_URL` (where the sandbox posts events) and optionally `AUTOTABML_SANDBOX_PACKAGE` (defaults to the GitHub `v2` branch). Deployment Protection must let the sandbox reach `/api/runs/*/ingest`.
-- **Replays-only demo:** set `AUTOTABML_LIVE_RUNS=0`.
-- **Limits:** Vercel Sandbox sessions run for at most 45 min on Hobby and 24 h on Pro/Enterprise (`AUTOTABML_SANDBOX_TIMEOUT_MS`, default 45 min). Each vCPU comes with 2 GB of RAM. The per-IP rate limit is in memory and applies per function instance, so move it to Redis before relying on it.
+- **Runner:** `vercel-sandbox` is chosen automatically on Vercel. Set `AUTOTINKER_PUBLIC_URL` (where the sandbox posts events) and optionally `AUTOTINKER_SANDBOX_PACKAGE` (defaults to the GitHub `v2` branch). Deployment Protection must let the sandbox reach `/api/runs/*/ingest`.
+- **Replays-only demo:** set `AUTOTINKER_LIVE_RUNS=0`.
+- **Limits:** Vercel Sandbox sessions run for at most 45 min on Hobby and 24 h on Pro/Enterprise (`AUTOTINKER_SANDBOX_TIMEOUT_MS`, default 45 min). Each vCPU comes with 2 GB of RAM. The per-IP rate limit is in memory and applies per function instance, so move it to Redis before relying on it.
 
 See `.env.example` for every variable.
 

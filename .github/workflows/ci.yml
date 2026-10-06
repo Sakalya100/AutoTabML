@@ -23,7 +23,7 @@ jobs:
       - run: uv run pytest -q
       - name: Schemas are up to date
         run: |
-          uv run python -m autotabml.obs.schema
+          uv run python -m autotinker.obs.schema
           git diff --exit-code schema/
 
   web:

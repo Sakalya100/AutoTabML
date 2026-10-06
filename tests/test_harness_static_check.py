@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from autotabml.harness import STARTER_SOLUTION, allowed_imports, static_check
+from autotinker.harness import STARTER_SOLUTION, allowed_imports, static_check
 
 OK_HEAD = "from sklearn.linear_model import LogisticRegression\n"
 

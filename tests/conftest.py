@@ -6,7 +6,7 @@ import re
 import numpy as np
 import pytest
 
-from autotabml.contracts import (
+from autotinker.contracts import (
     ColumnKind,
     ColumnProfile,
     CVScore,
@@ -41,7 +41,7 @@ def make_profile(problem: ProblemType = ProblemType.multiclass) -> DataProfile:
 
 
 class FakeHarness:
-    """Deterministic stand-in for autotabml.harness.Harness.
+    """Deterministic stand-in for autotinker.harness.Harness.
 
     Score comes from a `# fake-score: <float>` marker in the code (default 0.5, plus a tiny hash jitter);
     code containing `CRASH` fails with a runtime error. score_test may be called once."""

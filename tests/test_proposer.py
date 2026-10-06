@@ -4,13 +4,13 @@ import ast
 
 import pytest
 
-from autotabml.agent.context import KeptSolution, ProposalContext
-from autotabml.agent.heuristic import HeuristicProposer, default_spec, parse_spec, render
-from autotabml.contracts import IdeaCategory, ProblemType
+from autotinker.agent.context import KeptSolution, ProposalContext
+from autotinker.agent.heuristic import HeuristicProposer, default_spec, parse_spec, render
+from autotinker.contracts import IdeaCategory, ProblemType
 from tests.conftest import make_profile
 
 try:
-    from autotabml.harness.static_check import static_check
+    from autotinker.harness.static_check import static_check
 except ImportError:  # harness not built yet
     static_check = None  # type: ignore[assignment]
 

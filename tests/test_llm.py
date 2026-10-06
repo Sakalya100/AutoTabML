@@ -5,9 +5,9 @@ import json
 import httpx
 import pytest
 
-from autotabml.agent import prompts
-from autotabml.agent.context import ProposalContext
-from autotabml.agent.llm import (
+from autotinker.agent import prompts
+from autotinker.agent.context import ProposalContext
+from autotinker.agent.llm import (
     AnthropicLLM,
     LLMError,
     OpenAICompatLLM,
@@ -16,8 +16,8 @@ from autotabml.agent.llm import (
     make_llm,
     price_for,
 )
-from autotabml.agent.proposer import LLMProposer, ProposalFailed
-from autotabml.contracts import IdeaCategory
+from autotinker.agent.proposer import LLMProposer, ProposalFailed
+from autotinker.contracts import IdeaCategory
 from tests.conftest import make_profile
 
 CODE = "def build_pipeline(profile):\n    return None  # long enough code"

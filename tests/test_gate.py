@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from autotabml.contracts import CVScore, Decision, ExecResult
-from autotabml.evolve.gate import Candidate, NaiveGate, StatGate, naive_gate, paired_one_sided_p
+from autotinker.contracts import CVScore, Decision, ExecResult
+from autotinker.evolve.gate import Candidate, NaiveGate, StatGate, naive_gate, paired_one_sided_p
 
 
 def res(folds: list[float], select: float | None = None, fit: float = 1.0) -> ExecResult:

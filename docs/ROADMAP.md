@@ -1,4 +1,4 @@
-# AutoTabML v2 — Execution Roadmap
+# AutoTinker v2 — Execution Roadmap
 
 > **One-line pitch:** an AI agent that keeps improving its own ML pipeline for a tabular problem, without supervision, until it can show the remaining gains are just noise. It runs every experiment in a sandbox, scores each one against data it never gets to see, records everything it does, and outputs readable code you own.
 
@@ -33,7 +33,7 @@ Status: planning · Drafted 2026-10-06
 ## 1. Target architecture
 
 ```
-                ┌──────────────────────────── autotabml (PyPI) ─────────────────────────────┐
+                ┌──────────────────────────── autotinker (PyPI) ─────────────────────────────┐
  data sources   │                                                                            │
  CSV / pandas ─►│ DataSource ─► Profiler ─► TaskSpec ─► Harness (READ-ONLY to the agent)     │
  OpenML       ─►│   adapters     (stats,     (target,     • fixed splits: dev / select / LOCKED test
@@ -56,7 +56,7 @@ Status: planning · Drafted 2026-10-06
 ### Package layout
 
 ```
-autotabml/
+autotinker/
   data/        sources.py (csv, pandas, openml, kaggle), profiler.py
   task.py      TaskSpec (target, problem type, metric, budgets)
   harness/     splits.py, scorer.py, sandbox.py, contract.py
@@ -91,10 +91,10 @@ The harness does all fitting, cross-validation and scoring. The agent can't read
 | Phase | Theme | Rough effort (part-time) | Done when |
 |---|---|---|---|
 | 0 | Clean-up and foundations | 1 week | Packaging, CI and tests are set up; old app moved to `legacy/` |
-| 1 | Core harness and single-shot agent with repair | 2–3 weeks | `autotabml run iris.csv --target species` produces a scored `solution.py` in a sandbox |
+| 1 | Core harness and single-shot agent with repair | 2–3 weeks | `autotinker run iris.csv --target species` produces a scored `solution.py` in a sandbox |
 | 2 | Benchmark v0 and baselines | 1 week | Score table for 15–20 OpenML datasets against sklearn, FLAML and AutoGluon |
 | 3 | **Self-evolution loop and ceiling detection** | 3–4 weeks | `evolve(until="ceiling")` runs overnight, stops on its own, and reports how much it overfit the validation set |
-| 4 | SDK, CLI and PyPI 0.1 | 1–2 weeks | `pip install autotabml` works; docs site is live |
+| 4 | SDK, CLI and PyPI 0.1 | 1–2 weeks | `pip install autotinker` works; docs site is live |
 | 5 | Observability UI and hosted demo | 3 weeks | Public demo with a live evolution chart, experiment tree, diffs, cost and replays |
 | 6 | Kaggle integration | 2 weeks | Point it at a Kaggle dataset or competition and it fetches the data, evolves a solution and optionally submits |
 | 7 | Write-up and launch | 1 week | Technical blog post or report, demo video, README with the score table |
@@ -108,7 +108,7 @@ Phases 0 → 3 are the core. Phases 4–7 make it usable and visible. **Don't st
 **Tasks**
 - [ ] Move `app.py`, `autotabml_agents.py` and `autotabml_tasks.py` into `legacy/`. Add a note in the README saying v2 is in progress.
 - [ ] Take down the sleeping Hugging Face Space, or point it at a "v2 coming" page. Its model, `llama3-70b-8192`, has probably been retired by Groq.
-- [ ] Set up `pyproject.toml` (hatchling), `uv`, `ruff`, `mypy` (strict on `autotabml/`), `pytest`, `pre-commit`.
+- [ ] Set up `pyproject.toml` (hatchling), `uv`, `ruff`, `mypy` (strict on `autotinker/`), `pytest`, `pre-commit`.
 - [ ] Add GitHub Actions: lint, type-check and tests on Python 3.11–3.13.
 - [ ] Remove `tensorflow`. Pin dependencies through a lockfile.
 - [ ] `CONTRIBUTING.md` and `CHANGELOG.md`. Keep the 2024 contributors credited.
@@ -162,7 +162,7 @@ Phases 0 → 3 are the core. Phases 4–7 make it usable and visible. **Don't st
 - [ ] `RunRecord` is a JSON file covering: task, profile, every attempt (code, diff, scores, error, tokens, cost, time), and the final test score.
 - [ ] OpenTelemetry spans: `run > experiment > {llm_call, static_check, sandbox_exec, score}`. They follow the GenAI conventions and can be sent anywhere that accepts OTLP.
 
-**Done when:** `autotabml run iris.csv --target species` and `autotabml run openml:31` each produce a scored `solution.py`, a `RunRecord`, and traces visible in local Phoenix or Langfuse. Tests cover splits, the scorer, the sandbox's timeout and memory kills, the static checks, and a mocked LLM.
+**Done when:** `autotinker run iris.csv --target species` and `autotinker run openml:31` each produce a scored `solution.py`, a `RunRecord`, and traces visible in local Phoenix or Langfuse. Tests cover splits, the scorer, the sandbox's timeout and memory kills, the static checks, and a mocked LLM.
 
 ---
 
@@ -254,9 +254,9 @@ For every evolve run, report:
 ## Phase 4 — SDK, CLI and PyPI release (≈1–2 weeks)
 
 ```python
-from autotabml import AutoTabML
+from autotinker import AutoTinker
 
-at = AutoTabML(llm="claude-sonnet-5-5", sandbox="local")
+at = AutoTinker(llm="claude-sonnet-5-5", sandbox="local")
 run = at.evolve("train.csv", target="price", until="ceiling",
                 max_hours=4, max_cost_usd=3, on_event=print)
 
@@ -270,16 +270,16 @@ run.export("pipeline/")  # solution.py + fitted model + requirements + report.ht
 
 - [ ] An event stream (`on_event` callback plus an async iterator) that the CLI and server both use. Event types: `experiment_started`, `llm_call`, `sandbox_output`, `scored`, `decision`, `stopped`.
 - [ ] CLI:
-  - `autotabml run|evolve <source> --target ...`
-  - `autotabml replay run.json`
-  - `autotabml report run.json`
+  - `autotinker run|evolve <source> --target ...`
+  - `autotinker replay run.json`
+  - `autotinker report run.json`
   - Live terminal view built with `rich`.
-- [ ] `autotabml export` produces a standalone project that doesn't need autotabml to run. "Code you own" is part of the pitch.
+- [ ] `autotinker export` produces a standalone project that doesn't need autotinker to run. "Code you own" is part of the pitch.
 - [ ] Docs with mkdocs-material: a quickstart, the harness design, the stopping rule and the benchmark results.
-- [ ] Publish to PyPI from GitHub Actions using trusted publishing. The name `autotabml` was confirmed free on 2026-10-06.
-- [ ] Optional extras: `autotabml[kaggle]`, `autotabml[docker]`, `autotabml[otel]`, `autotabml[server]`.
+- [ ] Publish to PyPI from GitHub Actions using trusted publishing. The name `autotinker` was confirmed free on 2026-10-06.
+- [ ] Optional extras: `autotinker[kaggle]`, `autotinker[docker]`, `autotinker[otel]`, `autotinker[server]`.
 
-**Done when:** `pip install autotabml && autotabml evolve openml:31 --target class` works in a fresh virtual environment.
+**Done when:** `pip install autotinker && autotinker evolve openml:31 --target class` works in a fresh virtual environment.
 
 ---
 
@@ -331,7 +331,7 @@ run.export("pipeline/")  # solution.py + fitted model + requirements + report.ht
   - The license is checked.
   - The harness checks the join for leakage: the join key must not encode the target, and coverage is checked.
 
-**Done when:** `autotabml evolve kaggle:competition:<slug>` downloads the data, evolves a solution until it hits the ceiling, and (with confirmation) submits and reports the public leaderboard score.
+**Done when:** `autotinker evolve kaggle:competition:<slug>` downloads the data, evolves a solution until it hits the ceiling, and (with confirmation) submits and reports the public leaderboard score.
 
 ---
 
@@ -346,7 +346,7 @@ run.export("pipeline/")  # solution.py + fitted model + requirements + report.ht
 
 ## 8. Resume bullets this plan aims to earn (fill in real numbers)
 
-- Built **AutoTabML**, an open-source self-improving agent for tabular ML (autoresearch-style loop). It keeps or reverts changes using paired statistical tests and **stops on its own at a detected performance ceiling**. Reached **X%** of AutoGluon's score on **N** OpenML datasets with readable, exportable code at **$Y** per run.
+- Built **AutoTinker**, an open-source self-improving agent for tabular ML (autoresearch-style loop). It keeps or reverts changes using paired statistical tests and **stops on its own at a detected performance ceiling**. Reached **X%** of AutoGluon's score on **N** OpenML datasets with readable, exportable code at **$Y** per run.
 - Measured validation overfitting in self-improving agent loops. Using a statistical keep/revert gate and a separate selection holdout cut the select-to-test optimism gap by **Z%** compared with an autoresearch-style naive gate.
 - Shipped it as a PyPI SDK and CLI with OpenTelemetry-native tracing, plus a hosted UI that streams each run's live evolution chart, experiment tree and cost.
 - Added Kaggle integration (dataset and competition download, license checks, optional submission). The leaderboard score serves as an external ceiling signal.

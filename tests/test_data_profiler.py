@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autotabml.contracts import ColumnKind, DataProfile, Metric, ProblemType, TaskSpec
-from autotabml.data import infer_problem_type, load_source, profile_dataframe
+from autotinker.contracts import ColumnKind, DataProfile, Metric, ProblemType, TaskSpec
+from autotinker.data import infer_problem_type, load_source, profile_dataframe
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
 
