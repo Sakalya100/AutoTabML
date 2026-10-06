@@ -1,165 +1,124 @@
-[<img src="https://github.com/Sakalya100/AutoTabML/blob/main/Sample%20Data/AutoTabML%20Automated%20Code%20generation%20Using%20ML.png" width="5000px;"/>](https://github.com/Sakalya100)
-# AutoTabML - Automated Machine Learning Code Generator for Tabular Data
+# AutoTabML
 
-AutoTabML is an innovative application designed to automate the generation of machine learning code for tabular data. Utilizing CrewAI and the Groq Llama 70B model, AutoTabML simplifies the process of building and debugging machine learning models for both regression and classification problems. With this tool, you can generate working code, debug errors, and run your code without writing a single line of code manually.
+**A self-improving agent for tabular ML.** AutoTabML writes a readable scikit-learn pipeline, runs it in a sandbox, and keeps improving it until it can show the remaining gains are just noise. You get code you own, a full record of every experiment, and an honest estimate of how well the result will do on unseen data.
 
-## Try the Application
-The AutoTabML Application is hosted on HuggingFace Spaces for anyone to go and test this amazing functionality.
-[<img src="https://github.com/Sakalya100/AutoTabML/blob/main/Sample%20Data/5229488.png" width="200px;"/>](https://huggingface.co/spaces/Sakalya122/AutoTabML)
-## Features
-- **Automated Code Generation**: Generate Python code for machine learning tasks based on your tabular dataset and problem description.
-- **EDA and Feature Engineering**: Perform comprehensive Exploratory Data Analysis (EDA) and feature engineering.
-- **Model Recommendation**: Get suggestions for the most suitable machine learning models for your problem.
-- **Code Modification and Debugging**: Modify generated code based on user suggestions and debug errors effortlessly.
-- **In-app Execution**: Run the generated code within the application and view the results without the need for external IDEs or additional installations.
+It takes the loop from Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) (a fixed harness, one file the agent may edit, keep or revert, repeat) and applies it to tabular data. It also adds the two things that loop lacks:
 
-## How It Works
+1. **A keep/revert rule that doesn't overfit.** A change is kept only if it wins a *corrected* paired t-test across identical CV folds. It must also be bigger than the noise and must not get worse on a separate selection holdout.
+2. **A principled stopping point.** The loop stops when four "ceiling" signals agree: the noise floor, a saturation-curve fit, exhausted exploration, and an optional external reference. It then writes a report explaining why.
 
-AutoTabML leverages multiple agents, each specializing in different aspects of the machine learning pipeline. Here's a brief overview of the agents and their roles:
+A locked test split is scored **once**, at the very end. The **optimism gap** (selection score minus test score) shows how much the loop fooled itself.
 
-- **Data Reader Agent**: Reads and loads the uploaded dataset.
-- **Problem Definition Agent**: Clarifies the machine learning problem based on user input.
-- **EDA Agent**: Performs exploratory data analysis to understand data characteristics.
-- **Feature Engineering Agent**: Executes feature engineering based on EDA results.
-- **Model Recommendation Agent**: Suggests the most suitable machine learning models.
-- **Starter Code Generator Agent**: Generates the initial Python code template for the project.
-- **Code Modification Agent**: Adapts the generated code according to user feedback.
-- **Code Debugger Agent**: Debugs the generated code to fix any issues.
-- **Compiler Agent**: Extracts and compiles the Python code.
-
-## Technology Used
-[<img src="https://user-images.githubusercontent.com/25181517/183423507-c056a6f9-1ba8-4312-a350-19bcbc5a8697.png" width="50px;"/>](https://github.com/shalusingh-tech) [<img src="https://user-images.githubusercontent.com/7164864/217935870-c0bc60a3-6fc0-4047-b011-7b4c59488c91.png" width="60px;"/>](https://github.com/shalusingh-tech)  [<img src="https://github.com/joaomdmoura/crewAI/blob/main/docs/crewai_logo.png" width="60px;"/>](https://github.com/shalusingh-tech)  [<img src="https://github.com/groq/groq-api-cookbook/blob/main/images/groq-logo.png" width="50px;"/>](https://github.com/shalusingh-tech)  
-
-## Demo
-
-### Classification Demo
-https://github.com/Sakalya100/AutoTabML/assets/70064084/e157cd32-eb3f-44f1-a6da-b71e8367e3e7
-
-### Regression Demo
-https://github.com/Sakalya100/AutoTabML/assets/70064084/6ffcc9c5-4a8e-4d8b-b9f6-0eae93b39c33
-
-
-## Getting Started
-
-### Prerequisites
-
-- Required Python packages (listed in `requirements.txt`)
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/Sakalya100/AutoTabML.git
-   cd AutoTabML
-   ```
-
-2. Create and activate a virtual environment:
-
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. Install the required packages:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Set up the environment variables by creating a `.env` file in the root directory and adding your Groq API key:
-
-   ```
-   GROQ_API_KEY=your_groq_api_key
-   ```
-
-### Usage
-
-1. Run the Streamlit application:
-
-   ```bash
-   streamlit run app.py
-   ```
-
-2. Open your web browser and go to `http://localhost:8501`.
-
-3. Describe your machine learning problem and upload a sample CSV of your dataset.
-
-4. Click on "Process" to generate the initial code. You can then modify, debug, and run the code directly within the application.
-
-### Example Workflow
-
-1. **Describe Your Problem**: Enter a detailed description of the machine learning problem you want to solve.
-2. **Upload Dataset**: Upload your dataset in CSV format.
-3. **Generate Code**: Click the "Process" button to generate the initial Python code.
-4. **Modify and Debug**: Use the provided text areas to suggest code modifications or paste error messages for debugging.
-5. **Run the Code**: Execute the generated code and view the results, including any plots or outputs generated during execution.
+> v2 is a ground-up rewrite. The 2024 v1 (a Streamlit + CrewAI code generator) is in the git history before the `v2` branch.
 
 ---
-## Contributions
 
-We welcome contributions to AutoTabML! Whether you're fixing bugs, adding new features, improving documentation, or providing examples, your help is greatly appreciated.
+## Quickstart
 
-### How to Contribute
+```bash
+uv sync                                  # Python 3.11+
+uv run autotabml evolve examples/data/housing_regression.csv --target price
+```
 
-1. **Fork the Repository**: Click the "Fork" button at the top-right corner of this repository to create a copy of the repository under your own GitHub account.
+Without `ANTHROPIC_API_KEY` set, AutoTabML uses an **offline heuristic proposer**. It mutates the pipeline from a fixed bank of ideas, needs no LLM, and labels its runs that way. With a key:
 
-2. **Clone Your Fork**: Clone your fork to your local machine using the following command:
+```bash
+export ANTHROPIC_API_KEY=...
+uv run autotabml evolve data.csv --target churn --llm anthropic:claude-sonnet-5-5 \
+    --description "monthly churn for a telecom" --max-experiments 60 --max-cost 3
+uv run autotabml replay runs/<run-id>/run.json      # the ledger and stop report
+```
 
-    ```bash
-    git clone https://github.com/Sakalya100/AutoTabML.git
-    cd AutoTabML
-    ```
+### SDK
 
-3. **Create a Branch**: Create a new branch for your changes:
+```python
+from autotabml import AutoTabML
 
-    ```bash
-    git checkout -b feature-or-bugfix-name
-    ```
+at = AutoTabML(llm="anthropic:claude-sonnet-5-5")          # or "heuristic", "openai:…", "groq:…"
+run = at.evolve("train.csv", target="price", until="ceiling", max_cost_usd=3, on_event=print)
 
-4. **Make Your Changes**: Implement your changes in the new branch.
+run.leaderboard      # every experiment: idea, CV mean ± SE, select score, decision, reason
+run.best.code        # the winning solution.py
+run.stop_report      # which ceiling signals fired, with numbers
+run.test_score       # the locked holdout, scored once
+run.export("model/") # solution.py + standalone train.py + requirements + run.json
+```
 
-5. **Test Your Changes**: Ensure your changes are tested and working as expected. Run the application to verify.
+## How it works
 
-6. **Commit Your Changes**: Commit your changes with a clear and concise commit message:
+```
+ data ─► Profiler ─► Harness (read-only to the agent) ◄─────────────────────────┐
+          compact      dev / select / LOCKED test split                          │
+          profile,     repeated k-fold CV · sandboxed subprocess · scoring       │ ExecResult
+          no raw rows                                                            │
+                         Agent ── idea + new solution.py ──► static check ──► sandbox
+                           ▲                                                     │
+                           └── ledger + idea memory ◄── gate (keep/revert) ◄─────┘
+                                                         stop rule (ceiling?) ──► score test once
+```
 
-    ```bash
-    git add .
-    git commit -m "Description of your changes"
-    ```
+| Part | What it does |
+|---|---|
+| **Profiler** | Column types, missing values, cardinality, skew, target balance, and flags for ID-like or leaky columns. The LLM sees only this summary and at most 5 sample rows, never the full table. |
+| **Solution contract** | The agent edits one file, `solution.py`, which defines `build_pipeline(profile) -> sklearn estimator`. The harness does all fitting and scoring, so the agent never touches the data files and can't score its own splits. |
+| **Static check** | AST checks against an import allowlist. They block file and network IO, `eval`/`exec`, dunder tricks, and `.fit` calls outside the pipeline (a common cause of leakage). |
+| **Sandbox** | A separate process group with a wall-clock timeout, an RSS-watchdog memory limit (macOS ignores `RLIMIT_AS`), network blocked, an environment with no secrets, and a fresh temp directory. The worker returns only predictions. Labels for the select and test splits never leave the parent process. |
+| **Gate** | Keep only if all three hold: the Nadeau–Bengio corrected paired t-test gives p < 0.1; the gain is at least 0.5 × the best's CV SE; and the select holdout doesn't get worse. A simplicity rule also keeps "same score, clearly simpler or faster" changes. `gate="naive"` (keep any improvement, autoresearch-style) is available for ablations. |
+| **Stop rule** | Stop when all four signals fire: (1) recent kept gains are below the CV SE; (2) a fitted `a − b·e^(−ct)` curve predicts less than one SE of remaining gain; (3) K radical attempts since the last keep have failed; (4) the score is within ε of an external reference, if one is given. Budgets (experiments, $, time) always cap the run. |
+| **Observability** | Every step emits a typed JSONL event ([schema](schema/events.schema.json)). Each run writes a replayable `run.json` (code, diffs, scores, decisions, tokens, cost). OpenTelemetry spans are available with the `otel` extra. |
 
-7. **Push to Your Fork**: Push your changes to your forked repository:
+## Web app
 
-    ```bash
-    git push origin feature-or-bugfix-name
-    ```
+`web/` is a single Next.js app on Vercel. Its route handlers are the backend, and the Python engine runs out of process. The app lets you:
+- watch a recorded run evolve: the score chart with the noise band, the experiment ledger with code diffs, the stop report, and the optimism gap
+- start a live run on your own CSV, with progress streamed over SSE
 
-8. **Create a Pull Request**: Go to the original repository and click the "New Pull Request" button. Choose your fork and the branch you made changes in. Provide a descriptive title and a detailed description of your changes.
+During development the runner is a local subprocess. On Vercel it is a Vercel Sandbox microVM with locked-down network egress. See [web/README.md](web/README.md).
 
-### Opening Issues
+```bash
+cd web && npm install && npm run dev
+```
 
-If you find a bug or have an idea for a new feature, please open an issue:
+## Benchmarks
 
-1. **Go to the Issues Tab**: Navigate to the "Issues" tab in the repository.
+`benchmarks/run.py` compares four systems on the same splits:
+- the starter pipeline
+- `evolve` with the statistical gate
+- `evolve` with the naive gate (fixed 40-experiment budget)
+- `evolve` stopping at the ceiling
 
-2. **New Issue**: Click the "New Issue" button.
+Results go to [`benchmarks/results/`](benchmarks/results/).
 
-3. **Describe the Issue**: Provide a clear and detailed description of the issue or feature request. Include steps to reproduce the bug if applicable.
+**First results (offline heuristic proposer, one seed, small datasets). Treat them as a smoke test, not evidence yet.** Full table: [`benchmarks/results/heuristic.md`](benchmarks/results/heuristic.md).
 
-4. **Submit**: Submit the issue.
+| dataset (rows) | metric | starter | evolve, stat gate (40) | evolve, naive gate (40) | evolve, until ceiling |
+|---|---|---|---|---|---|
+| iris + NAs (150) | log loss ↓ | 0.167 | 0.107 | **0.074** | 0.107 (stopped at 21) |
+| housing (545) | RMSE ↓ | 1.09M | 0.996M | **0.919M** | 1.00M (stopped at 19) |
+| breast cancer (569) | ROC-AUC ↑ | 0.983 | **0.994** | 0.993 | **0.994** (stopped at 37) |
+| wine (178) | log loss ↓ | 0.051 | **0.019** | 0.059 | 0.023 (stopped at 15) |
+| diabetes (442) | RMSE ↓ | 70.7 | 66.0 | **60.4** | 65.3 (stopped at 12) |
 
-### Pull Request Guidelines
+What this does and doesn't show:
+- **Evolving beats the starter on every dataset**, on a test split the loop never saw.
+- **The ceiling rule used 104 experiments in total instead of 200 (48% fewer).** Its test scores matched or nearly matched the 40-experiment statistical-gate runs.
+- **The statistical gate does *not* yet beat the naive gate.** Naive wins on 3 of 5 datasets. With a heuristic proposer that mostly makes small hyperparameter tweaks, the naive gate builds up many small gains that the strict gate rejects. On datasets this small, single-split test scores are themselves noisy, which is also why many optimism gaps are negative. The proper test of the gate needs larger datasets (OpenML), several seeds, and an LLM proposer. That is next on the [roadmap](docs/ROADMAP.md) (Phase 3.5).
 
-- **Describe Your Changes**: Provide a clear and detailed description of what you have done and why.
-- **Reference Issues**: If your pull request addresses an issue, include a reference to the issue number.
-- **Update Documentation**: If applicable, update the documentation to reflect your changes.
-- **Review Process**: Be prepared to engage in the code review process. Address any feedback and make necessary revisions.
+Reproduce: `uv run python benchmarks/run.py --llm heuristic --max-experiments 40` (about 25 min on a laptop CPU).
 
+## Develop
+
+```bash
+uv sync && uv run pytest -q && uv run ruff check src tests && uv run mypy
+cd web && npm ci && npm run lint && npm test && npm run build
+```
+
+The layout: `src/autotabml/{data,harness,agent,evolve,obs}`, `api.py` (SDK), `cli.py`; `web/` (Next.js); `benchmarks/`; `schema/` (generated JSON Schemas); [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Contributors
 
-[<img src="https://github.com/Sakalya100.png" width="60px;"/>](https://github.com/Sakalya100)  [<img src="https://github.com/shalusingh-tech.png" width="60px;"/>](https://github.com/shalusingh-tech)   [<img src="https://github.com/pmp438.png" width="60px;"/>](https://github.com/pmp438)  [<img src="https://github.com/vedant22p.png" width="60px;"/>](https://github.com/vedant22p)     
+v2: [Sakalya Mitra](https://github.com/Sakalya100). v1 (2024): [Sakalya Mitra](https://github.com/Sakalya100), [shalusingh-tech](https://github.com/shalusingh-tech), [pmp438](https://github.com/pmp438), [vedant22p](https://github.com/vedant22p).
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT
