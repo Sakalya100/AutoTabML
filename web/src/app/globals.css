@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/* Theme: html[data-theme] is set before paint by the inline script in layout.tsx (system preference by default). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  color-scheme: light;
+  /* warm paper + blue-black ink; hues kept close so neutrals feel related */
+  --paper: oklch(97.4% 0.009 85);
+  --paper-2: oklch(94.6% 0.012 85);
+  --paper-3: oklch(91% 0.014 85);
+  --ink: oklch(23% 0.025 262);
+  --ink-2: oklch(40% 0.022 262);
+  --ink-3: oklch(55% 0.018 262);
+  --rule: oklch(85% 0.014 85);
+  --rule-strong: oklch(72% 0.016 85);
+  /* data colours */
+  --best: oklch(57% 0.17 42); /* burnt orange: the best-so-far line, the one thing to follow */
+  --best-soft: oklch(57% 0.17 42 / 0.13);
+  --keep: oklch(52% 0.11 165);
+  --discard: oklch(62% 0.02 262);
+  --crash: oklch(55% 0.2 25);
+  --select: oklch(45% 0.12 262);
+  --test: oklch(23% 0.025 262);
+  --focus: oklch(57% 0.17 42);
+  --code-bg: oklch(95.2% 0.011 85);
+  --add-bg: oklch(52% 0.11 165 / 0.12);
+  --del-bg: oklch(55% 0.2 25 / 0.1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: oklch(17.5% 0.018 262);
+  --paper-2: oklch(21% 0.02 262);
+  --paper-3: oklch(25.5% 0.022 262);
+  --ink: oklch(93% 0.012 85);
+  --ink-2: oklch(78% 0.014 85);
+  --ink-3: oklch(63% 0.016 262);
+  --rule: oklch(30% 0.02 262);
+  --rule-strong: oklch(40% 0.022 262);
+  --best: oklch(74% 0.15 55);
+  --best-soft: oklch(74% 0.15 55 / 0.14);
+  --keep: oklch(74% 0.12 165);
+  --discard: oklch(58% 0.02 262);
+  --crash: oklch(68% 0.18 28);
+  --select: oklch(76% 0.1 250);
+  --test: oklch(93% 0.012 85);
+  --focus: oklch(74% 0.15 55);
+  --code-bg: oklch(20% 0.02 262);
+  --add-bg: oklch(74% 0.12 165 / 0.13);
+  --del-bg: oklch(68% 0.18 28 / 0.13);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-best: var(--best);
+  --color-best-soft: var(--best-soft);
+  --color-keep: var(--keep);
+  --color-discard: var(--discard);
+  --color-crash: var(--crash);
+  --color-select: var(--select);
+  --color-test: var(--test);
+  --color-code: var(--code-bg);
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+html {
+  background: var(--paper);
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+}
+
+::selection {
+  background: var(--best-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* faint graph-paper texture used behind the hero chart */
+.graph-paper {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--rule) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--rule) 55%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.7s var(--ease-out-quart) both;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.pulse-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse-ring 1.4s var(--ease-out-quart) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .pulse-ring {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}

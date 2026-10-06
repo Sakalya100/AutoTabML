@@ -1,0 +1,608 @@
+{
+  "version": 1,
+  "run_id": "r-fixture-iris-0001",
+  "created_at": "2026-10-05T21:14:03.000Z",
+  "mode": "evolve",
+  "proposer": "heuristic",
+  "task": {
+    "target": "variety",
+    "problem_type": "multiclass",
+    "metric": "log_loss",
+    "description": "Classify iris flowers into three species from sepal and petal measurements.",
+    "seed": 0,
+    "cv_folds": 5,
+    "cv_repeats": 2,
+    "select_frac": 0.15,
+    "test_frac": 0.15,
+    "experiment_timeout_s": 120,
+    "experiment_memory_mb": 2048
+  },
+  "profile": {
+    "n_rows": 150,
+    "n_cols": 5,
+    "target": "variety",
+    "problem_type": "multiclass",
+    "metric": "log_loss",
+    "columns": [
+      {
+        "name": "sepal.length",
+        "dtype": "float64",
+        "kind": "numeric",
+        "missing_frac": 0,
+        "n_unique": 35,
+        "examples": [
+          5.1,
+          4.9,
+          6.3
+        ],
+        "stats": {
+          "min": 4.3,
+          "max": 7.9,
+          "mean": 5.843,
+          "std": 0.828,
+          "q25": 5.1,
+          "q50": 5.8,
+          "q75": 6.4,
+          "skew": 0.315
+        },
+        "top_values": null,
+        "flags": []
+      },
+      {
+        "name": "sepal.width",
+        "dtype": "float64",
+        "kind": "numeric",
+        "missing_frac": 0,
+        "n_unique": 23,
+        "examples": [
+          3.5,
+          3,
+          2.8
+        ],
+        "stats": {
+          "min": 2,
+          "max": 4.4,
+          "mean": 3.057,
+          "std": 0.436,
+          "q25": 2.8,
+          "q50": 3,
+          "q75": 3.3,
+          "skew": 0.319
+        },
+        "top_values": null,
+        "flags": []
+      },
+      {
+        "name": "petal.length",
+        "dtype": "float64",
+        "kind": "numeric",
+        "missing_frac": 0,
+        "n_unique": 43,
+        "examples": [
+          1.4,
+          4.7,
+          6
+        ],
+        "stats": {
+          "min": 1,
+          "max": 6.9,
+          "mean": 3.758,
+          "std": 1.765,
+          "q25": 1.6,
+          "q50": 4.35,
+          "q75": 5.1,
+          "skew": -0.275
+        },
+        "top_values": null,
+        "flags": []
+      },
+      {
+        "name": "petal.width",
+        "dtype": "float64",
+        "kind": "numeric",
+        "missing_frac": 0,
+        "n_unique": 22,
+        "examples": [
+          0.2,
+          1.4,
+          2.5
+        ],
+        "stats": {
+          "min": 0.1,
+          "max": 2.5,
+          "mean": 1.199,
+          "std": 0.762,
+          "q25": 0.3,
+          "q50": 1.3,
+          "q75": 1.8,
+          "skew": -0.103
+        },
+        "top_values": null,
+        "flags": []
+      }
+    ],
+    "target_summary": {
+      "kind": "classes",
+      "class_counts": {
+        "Setosa": 50,
+        "Versicolor": 50,
+        "Virginica": 50
+      },
+      "n_classes": 3
+    },
+    "warnings": [
+      "Small dataset (150 rows): CV standard errors will be wide relative to differences between models."
+    ],
+    "sample_rows": [
+      {
+        "sepal.length": 5.1,
+        "sepal.width": 3.5,
+        "petal.length": 1.4,
+        "petal.width": 0.2,
+        "variety": "Setosa"
+      },
+      {
+        "sepal.length": 7,
+        "sepal.width": 3.2,
+        "petal.length": 4.7,
+        "petal.width": 1.4,
+        "variety": "Versicolor"
+      },
+      {
+        "sepal.length": 6.3,
+        "sepal.width": 3.3,
+        "petal.length": 6,
+        "petal.width": 2.5,
+        "variety": "Virginica"
+      }
+    ]
+  },
+  "config": {
+    "mode": "evolve",
+    "proposer": "heuristic",
+    "max_repairs": 3,
+    "source": "examples/data/iris_classification.csv",
+    "gate": {
+      "name": "stat",
+      "alpha": 0.1,
+      "min_gain_se": 0.5
+    },
+    "stop_rule": {
+      "until": "ceiling",
+      "max_experiments": 30,
+      "max_cost_usd": 5,
+      "max_time_s": null,
+      "min_experiments": 10,
+      "noise_k": 2,
+      "radical_k": 3
+    }
+  },
+  "experiments": [
+    {
+      "id": "e000",
+      "parent_id": null,
+      "idea": {
+        "title": "Baseline: standardised logistic regression",
+        "rationale": "Start from the unmodified starter solution so every later change is measured against a known reference.",
+        "category": "baseline",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\n\ndef build_pipeline(profile: dict):\n    return make_pipeline(\n        StandardScaler(),\n        LogisticRegression(max_iter=1000),\n    )\n",
+      "diff": "",
+      "status": "keep",
+      "reason": "Baseline is always kept.",
+      "cv": {
+        "mean": -0.1124,
+        "se": 0.0121,
+        "folds": [
+          -0.011837,
+          -0.106902,
+          -0.13847,
+          -0.116859,
+          -0.136974,
+          -0.132892,
+          -0.116514,
+          -0.12732,
+          -0.095693,
+          -0.140539
+        ]
+      },
+      "select_score": -0.1042,
+      "fit_time_s": 0.021,
+      "loc": 9,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 6.8,
+      "started_at": "2026-10-05T21:14:04.400Z"
+    },
+    {
+      "id": "e001",
+      "parent_id": "e000",
+      "idea": {
+        "title": "Weaken L2 regularisation (C=1 → 10)",
+        "rationale": "Profile shows near-separable classes; the default penalty keeps predicted probabilities soft, which log-loss punishes.",
+        "category": "hyperparameters",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\n\n\ndef build_pipeline(profile: dict):\n    # Iris classes are nearly separable: weaken the L2 penalty so probabilities sharpen.\n    return make_pipeline(\n        StandardScaler(),\n        LogisticRegression(C=10.0, max_iter=2000),\n    )\n",
+      "diff": "--- e000/solution.py\n+++ e001/solution.py\n@@ -5,7 +5,8 @@\n \n \n def build_pipeline(profile: dict):\n+    # Iris classes are nearly separable: weaken the L2 penalty so probabilities sharpen.\n     return make_pipeline(\n         StandardScaler(),\n-        LogisticRegression(max_iter=1000),\n+        LogisticRegression(C=10.0, max_iter=2000),\n     )\n",
+      "status": "keep",
+      "reason": "Paired t-test over 10 folds p=0.004; gain 0.0312 ≥ 0.5×SE (0.0051); select improved 0.1042 → 0.0779.",
+      "cv": {
+        "mean": -0.0812,
+        "se": 0.0103,
+        "folds": [
+          -0.050389,
+          -0.158482,
+          -0.064875,
+          -0.098497,
+          -0.039587,
+          -0.092996,
+          -0.072001,
+          -0.085729,
+          -0.075351,
+          -0.074094
+        ]
+      },
+      "select_score": -0.0779,
+      "fit_time_s": 0.034,
+      "loc": 9,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 7.1,
+      "started_at": "2026-10-05T21:14:12.220Z"
+    },
+    {
+      "id": "e002",
+      "parent_id": "e001",
+      "idea": {
+        "title": "Switch to HistGradientBoosting",
+        "rationale": "Trees capture interactions without feature engineering; worth checking a different family early.",
+        "category": "model_family",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.ensemble import HistGradientBoostingClassifier\n\n\ndef build_pipeline(profile: dict):\n    # Radical: switch model family to gradient-boosted trees (no scaling needed).\n    return HistGradientBoostingClassifier(\n        learning_rate=0.1,\n        max_iter=200,\n        early_stopping=False,\n        random_state=0,\n    )\n",
+      "diff": "--- e001/solution.py\n+++ e002/solution.py\n@@ -1,12 +1,12 @@\n \"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\n-from sklearn.pipeline import make_pipeline\n-from sklearn.preprocessing import StandardScaler\n-from sklearn.linear_model import LogisticRegression\n+from sklearn.ensemble import HistGradientBoostingClassifier\n \n \n def build_pipeline(profile: dict):\n-    # Iris classes are nearly separable: weaken the L2 penalty so probabilities sharpen.\n-    return make_pipeline(\n-        StandardScaler(),\n-        LogisticRegression(C=10.0, max_iter=2000),\n+    # Radical: switch model family to gradient-boosted trees (no scaling needed).\n+    return HistGradientBoostingClassifier(\n+        learning_rate=0.1,\n+        max_iter=200,\n+        early_stopping=False,\n+        random_state=0,\n     )\n",
+      "status": "discard",
+      "reason": "Worse than best (0.1418 vs 0.0812); 150 rows is too few for boosted trees to calibrate.",
+      "cv": {
+        "mean": -0.1418,
+        "se": 0.0214,
+        "folds": [
+          -0.082533,
+          -0.164769,
+          -0.229325,
+          -0.092402,
+          -0.096862,
+          -0.204075,
+          -0.06183,
+          -0.081529,
+          -0.158631,
+          -0.246045
+        ]
+      },
+      "select_score": -0.1287,
+      "fit_time_s": 0.611,
+      "loc": 9,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 14.9,
+      "started_at": "2026-10-05T21:14:20.340Z"
+    },
+    {
+      "id": "e003",
+      "parent_id": "e001",
+      "idea": {
+        "title": "Add petal area and petal length/width ratio",
+        "rationale": "Versicolor/virginica overlap along single petal axes; their product and ratio separate them more cleanly.",
+        "category": "feature_engineering",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nimport pandas as pd\n\n\ndef engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n    # Row-wise, fit-free: petal area and length/width ratio separate versicolor/virginica.\n    df = df.copy()\n    df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n    df[\"petal.ratio\"] = df[\"petal.length\"] / (df[\"petal.width\"] + 0.1)\n    return df\n\n\ndef build_pipeline(profile: dict):\n    # Iris classes are nearly separable: weaken the L2 penalty so probabilities sharpen.\n    return make_pipeline(\n        StandardScaler(),\n        LogisticRegression(C=10.0, max_iter=2000),\n    )\n",
+      "diff": "--- e001/solution.py\n+++ e003/solution.py\n@@ -2,8 +2,17 @@\n from sklearn.pipeline import make_pipeline\n from sklearn.preprocessing import StandardScaler\n from sklearn.linear_model import LogisticRegression\n+import pandas as pd\n \n \n+def engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n+    # Row-wise, fit-free: petal area and length/width ratio separate versicolor/virginica.\n+    df = df.copy()\n+    df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n+    df[\"petal.ratio\"] = df[\"petal.length\"] / (df[\"petal.width\"] + 0.1)\n+    return df\n+\n+\n def build_pipeline(profile: dict):\n     # Iris classes are nearly separable: weaken the L2 penalty so probabilities sharpen.\n     return make_pipeline(\n",
+      "status": "keep",
+      "reason": "Paired t-test p=0.071; gain 0.0069 ≥ 0.5×SE (0.0046); select improved 0.0779 → 0.0716.",
+      "cv": {
+        "mean": -0.0743,
+        "se": 0.0091,
+        "folds": [
+          -0.126433,
+          -0.035862,
+          -0.066751,
+          -0.062741,
+          -0.097058,
+          -0.067307,
+          -0.058247,
+          -0.042238,
+          -0.077346,
+          -0.109016
+        ]
+      },
+      "select_score": -0.0716,
+      "fit_time_s": 0.039,
+      "loc": 15,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 7.4,
+      "started_at": "2026-10-05T21:14:36.260Z"
+    },
+    {
+      "id": "e004",
+      "parent_id": "e003",
+      "idea": {
+        "title": "RBF-kernel SVM with Platt scaling",
+        "rationale": "A smooth non-linear boundary might fit the curved versicolor/virginica border better than a linear model.",
+        "category": "model_family",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.svm import SVC\nimport pandas as pd\n\n\ndef engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n    # Row-wise, fit-free: petal area and length/width ratio separate versicolor/virginica.\n    df = df.copy()\n    df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n    df[\"petal.ratio\"] = df[\"petal.length\"] / (df[\"petal.width\"] + 0.1)\n    return df\n\n\ndef build_pipeline(profile: dict):\n    # Radical: RBF-kernel SVM with Platt-scaled probabilities.\n    return make_pipeline(\n        StandardScaler(),\n        SVC(C=3.0, gamma=\"scale\", probability=True, random_state=0),\n    )\n",
+      "diff": "--- e003/solution.py\n+++ e004/solution.py\n@@ -1,7 +1,7 @@\n \"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\n from sklearn.pipeline import make_pipeline\n from sklearn.preprocessing import StandardScaler\n-from sklearn.linear_model import LogisticRegression\n+from sklearn.svm import SVC\n import pandas as pd\n \n \n@@ -14,8 +14,8 @@\n \n \n def build_pipeline(profile: dict):\n-    # Iris classes are nearly separable: weaken the L2 penalty so probabilities sharpen.\n+    # Radical: RBF-kernel SVM with Platt-scaled probabilities.\n     return make_pipeline(\n         StandardScaler(),\n-        LogisticRegression(C=10.0, max_iter=2000),\n+        SVC(C=3.0, gamma=\"scale\", probability=True, random_state=0),\n     )\n",
+      "status": "discard",
+      "reason": "Not better than best (0.0791 vs 0.0743); Platt scaling adds variance on small folds.",
+      "cv": {
+        "mean": -0.0791,
+        "se": 0.0108,
+        "folds": [
+          -0.074328,
+          -0.062222,
+          -0.146816,
+          -0.036976,
+          -0.088719,
+          -0.071168,
+          -0.121141,
+          -0.03553,
+          -0.077515,
+          -0.076585
+        ]
+      },
+      "select_score": -0.0762,
+      "fit_time_s": 0.118,
+      "loc": 15,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 9.6,
+      "started_at": "2026-10-05T21:14:44.680Z"
+    },
+    {
+      "id": "e005",
+      "parent_id": "e003",
+      "idea": {
+        "title": "Push regularisation further (C=10 → 30)",
+        "rationale": "The C=10 step helped a lot; check whether the curve keeps going.",
+        "category": "hyperparameters",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nimport pandas as pd\n\n\ndef engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n    # Row-wise, fit-free: petal area and length/width ratio separate versicolor/virginica.\n    df = df.copy()\n    df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n    df[\"petal.ratio\"] = df[\"petal.length\"] / (df[\"petal.width\"] + 0.1)\n    return df\n\n\ndef build_pipeline(profile: dict):\n    # Push regularisation further down.\n    return make_pipeline(\n        StandardScaler(),\n        LogisticRegression(C=30.0, max_iter=4000),\n    )\n",
+      "diff": "--- e003/solution.py\n+++ e005/solution.py\n@@ -14,8 +14,8 @@\n \n \n def build_pipeline(profile: dict):\n-    # Iris classes are nearly separable: weaken the L2 penalty so probabilities sharpen.\n+    # Push regularisation further down.\n     return make_pipeline(\n         StandardScaler(),\n-        LogisticRegression(C=10.0, max_iter=2000),\n+        LogisticRegression(C=30.0, max_iter=4000),\n     )\n",
+      "status": "discard",
+      "reason": "Gain 0.0025 < 0.5×SE (0.0047), p=0.21 — indistinguishable from noise; select did not improve (0.0721 vs 0.0716).",
+      "cv": {
+        "mean": -0.0718,
+        "se": 0.0094,
+        "folds": [
+          -0.081706,
+          -0.078594,
+          -0.032142,
+          -0.076883,
+          -0.095299,
+          -0.077918,
+          -0.078298,
+          -0.056339,
+          -0.122057,
+          -0.018764
+        ]
+      },
+      "select_score": -0.0721,
+      "fit_time_s": 0.047,
+      "loc": 15,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 7.2,
+      "started_at": "2026-10-05T21:14:55.300Z"
+    },
+    {
+      "id": "e006",
+      "parent_id": "e003",
+      "idea": {
+        "title": "Drop sepal.width and the ratio feature",
+        "rationale": "sepal.width has the weakest class separation and the ratio is redundant with petal area; fewer inputs, same signal.",
+        "category": "simplification",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.linear_model import LogisticRegression\nimport pandas as pd\n\nKEEP = [\"sepal.length\", \"petal.length\", \"petal.width\", \"petal.area\"]\n\n\ndef engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n    df = df.copy()\n    df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n    return df\n\n\ndef build_pipeline(profile: dict):\n    # Simplify: drop sepal.width and the ratio feature; keep only what carries signal.\n    return make_pipeline(\n        ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]),\n        LogisticRegression(C=10.0, max_iter=2000),\n    )\n",
+      "diff": "--- e003/solution.py\n+++ e006/solution.py\n@@ -1,21 +1,22 @@\n \"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\n from sklearn.pipeline import make_pipeline\n from sklearn.preprocessing import StandardScaler\n+from sklearn.compose import ColumnTransformer\n from sklearn.linear_model import LogisticRegression\n import pandas as pd\n \n+KEEP = [\"sepal.length\", \"petal.length\", \"petal.width\", \"petal.area\"]\n \n+\n def engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n-    # Row-wise, fit-free: petal area and length/width ratio separate versicolor/virginica.\n     df = df.copy()\n     df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n-    df[\"petal.ratio\"] = df[\"petal.length\"] / (df[\"petal.width\"] + 0.1)\n     return df\n \n \n def build_pipeline(profile: dict):\n-    # Iris classes are nearly separable: weaken the L2 penalty so probabilities sharpen.\n+    # Simplify: drop sepal.width and the ratio feature; keep only what carries signal.\n     return make_pipeline(\n-        StandardScaler(),\n+        ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]),\n         LogisticRegression(C=10.0, max_iter=2000),\n     )\n",
+      "status": "keep",
+      "reason": "Gain 0.0002 is within noise, but the pipeline uses one fewer raw input and one fewer derived feature and fits faster (0.039 s → 0.031 s); select did not get worse (0.0716 → 0.0688) — kept by the simplicity rule.",
+      "cv": {
+        "mean": -0.0741,
+        "se": 0.009,
+        "folds": [
+          -0.06884,
+          -0.03533,
+          -0.046174,
+          -0.09964,
+          -0.082173,
+          -0.12738,
+          -0.081727,
+          -0.093232,
+          -0.061305,
+          -0.045199
+        ]
+      },
+      "select_score": -0.0688,
+      "fit_time_s": 0.031,
+      "loc": 16,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 6.9,
+      "started_at": "2026-10-05T21:15:03.520Z"
+    },
+    {
+      "id": "e007",
+      "parent_id": "e006",
+      "idea": {
+        "title": "Soft-voting ensemble: LR + SVC + kNN",
+        "rationale": "Blending three different families often squeezes out the last gains on tabular data.",
+        "category": "ensembling",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import VotingClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.svm import SVC\nimport pandas as pd\n\nKEEP = [\"sepal.length\", \"petal.length\", \"petal.width\", \"petal.area\"]\n\n\ndef engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n    df = df.copy()\n    df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n    return df\n\n\ndef build_pipeline(profile: dict):\n    # Simplify: drop sepal.width and the ratio feature; keep only what carries signal.\n    # Radical: soft-voting ensemble of three different model families.\n    vote = VotingClassifier(\n        [\n            (\"lr\", LogisticRegression(C=10.0, max_iter=2000)),\n            (\"svc\", SVC(C=3.0)),\n            (\"knn\", KNeighborsClassifier(n_neighbors=7)),\n        ],\n        voting=\"soft\",\n    )\n    return make_pipeline(ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]), vote)\n",
+      "diff": "--- e006/solution.py\n+++ e007/solution.py\n@@ -2,7 +2,10 @@\n from sklearn.pipeline import make_pipeline\n from sklearn.preprocessing import StandardScaler\n from sklearn.compose import ColumnTransformer\n+from sklearn.ensemble import VotingClassifier\n from sklearn.linear_model import LogisticRegression\n+from sklearn.neighbors import KNeighborsClassifier\n+from sklearn.svm import SVC\n import pandas as pd\n \n KEEP = [\"sepal.length\", \"petal.length\", \"petal.width\", \"petal.area\"]\n@@ -16,7 +19,13 @@\n \n def build_pipeline(profile: dict):\n     # Simplify: drop sepal.width and the ratio feature; keep only what carries signal.\n-    return make_pipeline(\n-        ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]),\n-        LogisticRegression(C=10.0, max_iter=2000),\n+    # Radical: soft-voting ensemble of three different model families.\n+    vote = VotingClassifier(\n+        [\n+            (\"lr\", LogisticRegression(C=10.0, max_iter=2000)),\n+            (\"svc\", SVC(C=3.0)),\n+            (\"knn\", KNeighborsClassifier(n_neighbors=7)),\n+        ],\n+        voting=\"soft\",\n     )\n+    return make_pipeline(ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]), vote)\n",
+      "status": "crash",
+      "reason": "Crashed after 1 repair attempt: SVC without probability=True cannot be used in soft voting.",
+      "cv": null,
+      "select_score": null,
+      "fit_time_s": null,
+      "loc": 24,
+      "repair_attempts": 1,
+      "error_kind": "runtime",
+      "error_tail": "Traceback (most recent call last):\n  File \"/harness/run.py\", line 88, in score_folds\n    proba = pipe.predict_proba(X_val)\n  File \"/site-packages/sklearn/pipeline.py\", line 721, in predict_proba\n    return self.steps[-1][1].predict_proba(Xt, **params)\n  File \"/site-packages/sklearn/ensemble/_voting.py\", line 412, in predict_proba\n    avg = np.average(self._collect_probas(X), axis=0, weights=self._weights_not_none)\n  File \"/site-packages/sklearn/ensemble/_voting.py\", line 389, in _collect_probas\n    return np.asarray([clf.predict_proba(X) for clf in self.estimators_])\n  File \"/site-packages/sklearn/svm/_base.py\", line 829, in predict_proba\n    self._check_proba()\n  File \"/site-packages/sklearn/svm/_base.py\", line 796, in _check_proba\n    raise AttributeError(\nAttributeError: predict_proba is not available when probability=False",
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 11.3,
+      "started_at": "2026-10-05T21:15:11.440Z"
+    },
+    {
+      "id": "e008",
+      "parent_id": "e006",
+      "idea": {
+        "title": "Random forest on the reduced feature set",
+        "rationale": "Bagged trees are robust on small data and need little tuning; a different family to rule out a local optimum.",
+        "category": "model_family",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import RandomForestClassifier\nimport pandas as pd\n\nKEEP = [\"sepal.length\", \"petal.length\", \"petal.width\", \"petal.area\"]\n\n\ndef engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n    df = df.copy()\n    df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n    return df\n\n\ndef build_pipeline(profile: dict):\n    # Simplify: drop sepal.width and the ratio feature; keep only what carries signal.\n    # Radical: bagged trees; scaling is harmless and keeps the column selection.\n    return make_pipeline(\n        ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]),\n        RandomForestClassifier(n_estimators=500, min_samples_leaf=2, random_state=0),\n    )\n",
+      "diff": "--- e006/solution.py\n+++ e008/solution.py\n@@ -2,7 +2,7 @@\n from sklearn.pipeline import make_pipeline\n from sklearn.preprocessing import StandardScaler\n from sklearn.compose import ColumnTransformer\n-from sklearn.linear_model import LogisticRegression\n+from sklearn.ensemble import RandomForestClassifier\n import pandas as pd\n \n KEEP = [\"sepal.length\", \"petal.length\", \"petal.width\", \"petal.area\"]\n@@ -16,7 +16,8 @@\n \n def build_pipeline(profile: dict):\n     # Simplify: drop sepal.width and the ratio feature; keep only what carries signal.\n+    # Radical: bagged trees; scaling is harmless and keeps the column selection.\n     return make_pipeline(\n         ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]),\n-        LogisticRegression(C=10.0, max_iter=2000),\n+        RandomForestClassifier(n_estimators=500, min_samples_leaf=2, random_state=0),\n     )\n",
+      "status": "discard",
+      "reason": "Worse than best (0.0987 vs 0.0741).",
+      "cv": {
+        "mean": -0.0987,
+        "se": 0.0152,
+        "folds": [
+          -0.127981,
+          -0.028553,
+          -0.040009,
+          -0.056596,
+          -0.117722,
+          -0.084819,
+          -0.098422,
+          -0.179671,
+          -0.102856,
+          -0.150371
+        ]
+      },
+      "select_score": -0.0934,
+      "fit_time_s": 0.842,
+      "loc": 16,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 16.2,
+      "started_at": "2026-10-05T21:15:23.760Z"
+    },
+    {
+      "id": "e009",
+      "parent_id": "e006",
+      "idea": {
+        "title": "Distance-weighted kNN (k=11)",
+        "rationale": "Iris clusters are compact in scaled petal space; a local method may calibrate well.",
+        "category": "model_family",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py — the only file the agent edits. The harness imports build_pipeline().\"\"\"\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.neighbors import KNeighborsClassifier\nimport pandas as pd\n\nKEEP = [\"sepal.length\", \"petal.length\", \"petal.width\", \"petal.area\"]\n\n\ndef engineer_features(df: pd.DataFrame) -> pd.DataFrame:\n    df = df.copy()\n    df[\"petal.area\"] = df[\"petal.length\"] * df[\"petal.width\"]\n    return df\n\n\ndef build_pipeline(profile: dict):\n    # Simplify: drop sepal.width and the ratio feature; keep only what carries signal.\n    # Radical: distance-weighted nearest neighbours in the scaled petal space.\n    return make_pipeline(\n        ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]),\n        KNeighborsClassifier(n_neighbors=11, weights=\"distance\"),\n    )\n",
+      "diff": "--- e006/solution.py\n+++ e009/solution.py\n@@ -2,7 +2,7 @@\n from sklearn.pipeline import make_pipeline\n from sklearn.preprocessing import StandardScaler\n from sklearn.compose import ColumnTransformer\n-from sklearn.linear_model import LogisticRegression\n+from sklearn.neighbors import KNeighborsClassifier\n import pandas as pd\n \n KEEP = [\"sepal.length\", \"petal.length\", \"petal.width\", \"petal.area\"]\n@@ -16,7 +16,8 @@\n \n def build_pipeline(profile: dict):\n     # Simplify: drop sepal.width and the ratio feature; keep only what carries signal.\n+    # Radical: distance-weighted nearest neighbours in the scaled petal space.\n     return make_pipeline(\n         ColumnTransformer([(\"keep\", StandardScaler(), KEEP)]),\n-        LogisticRegression(C=10.0, max_iter=2000),\n+        KNeighborsClassifier(n_neighbors=11, weights=\"distance\"),\n     )\n",
+      "status": "discard",
+      "reason": "Worse than best (0.0905 vs 0.0741).",
+      "cv": {
+        "mean": -0.0905,
+        "se": 0.0133,
+        "folds": [
+          -0.114985,
+          -0.134777,
+          -0.132909,
+          -0.078488,
+          -0.04689,
+          -0.081188,
+          -0.04993,
+          -0.160156,
+          -0.045983,
+          -0.059693
+        ]
+      },
+      "select_score": -0.0871,
+      "fit_time_s": 0.012,
+      "loc": 16,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0,
+      "duration_s": 6.4,
+      "started_at": "2026-10-05T21:15:40.980Z"
+    }
+  ],
+  "best_exp_id": "e006",
+  "stop": {
+    "reason": "ceiling",
+    "summary": "Stopped at experiment 10 (e009): the last kept gains were each below the CV standard error (0.0090); the fitted curve predicts at most 0.0011 more; 3 radical attempts since the last keep were rejected.",
+    "report": {
+      "noise_floor": {
+        "value": 0.0069,
+        "threshold": 0.009,
+        "fired": true,
+        "detail": "the last 2 kept gains (0.0069, 0.0002) were each below the CV standard error (0.009)"
+      },
+      "saturation": {
+        "value": 0.0011,
+        "threshold": 0.009,
+        "fired": true,
+        "detail": "the fitted curve (exp) predicts at most 0.0011 more",
+        "params": {
+          "a": -0.073,
+          "b": 0.0394,
+          "c": 0.62
+        }
+      },
+      "exploration": {
+        "value": 3,
+        "threshold": 3,
+        "fired": true,
+        "detail": "3 radical attempts were rejected since the last keep (need 3)"
+      }
+    }
+  },
+  "final": {
+    "best_exp_id": "e006",
+    "dev_cv_mean": -0.0741,
+    "select_score": -0.0688,
+    "test_score": -0.0839,
+    "optimism_gap": 0.0151
+  },
+  "total_cost_usd": 0,
+  "total_input_tokens": 0,
+  "total_output_tokens": 0,
+  "wall_time_s": 107.8
+}
