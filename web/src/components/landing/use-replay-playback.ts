@@ -14,6 +14,8 @@ export interface PlaybackOptions {
   target?: number | null;
   /** Reduced motion: no autoplay — jump straight to the target (or the finished run). */
   reduced?: boolean;
+  /** Scroll scrubbing: seek straight to the target both ways (the reef staggers births / retracts itself). */
+  jump?: boolean;
 }
 
 /**
@@ -21,7 +23,7 @@ export interface PlaybackOptions {
  * the same reducer the replay page and live runs use, so every number on screen is the run's own.
  */
 export function useReplayPlayback(events: readonly AnyEvent[], record: RunRecord | null, opts: PlaybackOptions = {}) {
-  const { speed = 1, loop = true, target = null, reduced = false } = opts;
+  const { speed = 1, loop = true, target = null, reduced = false, jump = false } = opts;
   const end = events.length;
   const [cursor, setCursor] = useState(() => (reduced ? (target ?? end) : Math.min(1, end)));
   // After a loop restart the old reef needs a beat to dissolve before the baseline sprouts again.
@@ -34,8 +36,8 @@ export function useReplayPlayback(events: readonly AnyEvent[], record: RunRecord
     }
     if (target != null) {
       if (cursor === target) return;
-      if (target < cursor) {
-        // Seeking back: jump. The reef retracts and dissolves the removed branches itself (newest first).
+      if (target < cursor || jump) {
+        // Seeking back (or scrubbing): jump. The reef retracts and dissolves the removed branches itself (newest first).
         const t = setTimeout(() => setCursor(target), 0);
         return () => clearTimeout(t);
       }
@@ -57,7 +59,7 @@ export function useReplayPlayback(events: readonly AnyEvent[], record: RunRecord
       setCursor((c) => (c >= end ? 1 : c + 1));
     }, base / Math.max(0.1, speed));
     return () => clearTimeout(t);
-  }, [cursor, end, events, loop, reduced, speed, target]);
+  }, [cursor, end, events, jump, loop, reduced, speed, target]);
 
   const view: RunView = useMemo(() => buildView(events.slice(0, cursor), record), [events, cursor, record]);
   return { view, cursor, end, setCursor };

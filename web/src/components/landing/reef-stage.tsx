@@ -8,7 +8,7 @@ import type { SceneChapter } from "@/lib/scene/contract";
 import { useWebGLAvailable } from "@/lib/scene/webgl";
 
 /**
- * The fixed full-screen backdrop: a CSS abyss that paints instantly, the WebGL reef on top once it has loaded,
+ * The full-screen backdrop: a CSS abyss that paints instantly, the WebGL reef on top once it has loaded,
  * and — when WebGL is unavailable — the 2D evolution chart of the same run.
  *
  * `Reef` is the shared ReefCanvas (components/reef), loaded by the caller with next/dynamic ssr:false so three.js
@@ -20,23 +20,21 @@ export function ReefStage({
   full,
   chapter,
   quality,
-  reduced,
+  autoRotate,
 }: {
   Reef: ComponentType<ReefCanvasProps> | null;
   view: RunView;
   full: RunView;
   chapter: SceneChapter;
   quality: "full" | "lite";
-  reduced: boolean;
+  autoRotate: boolean;
 }) {
   const webgl = useWebGLAvailable();
   return (
     <div className="lp-stage" aria-hidden data-chapter={chapter}>
       <div className="lp-abyss" />
-      <div className="lp-rays" />
-      <div className="lp-snow" />
       {webgl && Reef ? (
-        <Reef view={view} domainView={full} chapter={chapter} quality={quality} interactive={false} autoRotate={!reduced && chapter === "intro"} className="lp-reef" />
+        <Reef view={view} domainView={full} chapter={chapter} quality={quality} interactive={false} autoRotate={autoRotate} className="lp-reef" />
       ) : webgl === false || (webgl && !Reef) ? (
         <div className="lp-fallback-chart" data-theme="dark">
           <EvolutionChart view={view} domainView={full} plannedExperiments={full.experiments.length} compact />

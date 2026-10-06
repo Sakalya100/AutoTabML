@@ -11,8 +11,8 @@ export function Reveal({ children, delay = 0, className, y = 22 }: { children: R
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y, filter: "blur(6px)" }}
-      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.25 }}
       transition={{ duration: 0.9, delay, ease: EASE }}
     >
@@ -97,14 +97,3 @@ export function MagneticLink({ href, children, variant = "primary", external = f
 }
 
 const MotionNextLink = motion.create(Link);
-
-/** Small mono label above section headings: "02 · Mutation". */
-export function Eyebrow({ n, children }: { n: string; children: ReactNode }) {
-  return (
-    <div className="lp-eyebrow">
-      <span className="lp-eyebrow-n">{n}</span>
-      <span className="lp-eyebrow-line" aria-hidden />
-      <span>{children}</span>
-    </div>
-  );
-}

@@ -1,35 +1,33 @@
 "use client";
 
+/*
+ * Landing — design rules, distilled from Apple's AirPods Pro and Vision Pro pages and Linear's homepage:
+ *  1. One message per viewport. Each screen says one thing; detail lives one click away ("See the full run →").
+ *  2. A single centered column. No text|visual split, no side rails, no floating HUD — the tree IS the visual.
+ *  3. Headlines of 3–7 words in a big display serif, with at most one short subline under them.
+ *  4. Pin, then scrub: the "watch it grow" story is a sticky section whose scroll progress drives the real replay
+ *     forward and backward; one caption at a time crossfades in sync.
+ *  5. Big typographic number moments ("23 million pixels") — here the run's own numbers, one per screen.
+ *  6. Progressive disclosure: every idea gets one sentence and a quiet "Learn more", never a chart wall.
+ *  7. Generous negative space (~120–200px between sections), text measure ≤ 640px.
+ *  8. Calm motion: transform/opacity only, scroll-linked rather than timed, nothing that loops for attention;
+ *     prefers-reduced-motion gets static sections over the finished tree.
+ *  9. Minimal chrome: two CTAs at the top, the same two at the end, nothing competing in between.
+ */
+
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { MotionConfig, useReducedMotion } from "motion/react";
+import { MotionConfig, motion, useMotionValueEvent, useScroll, useTransform, type MotionValue } from "motion/react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import type { AnyEvent } from "@/lib/events";
-import { fmtDuration } from "@/lib/format";
 import { DOCS_URL, GITHUB_URL } from "@/lib/links";
+import { formatScore, metricInfo } from "@/lib/metrics";
 import { buildView } from "@/lib/run-state";
 import type { SceneChapter } from "@/lib/scene/contract";
 import type { LandingFacts } from "./facts";
-import { Hud } from "./hud";
-import { Eyebrow, MagneticLink, Reveal, RiseWords } from "./primitives";
-import { Rail, type RailItem } from "./rail";
+import { MagneticLink, Reveal, RiseWords, Ticker } from "./primitives";
 import { ReefStage } from "./reef-stage";
 import { useReplayPlayback } from "./use-replay-playback";
-import { CeilingViz } from "./viz-ceiling";
-import { MutationViz } from "./viz-mutation";
-import { NutrientsViz } from "./viz-nutrients";
-import { PearlViz } from "./viz-pearl";
-import { SelectionViz } from "./viz-selection";
-
-const SECTIONS: RailItem[] = [
-  { id: "grow", chapter: "intro", label: "Grow" },
-  { id: "nutrients", chapter: "nutrients", label: "Nutrients" },
-  { id: "mutation", chapter: "mutation", label: "Mutation" },
-  { id: "selection", chapter: "selection", label: "Selection" },
-  { id: "ceiling", chapter: "ceiling", label: "Ceiling" },
-  { id: "pearl", chapter: "test", label: "Pearl" },
-  { id: "ship", chapter: "overview", label: "Ship" },
-];
 
 // three.js stays out of the server render and the first paint; the CSS abyss shows until it streams in.
 const ReefCanvas = dynamic(() => import("@/components/reef/reef-canvas"), { ssr: false, loading: () => null });
@@ -43,225 +41,220 @@ const mq = (q: string) => ({
   get: () => window.matchMedia(q).matches,
 });
 const narrowQ = mq("(max-width: 767px)");
+const reducedQ = mq("(prefers-reduced-motion: reduce)");
 
-/**
- * The replay ticks every ~140 ms; only the reef and the HUD read it. Keeping the playback state here means a tick
- * re-renders these two, not the whole landing page (which was ~120 ms of React work per second in dev).
- */
-function PlaybackLayer({
-  events,
-  full,
-  chapter,
-  target,
-  narrow,
-  reduced,
-}: {
-  events: AnyEvent[];
-  full: ReturnType<typeof buildView>;
-  chapter: SceneChapter;
+/* ---- a tiny external store: scroll writes it, only the reef and the live numbers read it ---- */
+
+interface StageState {
+  /** Replay cursor to hold; null = autoplay (the hero grows the run once and holds it). */
   target: number | null;
-  narrow: boolean;
-  reduced: boolean;
-}) {
-  const { view } = useReplayPlayback(events, null, { target, loop: true, reduced, speed: 1 });
-  return (
-    <>
-      <ReefStage Reef={ReefCanvas} view={view} full={full} chapter={chapter} quality={narrow ? "lite" : "full"} reduced={reduced} />
-      <div className="lp-hud-wrap" data-chapter={chapter}>
-        <Hud view={view} total={full.experiments.length} compact={narrow} />
-      </div>
-    </>
-  );
+  /** Index into facts.growth for the live numbers. */
+  step: number;
+  chapter: SceneChapter;
 }
 
+function createStageStore(init: StageState) {
+  let s = init;
+  const ls = new Set<() => void>();
+  return {
+    get: () => s,
+    set(p: Partial<StageState>) {
+      const n = { ...s, ...p };
+      if (n.target === s.target && n.step === s.step && n.chapter === s.chapter) return;
+      s = n;
+      ls.forEach((l) => l());
+    },
+    sub(l: () => void) {
+      ls.add(l);
+      return () => {
+        ls.delete(l);
+      };
+    },
+  };
+}
+type StageStore = ReturnType<typeof createStageStore>;
+
+/**
+ * The reef reads the store here, so a scroll step re-renders this layer only — never the page.
+ * Scrubbing changes the cursor at most once per experiment (~40 states across the whole pin).
+ */
+function StageLayer({ events, full, store, narrow, reduced }: { events: AnyEvent[]; full: ReturnType<typeof buildView>; store: StageStore; narrow: boolean; reduced: boolean }) {
+  const target = useSyncExternalStore(store.sub, () => store.get().target, () => null);
+  const chapter = useSyncExternalStore(store.sub, () => store.get().chapter, () => "overview" as SceneChapter);
+  const { view } = useReplayPlayback(events, null, { target, loop: false, reduced, jump: true, speed: 1.5 });
+  return <ReefStage Reef={ReefCanvas} view={view} full={full} chapter={chapter} quality={narrow ? "lite" : "full"} autoRotate={!reduced} />;
+}
+
+function useStep(store: StageStore) {
+  return useSyncExternalStore(store.sub, () => store.get().step, () => 0);
+}
+
+/* ---- page ---- */
+
 export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingFacts }) {
-  const reduced = useReducedMotion() ?? false;
+  // Not useReducedMotion(): it reads the media query during the first render, which then disagrees with the
+  // server HTML (the pinned section and the static one are different markup) and breaks hydration.
+  const reduced = useSyncExternalStore(reducedQ.sub, reducedQ.get, () => false);
   const narrow = useSyncExternalStore(narrowQ.sub, narrowQ.get, () => false);
-  const [active, setActive] = useState(SECTIONS[0].id);
-  const chapter: SceneChapter = SECTIONS.find((s) => s.id === active)?.chapter ?? "intro";
-
   const full = useMemo(() => buildView(events), [events]);
+  const [store] = useState(() => createStageStore({ target: null, step: 0, chapter: "overview" }));
 
-  // Active chapter = the section crossing the middle band of the viewport. Plain document scroll; no hijacking.
   const root = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  // Each section declares how present the tree is behind it (and which camera framing it wants).
+  // Written straight to the DOM / store: crossing a section never re-renders the page.
   useEffect(() => {
-    const els = root.current?.querySelectorAll<HTMLElement>("[data-section]");
+    const els = root.current?.querySelectorAll<HTMLElement>("[data-stage]");
     if (!els?.length) return;
     const io = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) if (e.isIntersecting) setActive((e.target as HTMLElement).id);
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const el = e.target as HTMLElement;
+          stageRef.current?.setAttribute("data-presence", el.dataset.stage ?? "full");
+          store.set({ chapter: (el.dataset.chapter as SceneChapter | undefined) ?? "overview" });
+        }
       },
-      { rootMargin: "-45% 0px -45% 0px" },
+      { rootMargin: "-48% 0px -48% 0px" },
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, []);
+  }, [store]);
+
+  // Hero: as it scrolls away the copy lifts and fades, and the tree rises from below the headline to center.
+  const hero = useRef<HTMLElement>(null);
+  const { scrollYProgress: heroP } = useScroll({ target: hero, offset: ["start start", "end start"] });
+  const stageY = useTransform(heroP, [0, 1], reduced ? ["0vh", "0vh"] : [narrow ? "20vh" : "13vh", "0vh"]);
+  const copyY = useTransform(heroP, [0, 1], [0, reduced ? 0 : -90]);
+  const copyOpacity = useTransform(heroP, [0, 0.55], [1, reduced ? 1 : 0]);
+  const copyScale = useTransform(heroP, [0, 1], [1, reduced ? 1 : 0.94]);
 
   const replayHref = `/replays/${facts.name}`;
-  const metricLabel = facts.metric.replace(/_/g, "-").toUpperCase();
-  const gainText = facts.keepPair?.gainSe != null && facts.keepPair.p != null ? `kept: gain ${facts.keepPair.gainSe > 0 ? "+" : ""}${facts.keepPair.gainSe.toFixed(2)} SE over ${facts.keepPair.parent.id}, p = ${facts.keepPair.p}` : null;
+  const proposerLine = facts.proposer === "heuristic" ? "offline heuristic proposer (no LLM)" : `proposer: ${facts.proposer}`;
 
   return (
     <MotionConfig reducedMotion="user">
       <div ref={root} data-landing className="lp-root" data-theme="dark">
-        <PlaybackLayer events={events} full={full} chapter={chapter} target={facts.cursors[chapter]} narrow={narrow} reduced={reduced} />
-        <Rail items={SECTIONS} active={active} />
+        <div ref={stageRef} className="lp-stage-wrap" data-presence="full">
+          <motion.div className="lp-stage-move" style={{ y: stageY }}>
+            <StageLayer events={events} full={full} store={store} narrow={narrow} reduced={reduced} />
+          </motion.div>
+        </div>
 
-        {/* 0 — HERO */}
-        <section id="grow" data-section className="lp-section lp-hero">
-          <div className="lp-col">
-            <p className="lp-kicker lp-in" style={{ "--d": "0ms" } as CSSProperties}>
-              AutoTabML · self-evolving tabular ML
-            </p>
+        {/* 1 — HERO: one headline, one line, two doors. */}
+        <section ref={hero} className="lp-section lp-hero" data-stage="full" data-chapter="overview">
+          <motion.div className="lp-hero-copy" style={{ y: copyY, opacity: copyOpacity, scale: copyScale }}>
             {/* CSS-only entrance: the headline paints with the HTML, before any JS or three.js. */}
             <h1 className="lp-h1">
-              <span className="lp-line">
-                <span className="lp-word" style={{ "--d": "60ms" } as CSSProperties}>
-                  Models
-                </span>{" "}
-                <span className="lp-word" style={{ "--d": "140ms" } as CSSProperties}>
-                  that
+              {["Models", "that", "grow"].map((w, i) => (
+                <span key={w}>
+                  <span className="lp-word" style={{ "--d": `${80 + i * 90}ms` } as CSSProperties}>
+                    {w}
+                  </span>{" "}
                 </span>
-              </span>
-              <span className="lp-line">
-                <span className="lp-word" style={{ "--d": "240ms" } as CSSProperties}>
-                  grow
-                </span>{" "}
-                <span className="lp-word" style={{ "--d": "340ms" } as CSSProperties}>
-                  <em className="lp-gold">themselves.</em>
-                </span>
+              ))}
+              <span className="lp-word" style={{ "--d": "350ms" } as CSSProperties}>
+                <em className="lp-gold">themselves.</em>
               </span>
             </h1>
-            <p className="lp-lede lp-in" style={{ "--d": "520ms" } as CSSProperties}>
-              AutoTabML evolves a readable ML pipeline, experiment by experiment, keeps only the gains that beat the noise — and stops itself when the
-              rest is noise.
+            <p className="lp-sub lp-in lp-measure" style={{ "--d": "560ms", maxWidth: "36ch" } as CSSProperties}>
+              AutoTabML evolves a readable ML pipeline, keeps only what beats the noise, and knows when to stop.
             </p>
-            <div className="lp-in mt-9 flex flex-wrap items-center gap-3" style={{ "--d": "680ms" } as CSSProperties}>
+            <div className="lp-ctas lp-in" style={{ "--d": "700ms" } as CSSProperties}>
               <MagneticLink href={replayHref}>Watch a run</MagneticLink>
               <MagneticLink href="/new" variant="ghost">
                 Grow your own
               </MagneticLink>
             </div>
-            <p className="lp-honest lp-in" style={{ "--d": "900ms" } as CSSProperties}>
-              <span className="lp-honest-dot" aria-hidden />
-              Replay of a real run · {facts.dataset} · offline heuristic proposer (no LLM)
-            </p>
-          </div>
-          <a href="#nutrients" className="lp-scrollcue" aria-label="Scroll to the story">
-            <span>descend</span>
-            <span className="lp-scrollcue-line" aria-hidden />
-          </a>
+          </motion.div>
+          <p className="lp-honest lp-in" style={{ "--d": "1000ms" } as CSSProperties}>
+            <span className="lp-honest-dot" aria-hidden />
+            Replay of a real run · {proposerLine}
+          </p>
         </section>
 
-        {/* 1 — NUTRIENTS */}
-        <Chapter id="nutrients" n="01" eyebrow="Nutrients" title="Your data, digested.">
-          <p>
-            Before a single model runs, the harness profiles the table — types, ranges, skew, missingness, target balance, flags for ID-like or leaky
-            columns. The agent sees <strong>this profile and at most {facts.profile?.sampleRows ?? 5} sample rows</strong>. Never the table. Labels for the
-            select and test splits never leave the harness.
-          </p>
-          {facts.profile && (
-            <Reveal delay={0.1}>
-              <NutrientsViz profile={facts.profile} />
-            </Reveal>
-          )}
-        </Chapter>
+        {/* 2 — WATCH IT GROW: pinned; scroll scrubs the real replay. */}
+        <Growth facts={facts} store={store} reduced={reduced} />
 
-        {/* 2 — MUTATION */}
-        <Chapter id="mutation" n="02" eyebrow="Mutation" title="One idea, stated before the code.">
-          <p>
-            Every experiment names its hypothesis first, then edits a single file — <code>solution.py</code> — starting from the current best. Crashes get
-            up to three automatic repairs. This is the mutation that grew this run&apos;s winner:
-          </p>
-          {facts.showcase && (
-            <Reveal delay={0.1}>
-              <MutationViz showcase={facts.showcase} gainText={gainText} />
-            </Reveal>
-          )}
-        </Chapter>
+        {/* 3 — the typographic moment */}
+        <Statement facts={facts} reduced={reduced} />
 
-        {/* 3 — SELECTION */}
-        <Chapter id="selection" n="03" eyebrow="Selection" title="Keep, or wither. Noise doesn't get a vote.">
-          <p>
-            Each child is scored on the <em>same</em> cross-validation folds as its parent, and the gate tests the fold-by-fold differences with a
-            Nadeau–Bengio corrected paired t-test. It keeps a change only if p &lt; {facts.gate.alpha ?? 0.1}, the gain is at least{" "}
-            {facts.gate.minGainSe ?? 0.5}× the standard error, and a separate select holdout doesn&apos;t get worse.
-          </p>
-          <p className="text-[color:var(--lp-ink-3)]">
-            The second pair is a real child that scored higher on average and still withered: its fold differences straddle zero.
-          </p>
-          <Reveal delay={0.1}>
-            <SelectionViz facts={facts} />
-          </Reveal>
-        </Chapter>
-
-        {/* 4 — CEILING */}
-        <Chapter id="ceiling" n="04" eyebrow="The ceiling" title="It knows when to stop.">
-          <p>
-            No budget ended this run. After {facts.nExperiments} experiments the light at the surface came into focus: every configured ceiling signal agreed
-            that what&apos;s left to find is smaller than the noise.
-          </p>
-          {facts.stop && (
-            <Reveal delay={0.1}>
-              <CeilingViz stop={facts.stop} metric={facts.metric} />
-            </Reveal>
-          )}
-        </Chapter>
-
-        {/* 5 — PEARL */}
-        <Chapter id="pearl" n="05" eyebrow="The pearl" title="The locked test, opened once.">
-          <p>
-            A test split the loop never touched is scored exactly once, at the very end. The <strong>optimism gap</strong> — select minus test — tells you how
-            much the search fooled itself.
-          </p>
-          {facts.final && (
-            <Reveal delay={0.1}>
-              <PearlViz final={facts.final} metric={facts.metric} />
-            </Reveal>
-          )}
-          <p className="text-[14px] text-[color:var(--lp-ink-3)]">
-            On {facts.profile?.nRows.toLocaleString("en-US") ?? "a few hundred"} rows a single test split is itself noisy, so a negative gap here is luck, not
-            magic. {facts.wallTimeS != null ? `Whole run: ${fmtDuration(facts.wallTimeS)} on a laptop CPU, ${facts.totalCostUsd === 0 ? "$0" : `$${facts.totalCostUsd.toFixed(2)}`}.` : ""}
-          </p>
-        </Chapter>
-
-        {/* 6 — SHIP */}
-        <section id="ship" data-section className="lp-section lp-ship">
-          <div className="lp-ship-grid">
-            <div>
-              <Eyebrow n="06">Ship it</Eyebrow>
-              <h2 className="lp-h2 mt-5">
-                <RiseWords text="Grow your own." />
-              </h2>
-              <p className="lp-body mt-5 max-w-[46ch]">
-                One command, or three lines of Python. Bring a CSV and a target; AutoTabML brings the harness, the gate and the stopping rule. Plug in an LLM
-                for smarter ideas, or run fully offline.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <MagneticLink href="/new">Start a run</MagneticLink>
-                <MagneticLink href={GITHUB_URL} variant="ghost" external>
-                  GitHub
-                </MagneticLink>
-              </div>
-              <nav className="lp-links mt-8">
-                <Link href={replayHref}>Watch this run, step by step</Link>
-                <Link href="/replays">All replays</Link>
-                <a href={DOCS_URL}>Roadmap &amp; design notes</a>
-              </nav>
-            </div>
-            <Reveal delay={0.1} className="min-w-0">
-              <Terminal />
-              <ul className="lp-gets mt-6">
-                <Get k="solution.py" v="Readable scikit-learn you own — build_pipeline(profile), no magic." />
-                <Get k="run.json" v="Every idea, diff, fold score and gate decision. Replayable." />
-                <Get k="events.jsonl" v="A typed trace of every step; OpenTelemetry spans optional." />
-                <Get k="stop report" v={`Which ceiling signals fired, the locked test score, the optimism gap.`} />
-              </ul>
+        {/* 4 — the locked test */}
+        <section className="lp-section lp-test" data-stage="full" data-chapter="test">
+          <div className="lp-measure">
+            <h2 className="lp-h2">
+              <RiseWords text="A test it never sees." />
+            </h2>
+            <Reveal delay={0.2}>
+              <p className="lp-sub">One split stays locked for the whole run. It is scored once, at the very end.</p>
             </Reveal>
           </div>
+          {facts.final && (
+            <Reveal className="lp-stat" delay={0.1}>
+              <span className="lp-stat-v">{formatScore(facts.metric, facts.final.test)}</span>
+              <span className="lp-stat-k">{metricInfo(facts.metric).label} on the locked test</span>
+              <span className="lp-stat-k" style={{ color: "var(--lp-ink-3)" }}>
+                Optimism gap: {facts.final.gapText}.
+              </span>
+            </Reveal>
+          )}
+        </section>
+
+        {/* 5 — three ideas, stacked */}
+        <section className="lp-section lp-ideas" data-stage="faint" data-chapter="overview">
+          <Idea title="Sandboxed." more={{ href: `${GITHUB_URL}#how-it-works`, label: "How the harness works" }}>
+            Every experiment runs in its own process: no network, no secrets, hard limits.
+          </Idea>
+          <Idea title="Statistically honest." more={{ href: replayHref, label: "See every decision" }}>
+            A change survives only if it wins a corrected paired t-test on the same folds as its parent.
+          </Idea>
+          <Idea title="Code you own." more={{ href: DOCS_URL, label: "Read the design notes" }}>
+            The result is one readable scikit-learn file, plus a replayable record of every step.
+          </Idea>
+        </section>
+
+        {/* 6 — start */}
+        <section className="lp-section" data-stage="faint" data-chapter="overview">
+          <h2 className="lp-h2">
+            <RiseWords text="Three lines to start." />
+          </h2>
+          <Reveal delay={0.15} className="w-full">
+            <pre className="lp-code">
+              <code>
+                <span className="lp-k">from</span> autotabml <span className="lp-k">import</span> AutoTabML{"\n"}
+                run = AutoTabML().evolve(<span className="lp-s">&quot;data.csv&quot;</span>, target=<span className="lp-s">&quot;y&quot;</span>){"\n"}
+                run.best.code <span className="lp-c"># the winning solution.py</span>
+              </code>
+            </pre>
+            <p className="lp-shell">
+              Or from the shell: <code>uv run autotabml evolve data.csv --target y</code>
+              <br />
+              Offline by default — no API key needed.
+            </p>
+          </Reveal>
+        </section>
+
+        {/* 7 — close */}
+        <section className="lp-section lp-close" data-stage="dim" data-chapter="overview">
+          <h2 className="lp-h2">
+            <RiseWords text="Grow your own." />
+          </h2>
+          <Reveal delay={0.2}>
+            <div className="lp-ctas">
+              <MagneticLink href="/new">Start a run</MagneticLink>
+              <MagneticLink href={replayHref} variant="ghost">
+                See the full run
+              </MagneticLink>
+            </div>
+            <nav className="lp-links" aria-label="More">
+              <Link href="/replays">All replays</Link>
+              <a href={GITHUB_URL}>GitHub</a>
+              <a href={DOCS_URL}>Roadmap</a>
+            </nav>
+          </Reveal>
           <p className="lp-colophon">
-            Every number on this page comes from the {facts.name.replace(/_/g, " ")} replay: {facts.nExperiments} experiments, {facts.nKept} kept, stopped by
-            the {facts.stop?.reason ?? "stop"} rule. {metricLabel} shown as the metric&apos;s own value.
+            Every number on this page comes from the {facts.name.replace(/_/g, " ")} replay ({facts.nExperiments} experiments, {facts.nKept} kept).
           </p>
         </section>
       </div>
@@ -269,70 +262,195 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
   );
 }
 
-function Chapter({ id, n, eyebrow, title, children }: { id: string; n: string; eyebrow: string; title: string; children: ReactNode }) {
-  const [lede, ...rest] = Array.isArray(children) ? children : [children];
+/* ---- 2: the pinned growth sequence ---- */
+
+interface Beat {
+  title: string;
+  /** `done`: the static (reduced-motion) view, which only ever shows the finished run. */
+  stat: (step: number, done?: boolean) => { v: ReactNode; k: string };
+}
+
+function beatsFor(facts: LandingFacts): Beat[] {
+  const total = facts.nExperiments;
+  const label = metricInfo(facts.metric).label;
+  const at = (i: number) => facts.growth[Math.min(i, facts.growth.length - 1)];
+  return [
+    {
+      title: "It states an idea.",
+      stat: (i) => ({
+        v: (
+          <>
+            <Ticker value={at(i).n} format={(n) => String(Math.round(n)).padStart(2, "0")} />
+            <span className="lp-stat-dim"> / {total}</span>
+          </>
+        ),
+        k: "experiments, one hypothesis each",
+      }),
+    },
+    {
+      title: "Tests it in a sandbox.",
+      stat: (i, done) => ({
+        v: <Ticker value={at(i).best} format={(n) => formatScore(facts.metric, n)} />,
+        k: `best cross-validated ${label}${done ? "" : " so far"}`,
+      }),
+    },
+    {
+      title: "Keeps only what beats the noise.",
+      stat: (i) => ({
+        v: (
+          <>
+            <span style={{ color: "var(--lp-keep)" }}>
+              <Ticker value={at(i).kept} format={(n) => String(Math.round(n))} />
+            </span>
+            <span className="lp-stat-dim"> kept</span>
+          </>
+        ),
+        k: `of ${at(i).n} tried — the rest withered`,
+      }),
+    },
+    {
+      title: facts.stop?.reason === "ceiling" ? "Stops when the rest is noise." : "Stops at its budget.",
+      stat: () =>
+        facts.stop && facts.stop.signals > 0
+          ? { v: `${facts.stop.fired} / ${facts.stop.signals}`, k: "ceiling signals agreed — no budget ran out" }
+          : { v: String(total), k: "experiments in all" },
+    },
+  ];
+}
+
+/** Scroll progress range [start, end) of each beat; the cursor runs over SCRUB. */
+const BEAT_AT = [0, 0.26, 0.5, 0.74, 1];
+const SCRUB: [number, number] = [0.03, 0.9];
+
+function Growth({ facts, store, reduced }: { facts: LandingFacts; store: StageStore; reduced: boolean }) {
+  const ref = useRef<HTMLElement>(null);
+  const beats = beatsFor(facts);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 0.5", "end end"] });
+  const g = facts.growth;
+
+  const apply = (v: number) => {
+    if (reduced) return;
+    if (v <= 0) return store.set({ target: null, step: 0 });
+    if (v >= 1) return store.set({ target: facts.end, step: g.length - 1 });
+    const t = Math.min(1, Math.max(0, (v - SCRUB[0]) / (SCRUB[1] - SCRUB[0])));
+    const i = Math.round(t * (g.length - 1));
+    store.set({ target: g[i].cursor, step: i });
+  };
+  useMotionValueEvent(scrollYProgress, "change", apply);
+  // A reload mid-page restores the scroll position without a change event.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  useEffect(() => apply(scrollYProgress.get()), []);
+
+  if (reduced) {
+    return (
+      <section className="lp-beats-static" data-stage="full" data-chapter="overview" aria-label="Watch it grow">
+        {beats.map((b, i) => (
+          <div key={i} className="lp-beat">
+            <h2 className="lp-h2">{b.title}</h2>
+            <BeatStat beat={b} step={g.length - 1} done />
+          </div>
+        ))}
+      </section>
+    );
+  }
+
   return (
-    <section id={id} data-section className="lp-section">
-      <div className="lp-col">
-        <Reveal>
-          <Eyebrow n={n}>{eyebrow}</Eyebrow>
-        </Reveal>
-        <h2 className="lp-h2 mt-5">
-          <RiseWords text={title} />
-        </h2>
-        <Reveal delay={0.15} className="lp-body mt-5">
-          {lede}
-        </Reveal>
-        <div className="mt-8 space-y-6">{rest}</div>
+    <section ref={ref} className="lp-pin" data-stage="full" data-chapter="overview" aria-label="Watch it grow">
+      <div className="lp-pin-sticky">
+        {beats.map((b, i) => (
+          <BeatLayer key={i} beat={b} i={i} n={beats.length} progress={scrollYProgress} store={store} />
+        ))}
       </div>
     </section>
   );
 }
 
-function Terminal() {
+function BeatLayer({ beat, i, n, progress, store }: { beat: Beat; i: number; n: number; progress: MotionValue<number>; store: StageStore }) {
+  const a = BEAT_AT[i];
+  const b = BEAT_AT[i + 1];
+  // Strictly sequential crossfade: the outgoing caption is gone before the next one arrives — never two at once.
+  const f = 0.05;
+  const first = i === 0;
+  const last = i === n - 1;
+  const input = [first ? -1 : a, first ? 0 : a + f, last ? 1 : b - f, last ? 2 : b];
+  const opacity = useTransform(progress, input, [first ? 1 : 0, 1, 1, last ? 1 : 0]);
+  const y = useTransform(progress, input, [first ? 0 : 36, 0, 0, last ? 0 : -36]);
+  const step = useStep(store);
   return (
-    <div className="lp-term">
-      <div className="lp-term-bar" aria-hidden>
-        <span />
-        <span />
-        <span />
-        <em>shell</em>
+    <motion.div className="lp-beat" style={{ opacity, y }}>
+      <div>
+        {first && <p className="lp-beat-eyebrow">Watch it grow · scroll</p>}
+        <h2 className="lp-h2">{beat.title}</h2>
       </div>
-      <pre>
-        <code>
-          <span className="lp-c"># offline — no API key needed</span>
-          {"\n"}
-          <span className="lp-p">$</span> uv run autotabml evolve data.csv --target y{"\n"}
-          {"\n"}
-          <span className="lp-c"># or let an LLM propose the ideas</span>
-          {"\n"}
-          <span className="lp-p">$</span> uv run autotabml evolve data.csv --target y \{"\n"}
-          {"    "}--llm anthropic:claude-sonnet-5-5 --max-cost 3{"\n"}
-        </code>
-      </pre>
-      <div className="lp-term-sep" />
-      <pre>
-        <code>
-          <span className="lp-k">from</span> autotabml <span className="lp-k">import</span> AutoTabML{"\n"}
-          {"\n"}
-          run = AutoTabML(llm=<span className="lp-s">&quot;heuristic&quot;</span>).evolve(<span className="lp-s">&quot;data.csv&quot;</span>, target=
-          <span className="lp-s">&quot;y&quot;</span>){"\n"}
-          run.best.code <span className="lp-c"># the winning solution.py</span>
-          {"\n"}
-          run.stop_report <span className="lp-c"># why it stopped</span>
-          {"\n"}
-          run.test_score <span className="lp-c"># the locked holdout, scored once</span>
-        </code>
-      </pre>
+      <BeatStat beat={beat} step={step} />
+    </motion.div>
+  );
+}
+
+function BeatStat({ beat, step, done = false }: { beat: Beat; step: number; done?: boolean }) {
+  const s = beat.stat(step, done);
+  return (
+    <div className="lp-stat">
+      <span className="lp-stat-v">{s.v}</span>
+      <span className="lp-stat-k">{s.k}</span>
     </div>
   );
 }
 
-function Get({ k, v }: { k: string; v: string }) {
+/* ---- 3: the statement, revealed word by word as you scroll ---- */
+
+function Statement({ facts, reduced }: { facts: LandingFacts; reduced: boolean }) {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const ending = facts.stop?.reason === "ceiling" ? "Stopped on its own." : "Stopped at its budget.";
+  const words = `${facts.nExperiments} experiments. ${facts.nKept} kept. ${ending}`.split(" ");
   return (
-    <li>
-      <code>{k}</code>
-      <span>{v}</span>
-    </li>
+    <section ref={ref} className="lp-words" data-stage="dim" data-chapter="overview" style={reduced ? { height: "auto" } : undefined}>
+      <div className="lp-words-sticky" style={reduced ? { position: "relative", minHeight: "80svh" } : undefined}>
+        <p className="lp-words-text" aria-label={words.join(" ")}>
+          {words.map((w, i) => (
+            <Word key={i} progress={scrollYProgress} range={[0.08 + (i / words.length) * 0.62, 0.08 + ((i + 1) / words.length) * 0.62]} reduced={reduced} gold={/^\d+$/.test(w)}>
+              {w}
+            </Word>
+          ))}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function Word({ children, progress, range, reduced, gold }: { children: string; progress: MotionValue<number>; range: [number, number]; reduced: boolean; gold: boolean }) {
+  const opacity = useTransform(progress, range, [0.13, 1]);
+  return (
+    <>
+      <motion.span aria-hidden style={{ opacity: reduced ? 1 : opacity, color: gold ? "var(--lp-gold)" : undefined }}>
+        {children}
+      </motion.span>{" "}
+    </>
+  );
+}
+
+/* ---- 5: one idea ---- */
+
+function Idea({ title, children, more }: { title: string; children: ReactNode; more: { href: string; label: string } }) {
+  const external = more.href.startsWith("http");
+  return (
+    <div className="lp-idea lp-measure">
+      <h2 className="lp-h2">
+        <RiseWords text={title} />
+      </h2>
+      <Reveal delay={0.15}>
+        <p>{children}</p>
+        {external ? (
+          <a className="lp-more" href={more.href}>
+            {more.label} <span aria-hidden>→</span>
+          </a>
+        ) : (
+          <Link className="lp-more" href={more.href}>
+            {more.label} <span aria-hidden>→</span>
+          </Link>
+        )}
+      </Reveal>
+    </div>
   );
 }

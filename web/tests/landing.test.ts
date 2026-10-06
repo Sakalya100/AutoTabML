@@ -16,40 +16,33 @@ describe("landing facts (real breast_cancer replay)", () => {
     expect(facts.nExperiments).toBe(37);
     expect(facts.nKept).toBe(4);
     expect(facts.nKept + facts.nDiscarded + facts.nCrashed).toBe(37);
-    expect(facts.profile?.nRows).toBe(569);
-    expect(facts.profile?.sampleRows).toBeLessThanOrEqual(5);
+    expect(facts.nRows).toBe(569);
+    expect(facts.proposer).toBe("heuristic");
   });
 
-  it("showcases the winning mutation with its real diff", () => {
-    expect(facts.showcase?.id).toBe(record.best_exp_id);
-    expect(facts.showcase?.diff.some((d) => d.t === "+")).toBe(true);
-    expect(facts.keepPair?.decision).toBe("keep");
-    expect(facts.keepPair?.p).toBeLessThan(facts.gate.alpha ?? 0.1);
+  it("the growth sequence runs from an empty seabed, one experiment per step, to the stop", () => {
+    const g = facts.growth;
+    expect(g).toHaveLength(1 + 37 + 1);
+    expect(g[0]).toMatchObject({ n: 0, kept: 0, best: null });
+    for (let i = 1; i < g.length; i++) expect(g[i].cursor).toBeGreaterThan(g[i - 1].cursor);
+    expect(g.at(-1)).toMatchObject({ n: 37, kept: 4 });
+    expect(buildView(events.slice(0, g.at(-1)!.cursor)).phase).toBe("stopped");
+    expect(buildView(events.slice(0, g[1].cursor)).experiments).toHaveLength(1);
+    expect(facts.end).toBe(events.length);
+    expect(buildView(events.slice(0, facts.end)).phase).toBe("finished");
   });
 
-  it("the withered example scored higher than its parent yet failed the gate", () => {
-    const d = facts.discardPair!;
-    expect(d.decision).toBe("discard");
-    expect(d.exp.mean).toBeGreaterThan(d.parent.mean);
-    expect(d.p).toBeGreaterThanOrEqual(facts.gate.alpha ?? 0.1);
-    expect(d.exp.folds).toHaveLength(d.parent.folds.length);
+  it("the live best score is the run's own best", () => {
+    const best = facts.growth.map((s) => s.best).filter((b): b is number => b != null);
+    expect(best).toHaveLength(38); // 37 decisions + the stop
+    const finalBest = record.experiments?.find((e) => e.id === record.best_exp_id)?.cv as { mean?: number } | undefined;
+    expect(best.at(-1)).toBeCloseTo(finalBest?.mean ?? NaN, 10);
   });
 
-  it("chapter cursors put the reef in the state each chapter describes", () => {
-    const at = (c: number | null) => buildView(events.slice(0, c ?? events.length));
-    expect(facts.cursors.intro).toBeNull();
-    expect(at(facts.cursors.nutrients).profile).not.toBeNull();
-    expect(at(facts.cursors.nutrients).experiments).toHaveLength(0);
-    expect(at(facts.cursors.mutation).current?.id).toBe(facts.showcase?.id);
-    expect(at(facts.cursors.selection).phase).toBe("running");
-    expect(at(facts.cursors.ceiling).phase).toBe("stopped");
-    expect(at(facts.cursors.test).phase).toBe("finished");
-  });
-
-  it("ceiling and pearl numbers come from the stop report and final scores", () => {
-    expect(facts.stop?.saturationParams).toHaveLength(3);
-    expect(facts.stop?.trajectory).toHaveLength(37);
-    expect(facts.stop?.signals.map((s) => s.key)).toEqual(["noise_floor", "saturation", "exploration", "external_ref"]);
+  it("stop and locked-test numbers come from the stop report and final scores", () => {
+    expect(facts.stop?.reason).toBe("ceiling");
+    expect(facts.stop?.signals).toBeGreaterThan(0);
+    expect(facts.stop?.fired).toBe(facts.stop?.signals);
     expect(facts.final?.test).toBeCloseTo(0.99363, 4);
     expect(facts.final?.gapText).toMatch(/no optimism/);
   });
