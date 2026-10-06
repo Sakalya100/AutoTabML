@@ -13,7 +13,7 @@ export default async function Home() {
     return (
       <main className="mx-auto max-w-[1240px] px-4 py-24 sm:px-6">
         <h1 className="font-display text-[clamp(2.75rem,6vw,5rem)] leading-[0.95]">
-          Models that grow <span className="text-best italic">themselves.</span>
+          Models that tinker <span className="text-best italic">themselves.</span>
         </h1>
         <p className="mt-6 max-w-[54ch] text-lg text-ink-2">
           AutoTinker evolves a readable ML pipeline, experiment by experiment, until the gains are just noise.
@@ -32,6 +32,6 @@ export default async function Home() {
   const p = replay.record.profile;
   const dataset = p ? `${STORY_REPLAY.replace(/_/g, " ")} · ${p.n_rows.toLocaleString("en-US")} rows · ${p.n_cols - 1} features` : replay.info.dataset;
   const facts = landingFacts(replay.info.name, dataset, replay.events, replay.record);
-  // Only the event stream goes to the client (the reef/HUD replay it); code and diffs stay on the server.
+  // Only the event stream goes to the client (the survey world replays it); code and diffs stay on the server.
   return <Landing events={replay.events} facts={facts} />;
 }

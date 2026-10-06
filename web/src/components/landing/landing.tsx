@@ -1,36 +1,33 @@
 "use client";
 
 /*
- * Landing — design rules, distilled from Apple's AirPods Pro and Vision Pro pages and Linear's homepage:
- *  1. One message per viewport. Each screen says one thing; detail lives one click away ("See the full run →").
- *  2. A single centered column. No text|visual split, no side rails, no floating HUD — the tree IS the visual.
- *  3. Headlines of 3–7 words in a big display serif, with at most one short subline under them.
- *  4. Pin, then scrub: the "watch it grow" story is a sticky section whose scroll progress drives the real replay
- *     forward and backward; one caption at a time crossfades in sync.
- *  5. Big typographic number moments ("23 million pixels") — here the run's own numbers, one per screen.
- *  6. Progressive disclosure: every idea gets one sentence and a quiet "Learn more", never a chart wall.
- *  7. Generous negative space (~120–200px between sections), text measure ≤ 640px.
- *  8. Calm motion: transform/opacity only, scroll-linked rather than timed, nothing that loops for attention;
- *     prefers-reduced-motion gets static sections over the finished tree.
- *  9. Minimal chrome: two CTAs at the top, the same two at the end, nothing competing in between.
+ * Landing — Terra Incognita (docs/creative/02-direction.md, direction B).
+ * One world, named camera poses, scroll = travel:
+ *   loader (orbit) → approach (headline on the plain) → first probe → the climb (pinned, scrubs the real replay)
+ *   → the mist → the ceiling → the truth → the chart.
+ * Rules: one idea per screen, one short caption at a time, every number from the replay files, nothing over the
+ * canvas but text (no panels, no backdrop blur). The 3D headline has the same words in the DOM for screen readers.
  */
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { MotionConfig, motion, useMotionValueEvent, useScroll, useTransform, type MotionValue } from "motion/react";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { MotionConfig, motion, useScroll, useTransform, type MotionValue } from "motion/react";
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { EvolutionChart } from "@/components/evolution-chart";
 import type { AnyEvent } from "@/lib/events";
 import { DOCS_URL, GITHUB_URL } from "@/lib/links";
-import { formatScore, metricInfo } from "@/lib/metrics";
-import { buildView } from "@/lib/run-state";
-import type { SceneChapter } from "@/lib/scene/contract";
+import { formatScore, formatSe, metricInfo } from "@/lib/metrics";
+import { buildView, type RunView } from "@/lib/run-state";
+import { useWebGLAvailable } from "@/lib/gl";
+import type { SurveyPose } from "@/lib/survey/contract";
 import type { LandingFacts } from "./facts";
-import { MagneticLink, Reveal, RiseWords, Ticker } from "./primitives";
-import { ReefStage } from "./reef-stage";
-import { useReplayPlayback } from "./use-replay-playback";
+import { MagneticLink, Ticker } from "./primitives";
 
-// three.js stays out of the server render and the first paint; the CSS abyss shows until it streams in.
-const ReefCanvas = dynamic(() => import("@/components/reef/reef-canvas"), { ssr: false, loading: () => null });
+// three.js stays out of the server render and the first paint; the void + loader show until it streams in.
+const SurveyCanvas = dynamic(() => import("@/components/survey/survey-canvas"), { ssr: false, loading: () => null });
+
+const HEADLINE = "Models that tinker themselves.";
+const OUTRO = "Your data. Your map.";
 
 const mq = (q: string) => ({
   sub: (cb: () => void) => {
@@ -43,14 +40,14 @@ const mq = (q: string) => ({
 const narrowQ = mq("(max-width: 767px)");
 const reducedQ = mq("(prefers-reduced-motion: reduce)");
 
-/* ---- a tiny external store: scroll writes it, only the reef and the live numbers read it ---- */
+/* ---- a tiny external store: scroll writes it, only the stage reads it ---- */
 
 interface StageState {
-  /** Replay cursor to hold; null = autoplay (the hero grows the run once and holds it). */
-  target: number | null;
-  /** Index into facts.growth for the live numbers. */
+  pose: SurveyPose;
+  progress: number;
+  cursor: number;
+  /** Index into facts.growth (for the live numbers in the climb). */
   step: number;
-  chapter: SceneChapter;
 }
 
 function createStageStore(init: StageState) {
@@ -60,7 +57,7 @@ function createStageStore(init: StageState) {
     get: () => s,
     set(p: Partial<StageState>) {
       const n = { ...s, ...p };
-      if (n.target === s.target && n.step === s.step && n.chapter === s.chapter) return;
+      if (n.pose === s.pose && n.cursor === s.cursor && n.step === s.step && Math.abs(n.progress - s.progress) < 1e-4) return;
       s = n;
       ls.forEach((l) => l());
     },
@@ -74,383 +71,389 @@ function createStageStore(init: StageState) {
 }
 type StageStore = ReturnType<typeof createStageStore>;
 
-/**
- * The reef reads the store here, so a scroll step re-renders this layer only — never the page.
- * Scrubbing changes the cursor at most once per experiment (~40 states across the whole pin).
- */
-function StageLayer({ events, full, store, narrow, reduced }: { events: AnyEvent[]; full: ReturnType<typeof buildView>; store: StageStore; narrow: boolean; reduced: boolean }) {
-  const target = useSyncExternalStore(store.sub, () => store.get().target, () => null);
-  const chapter = useSyncExternalStore(store.sub, () => store.get().chapter, () => "overview" as SceneChapter);
-  const { view } = useReplayPlayback(events, null, { target, loop: false, reduced, jump: true, speed: 1.5 });
-  return <ReefStage Reef={ReefCanvas} view={view} full={full} chapter={chapter} quality={narrow ? "lite" : "full"} autoRotate={!reduced} />;
-}
-
-function useStep(store: StageStore) {
-  return useSyncExternalStore(store.sub, () => store.get().step, () => 0);
-}
+const Stage = memo(function Stage({ events, full, store, narrow, onReady }: { events: AnyEvent[]; full: RunView; store: StageStore; narrow: boolean; onReady: () => void }) {
+  const s = useSyncExternalStore(store.sub, store.get, store.get);
+  const webgl = useWebGLAvailable();
+  const view = useMemo(() => (s.cursor >= events.length ? full : buildView(events.slice(0, s.cursor))), [events, full, s.cursor]);
+  const headline = s.pose === "approach" || s.pose === "orbit" ? HEADLINE : s.pose === "chart" ? OUTRO : null;
+  if (webgl === false)
+    return (
+      <div className="lp-fallback-chart" data-theme="dark">
+        <EvolutionChart view={full} domainView={full} plannedExperiments={full.experiments.length} compact />
+      </div>
+    );
+  return (
+    <SurveyCanvas
+      view={view}
+      domainView={full}
+      pose={s.pose}
+      poseProgress={s.progress}
+      quality={narrow ? "lite" : "full"}
+      interactive={false}
+      headline={headline}
+      className="lp-canvas"
+      ariaLabel={`Survey of the ${full.experiments.length}-experiment replay: each probe's height is its cross-validated score.`}
+      onReady={onReady}
+    />
+  );
+});
 
 /* ---- page ---- */
 
+/** Section → which moment of the replay it shows. */
+function cursorFor(pose: SurveyPose, p: number, facts: LandingFacts, reduced: boolean): { cursor: number; step: number } {
+  const g = facts.growth;
+  const last = g.length - 1; // the stop
+  const preStop = Math.max(0, last - 1);
+  switch (pose) {
+    case "first-probe":
+      return { cursor: g[Math.min(1, last)].cursor, step: Math.min(1, last) };
+    case "climb": {
+      if (reduced) return { cursor: g[preStop].cursor, step: preStop };
+      const t = Math.min(1, Math.max(0, (p - 0.02) / 0.9));
+      const i = Math.min(preStop, Math.max(1, 1 + Math.round(t * (preStop - 1))));
+      return { cursor: g[i].cursor, step: i };
+    }
+    case "ceiling":
+      return { cursor: g[last].cursor, step: last };
+    case "truth":
+    case "chart":
+      return { cursor: facts.end, step: last };
+    default:
+      return { cursor: g[preStop].cursor, step: preStop };
+  }
+}
+
 export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingFacts }) {
-  // Not useReducedMotion(): it reads the media query during the first render, which then disagrees with the
-  // server HTML (the pinned section and the static one are different markup) and breaks hydration.
   const reduced = useSyncExternalStore(reducedQ.sub, reducedQ.get, () => false);
   const narrow = useSyncExternalStore(narrowQ.sub, narrowQ.get, () => false);
+  const webgl = useWebGLAvailable();
   const full = useMemo(() => buildView(events), [events]);
-  const [store] = useState(() => createStageStore({ target: null, step: 0, chapter: "overview" }));
-
+  const [store] = useState(() => createStageStore({ pose: "orbit", progress: 0, ...cursorFor("approach", 0, facts, false) }));
+  const [ready, setReady] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
+  const readyRef = useRef(false);
 
-  // Each section declares how present the tree is behind it (and which camera framing it wants).
-  // Written straight to the DOM / store: crossing a section never re-renders the page.
+  // Loader gate: never block for long — if WebGL is missing or slow, open anyway.
   useEffect(() => {
-    const els = root.current?.querySelectorAll<HTMLElement>("[data-stage]");
-    if (!els?.length) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          const el = e.target as HTMLElement;
-          stageRef.current?.setAttribute("data-presence", el.dataset.stage ?? "full");
-          store.set({ chapter: (el.dataset.chapter as SceneChapter | undefined) ?? "overview" });
-        }
-      },
-      { rootMargin: "-48% 0px -48% 0px" },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [store]);
+    if (webgl === false) {
+      const t = setTimeout(() => setReady(true), 0);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setReady(true), 7000);
+    return () => clearTimeout(t);
+  }, [webgl]);
+  const [onReady] = useState(() => () => setReady(true));
 
-  // Hero: as it scrolls away the copy lifts and fades, and the tree rises from below the headline to center.
+  // Scroll → (pose, progress, cursor). One passive listener, one rAF; the page itself never re-renders.
+  useEffect(() => {
+    readyRef.current = ready;
+    const sections = Array.from(root.current?.querySelectorAll<HTMLElement>("[data-pose]") ?? []);
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      let pose: SurveyPose = "approach";
+      let p = 0;
+      for (const el of sections) {
+        const r = el.getBoundingClientRect();
+        if (r.top <= vh * 0.5 && r.bottom > vh * 0.5) {
+          pose = el.dataset.pose as SurveyPose;
+          p = el.dataset.pin != null ? -r.top / Math.max(1, r.height - vh) : (vh * 0.5 - r.top) / Math.max(1, r.height);
+          break;
+        }
+        if (r.top > vh * 0.5) break;
+        pose = el.dataset.pose as SurveyPose;
+        p = 1;
+      }
+      p = Math.min(1, Math.max(0, p));
+      if (!readyRef.current && pose === "approach") pose = "orbit";
+      const c = cursorFor(pose, p, facts, reduced);
+      store.set({ pose, progress: reduced ? 0.5 : p, ...c });
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    apply();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, [facts, reduced, store, ready]);
+
+  // As the hero scrolls away its copy lifts and fades, so it never sits on the headline lying on the plain.
   const hero = useRef<HTMLElement>(null);
   const { scrollYProgress: heroP } = useScroll({ target: hero, offset: ["start start", "end start"] });
-  const stageY = useTransform(heroP, [0, 1], reduced ? ["0vh", "0vh"] : [narrow ? "20vh" : "13vh", "0vh"]);
-  const copyY = useTransform(heroP, [0, 1], [0, reduced ? 0 : -90]);
-  const copyOpacity = useTransform(heroP, [0, 0.55], [1, reduced ? 1 : 0]);
-  const copyScale = useTransform(heroP, [0, 1], [1, reduced ? 1 : 0.94]);
+  const heroFade = useTransform(heroP, [0, 0.3], [1, 0]);
+  const heroLift = useTransform(heroP, [0, 0.3], [0, -40]);
 
   const replayHref = `/replays/${facts.name}`;
   const proposerLine = facts.proposer === "heuristic" ? "offline heuristic proposer (no LLM)" : `proposer: ${facts.proposer}`;
+  const label = metricInfo(facts.metric).label;
+  const sv = facts.survey;
 
   return (
     <MotionConfig reducedMotion="user">
-      <div ref={root} data-landing className="lp-root" data-theme="dark">
-        <div ref={stageRef} className="lp-stage-wrap" data-presence="full">
-          <motion.div className="lp-stage-move" style={{ y: stageY }}>
-            <StageLayer events={events} full={full} store={store} narrow={narrow} reduced={reduced} />
-          </motion.div>
+      <div ref={root} data-landing className="lp-root" data-theme="dark" data-ready={ready ? "" : undefined} data-webgl={webgl === false ? "off" : "on"}>
+        <Loader ready={ready} reduced={reduced} />
+        <div className="lp-stage-wrap" aria-hidden={false}>
+          <Stage events={events} full={full} store={store} narrow={narrow} onReady={onReady} />
+          <div className="lp-scrim" aria-hidden />
         </div>
 
-        {/* 1 — HERO: one headline, one line, two doors. */}
-        <section ref={hero} className="lp-section lp-hero" data-stage="full" data-chapter="overview">
-          <motion.div className="lp-hero-copy" style={{ y: copyY, opacity: copyOpacity, scale: copyScale }}>
-            {/* CSS-only entrance: the headline paints with the HTML, before any JS or three.js. */}
-            <h1 className="lp-h1">
-              {["Models", "that", "grow"].map((w, i) => (
-                <span key={w}>
-                  <span className="lp-word" style={{ "--d": `${80 + i * 90}ms` } as CSSProperties}>
-                    {w}
-                  </span>{" "}
-                </span>
-              ))}
-              <span className="lp-word" style={{ "--d": "350ms" } as CSSProperties}>
-                <em className="lp-gold">themselves.</em>
-              </span>
-            </h1>
-            <p className="lp-sub lp-in lp-measure" style={{ "--d": "560ms", maxWidth: "36ch" } as CSSProperties}>
+        {/* 1 — APPROACH: the headline lies on the plain (SDF in the scene; the same words here for everyone else). */}
+        <section ref={hero} className="lp-sec lp-hero" data-pose="approach">
+          <h1 className={webgl === false ? "lp-h1" : "sr-only"}>{HEADLINE}</h1>
+          <motion.div className="lp-hero-copy" style={{ opacity: heroFade, y: heroLift }}>
+            <p className="lp-sub lp-in" style={{ "--d": "200ms" } as CSSProperties}>
               AutoTinker evolves a readable ML pipeline, keeps only what beats the noise, and knows when to stop.
             </p>
-            <div className="lp-ctas lp-in" style={{ "--d": "700ms" } as CSSProperties}>
+            <div className="lp-ctas lp-in" style={{ "--d": "320ms" } as CSSProperties}>
               <MagneticLink href={replayHref}>Watch a run</MagneticLink>
               <MagneticLink href="/new" variant="ghost">
-                Grow your own
+                Start a survey
               </MagneticLink>
             </div>
           </motion.div>
-          <p className="lp-honest lp-in" style={{ "--d": "1000ms" } as CSSProperties}>
-            <span className="lp-honest-dot" aria-hidden />
-            Replay of a real run · {proposerLine}
-          </p>
-        </section>
-
-        {/* 2 — WATCH IT GROW: pinned; scroll scrubs the real replay. */}
-        <Growth facts={facts} store={store} reduced={reduced} />
-
-        {/* 3 — the typographic moment */}
-        <Statement facts={facts} reduced={reduced} />
-
-        {/* 4 — the locked test */}
-        <section className="lp-section lp-test" data-stage="full" data-chapter="test">
-          <div className="lp-measure">
-            <h2 className="lp-h2">
-              <RiseWords text="A test it never sees." />
-            </h2>
-            <Reveal delay={0.2}>
-              <p className="lp-sub">One split stays locked for the whole run. It is scored once, at the very end.</p>
-            </Reveal>
-          </div>
-          {facts.final && (
-            <Reveal className="lp-stat" delay={0.1}>
-              <span className="lp-stat-v">{formatScore(facts.metric, facts.final.test)}</span>
-              <span className="lp-stat-k">{metricInfo(facts.metric).label} on the locked test</span>
-              <span className="lp-stat-k" style={{ color: "var(--lp-ink-3)" }}>
-                Optimism gap: {facts.final.gapText}.
-              </span>
-            </Reveal>
-          )}
-        </section>
-
-        {/* 5 — three ideas, stacked */}
-        <section className="lp-section lp-ideas" data-stage="faint" data-chapter="overview">
-          <Idea title="Sandboxed." more={{ href: `${GITHUB_URL}#how-it-works`, label: "How the harness works" }}>
-            Every experiment runs in its own process: no network, no secrets, hard limits.
-          </Idea>
-          <Idea title="Statistically honest." more={{ href: replayHref, label: "See every decision" }}>
-            A change survives only if it wins a corrected paired t-test on the same folds as its parent.
-          </Idea>
-          <Idea title="Code you own." more={{ href: DOCS_URL, label: "Read the design notes" }}>
-            The result is one readable scikit-learn file, plus a replayable record of every step.
-          </Idea>
-        </section>
-
-        {/* 6 — start */}
-        <section className="lp-section" data-stage="faint" data-chapter="overview">
-          <h2 className="lp-h2">
-            <RiseWords text="Three lines to start." />
-          </h2>
-          <Reveal delay={0.15} className="w-full">
-            <pre className="lp-code">
-              <code>
-                <span className="lp-k">from</span> autotinker <span className="lp-k">import</span> AutoTinker{"\n"}
-                run = AutoTinker().evolve(<span className="lp-s">&quot;data.csv&quot;</span>, target=<span className="lp-s">&quot;y&quot;</span>){"\n"}
-                run.best.code <span className="lp-c"># the winning solution.py</span>
-              </code>
-            </pre>
-            <p className="lp-shell">
-              Or from the shell: <code>uv run autotinker evolve data.csv --target y</code>
-              <br />
-              Offline by default — no API key needed.
+          <div className="lp-hero-foot lp-in" style={{ "--d": "520ms" } as CSSProperties}>
+            <p className="lp-honest">
+              <span className="lp-honest-dot" aria-hidden />
+              Replay of a real run · {proposerLine}
             </p>
-          </Reveal>
+            {webgl !== false && (
+              <p className="lp-hint" aria-hidden>
+                <span className="lp-hint-ring" /> Press and hold to sound the land
+              </p>
+            )}
+          </div>
         </section>
 
-        {/* 7 — close */}
-        <section className="lp-section lp-close" data-stage="dim" data-chapter="overview">
-          <h2 className="lp-h2">
-            <RiseWords text="Grow your own." />
-          </h2>
-          <Reveal delay={0.2}>
+        {/* 2 — FIRST PROBE */}
+        <Chapter pose="first-probe" n="01" eyebrow="First probe" title="Every experiment is a probe." height={150}>
+          <p className="lp-sub">Where it lands, ground appears. Its height is the real score.</p>
+          {sv.baseline != null && <Stat v={formatScore(facts.metric, sv.baseline)} k={`baseline · cross-validated ${label}`} />}
+        </Chapter>
+
+        {/* 3 — THE CLIMB: pinned; scroll scrubs the real replay. */}
+        <Climb facts={facts} store={store} reduced={reduced} />
+
+        {/* 4 — THE MIST */}
+        <Chapter pose="mist" n="03" eyebrow="The mist" title="Gains smaller than the mist are noise." height={160}>
+          <p className="lp-sub">The mist is as thick as the best score&apos;s standard error. A probe inside it is a tie, so it is not kept.</p>
+          {sv.bestSe != null && <Stat v={`± ${formatSe(sv.bestSe)}`} k="standard error of the best" />}
+        </Chapter>
+
+        {/* 5 — THE CEILING */}
+        <Chapter pose="ceiling" n="04" eyebrow="The ceiling" title="It stops when the rest is in the clouds." height={170}>
+          <p className="lp-sub">The stop rule fits the climb and settles a cloud deck at the asymptote, just above the summit.</p>
+          {sv.ceiling != null ? (
+            <Stat
+              v={formatScore(facts.metric, sv.ceiling)}
+              k={facts.stop && facts.stop.signals > 0 ? `fitted ceiling · ${facts.stop.fired} of ${facts.stop.signals} stop signals agreed` : "fitted ceiling"}
+            />
+          ) : (
+            facts.stop && <Stat v={`${facts.stop.fired} / ${facts.stop.signals}`} k="stop signals agreed" />
+          )}
+        </Chapter>
+
+        {/* 6 — THE TRUTH */}
+        <Chapter pose="truth" n="05" eyebrow="The locked test" title="One locked test, opened once." height={170}>
+          <p className="lp-sub">A split it never saw, scored a single time at the very end.</p>
+          {facts.final && (
+            <Stat
+              v={formatScore(facts.metric, facts.final.test)}
+              k={`${label} on the locked test · select ${formatScore(facts.metric, facts.final.select)} · ${facts.final.gapText}`}
+            />
+          )}
+        </Chapter>
+
+        {/* 7 — THE CHART */}
+        <section className="lp-sec lp-chart" data-pose="chart" style={{ minHeight: "150svh" }}>
+          <div className="lp-chart-inner">
+            <h2 className="sr-only">{OUTRO}</h2>
+            <p className="lp-eyebrow">
+              <span>06</span> The map
+            </p>
+            <p className="lp-sub lp-measure">
+              {facts.nExperiments} probes, {facts.nKept} kept, stopped on its own. Every run leaves a map like this one.
+            </p>
             <div className="lp-ctas">
-              <MagneticLink href="/new">Start a run</MagneticLink>
+              <MagneticLink href="/new">Start a survey</MagneticLink>
               <MagneticLink href={replayHref} variant="ghost">
-                See the full run
+                Watch a run
               </MagneticLink>
             </div>
             <nav className="lp-links" aria-label="More">
               <Link href="/replays">All replays</Link>
               <a href={GITHUB_URL}>GitHub</a>
-              <a href={DOCS_URL}>Roadmap</a>
+              <a href={DOCS_URL}>Design notes</a>
             </nav>
-          </Reveal>
-          <p className="lp-colophon">
-            Every number on this page comes from the {facts.name.replace(/_/g, " ")} replay ({facts.nExperiments} experiments, {facts.nKept} kept).
-          </p>
+            <p className="lp-colophon">
+              Height is measured: each probe sits at its cross-validated {label}. The map is a projection: bearing is the idea&apos;s family, step is
+              the size of the change. Every number here comes from the {facts.name.replace(/_/g, " ")} replay.
+            </p>
+          </div>
         </section>
       </div>
     </MotionConfig>
   );
 }
 
-/* ---- 2: the pinned growth sequence ---- */
+/* ---- loader: the first frame behind it IS the intro shot ---- */
 
-interface Beat {
-  title: string;
-  /** `done`: the static (reduced-motion) view, which only ever shows the finished run. */
-  stat: (step: number, done?: boolean) => { v: ReactNode; k: string };
+function Loader({ ready, reduced }: { ready: boolean; reduced: boolean }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (ready) {
+      const t = setTimeout(() => setN(100), 0);
+      return () => clearTimeout(t);
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = () => {
+      // Eases toward 92 while shaders compile; the last stretch is the real "ready".
+      const k = 1 - Math.exp(-(performance.now() - t0) / 1400);
+      setN(Math.round(92 * k));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ready]);
+  return (
+    <div className="lp-loader" data-done={ready ? "" : undefined} data-reduced={reduced ? "" : undefined} aria-hidden={ready} role="status">
+      <p className="lp-loader-word">Surveying…</p>
+      <p className="lp-loader-n">{String(n).padStart(3, "0")}</p>
+    </div>
+  );
 }
 
-function beatsFor(facts: LandingFacts): Beat[] {
-  const total = facts.nExperiments;
+/* ---- one chapter: a sticky caption that fades in and out with its section ---- */
+
+function Chapter({ pose, n, eyebrow, title, height, children }: { pose: SurveyPose; n: string; eyebrow: string; title: string; height: number; children: ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const opacity = useTransform(scrollYProgress, [0.22, 0.36, 0.7, 0.82], [0, 1, 1, 0]);
+  const y = useTransform(scrollYProgress, [0.22, 0.36, 0.7, 0.82], [28, 0, 0, -20]);
+  return (
+    <section ref={ref} className="lp-sec lp-chapter" data-pose={pose} style={{ height: `${height}svh` }}>
+      <div className="lp-sticky">
+        <motion.div className="lp-caption" style={{ opacity, y }}>
+          <p className="lp-eyebrow">
+            <span>{n}</span> {eyebrow}
+          </p>
+          <h2 className="lp-h2">{title}</h2>
+          {children}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function Stat({ v, k }: { v: ReactNode; k: string }) {
+  return (
+    <div className="lp-stat">
+      <span className="lp-stat-v">{v}</span>
+      <span className="lp-stat-k">{k}</span>
+    </div>
+  );
+}
+
+/* ---- the pinned climb ---- */
+
+const BEAT_AT = [0, 0.34, 0.67, 1];
+
+function Climb({ facts, store, reduced }: { facts: LandingFacts; store: StageStore; reduced: boolean }) {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const step = useSyncExternalStore(store.sub, () => store.get().step, () => 0);
+  const g = facts.growth;
+  const at = g[Math.min(step, g.length - 1)];
   const label = metricInfo(facts.metric).label;
-  const at = (i: number) => facts.growth[Math.min(i, facts.growth.length - 1)];
-  return [
+  const beats: { title: string; sub: string; stat: ReactNode; k: string }[] = [
     {
-      title: "It states an idea.",
-      stat: (i) => ({
-        v: (
-          <>
-            <Ticker value={at(i).n} format={(n) => String(Math.round(n)).padStart(2, "0")} />
-            <span className="lp-stat-dim"> / {total}</span>
-          </>
-        ),
-        k: "experiments, one hypothesis each",
-      }),
+      title: "Each idea sends a probe.",
+      sub: "Bearing is the idea's family; the step is the size of the change.",
+      stat: (
+        <>
+          <Ticker value={at.n} format={(x) => String(Math.round(x)).padStart(2, "0")} />
+          <span className="lp-stat-dim"> / {facts.nExperiments}</span>
+        </>
+      ),
+      k: "experiments, one hypothesis each",
     },
     {
-      title: "Tests it in a sandbox.",
-      stat: (i, done) => ({
-        v: <Ticker value={at(i).best} format={(n) => formatScore(facts.metric, n)} />,
-        k: `best cross-validated ${label}${done ? "" : " so far"}`,
-      }),
+      title: "The bead moves only on a real gain.",
+      sub: "A corrected paired test decides. Everything else stays a stake on lower ground.",
+      stat: (
+        <>
+          <span className="lp-signal">
+            <Ticker value={at.kept} format={(x) => String(Math.round(x))} />
+          </span>
+          <span className="lp-stat-dim"> kept</span>
+        </>
+      ),
+      k: `of ${at.n} tried`,
     },
     {
-      title: "Keeps only what beats the noise.",
-      stat: (i) => ({
-        v: (
-          <>
-            <span style={{ color: "var(--lp-keep)" }}>
-              <Ticker value={at(i).kept} format={(n) => String(Math.round(n))} />
-            </span>
-            <span className="lp-stat-dim"> kept</span>
-          </>
-        ),
-        k: `of ${at(i).n} tried — the rest withered`,
-      }),
-    },
-    {
-      title: facts.stop?.reason === "ceiling" ? "Stops when the rest is noise." : "Stops at its budget.",
-      stat: () =>
-        facts.stop && facts.stop.signals > 0
-          ? { v: `${facts.stop.fired} / ${facts.stop.signals}`, k: "ceiling signals agreed — no budget ran out" }
-          : { v: String(total), k: "experiments in all" },
+      title: "Up is better.",
+      sub: "The mercury rests on the best score so far.",
+      stat: <Ticker value={at.best} format={(x) => formatScore(facts.metric, x)} />,
+      k: `best cross-validated ${label} so far`,
     },
   ];
-}
-
-/** Scroll progress range [start, end) of each beat; the cursor runs over SCRUB. */
-const BEAT_AT = [0, 0.26, 0.5, 0.74, 1];
-const SCRUB: [number, number] = [0.03, 0.9];
-
-function Growth({ facts, store, reduced }: { facts: LandingFacts; store: StageStore; reduced: boolean }) {
-  const ref = useRef<HTMLElement>(null);
-  const beats = beatsFor(facts);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 0.5", "end end"] });
-  const g = facts.growth;
-
-  const apply = (v: number) => {
-    if (reduced) return;
-    if (v <= 0) return store.set({ target: null, step: 0 });
-    if (v >= 1) return store.set({ target: facts.end, step: g.length - 1 });
-    const t = Math.min(1, Math.max(0, (v - SCRUB[0]) / (SCRUB[1] - SCRUB[0])));
-    const i = Math.round(t * (g.length - 1));
-    store.set({ target: g[i].cursor, step: i });
-  };
-  useMotionValueEvent(scrollYProgress, "change", apply);
-  // A reload mid-page restores the scroll position without a change event.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
-  useEffect(() => apply(scrollYProgress.get()), []);
-
-  if (reduced) {
+  if (reduced)
     return (
-      <section className="lp-beats-static" data-stage="full" data-chapter="overview" aria-label="Watch it grow">
+      <section className="lp-sec lp-chapter" data-pose="climb" style={{ height: "auto" }} aria-label="The climb">
         {beats.map((b, i) => (
-          <div key={i} className="lp-beat">
-            <h2 className="lp-h2">{b.title}</h2>
-            <BeatStat beat={b} step={g.length - 1} done />
+          <div key={i} className="lp-sticky lp-static">
+            <div className="lp-caption">
+              <p className="lp-eyebrow">
+                <span>02</span> The climb
+              </p>
+              <h2 className="lp-h2">{b.title}</h2>
+              <p className="lp-sub">{b.sub}</p>
+              <Stat v={b.stat} k={b.k} />
+            </div>
           </div>
         ))}
       </section>
     );
-  }
-
   return (
-    <section ref={ref} className="lp-pin" data-stage="full" data-chapter="overview" aria-label="Watch it grow">
-      <div className="lp-pin-sticky">
+    <section ref={ref} className="lp-sec lp-pin" data-pose="climb" data-pin="" aria-label="The climb">
+      <div className="lp-sticky">
         {beats.map((b, i) => (
-          <BeatLayer key={i} beat={b} i={i} n={beats.length} progress={scrollYProgress} store={store} />
+          <BeatLayer key={i} i={i} n={beats.length} progress={scrollYProgress}>
+            {i === 0 && (
+              <p className="lp-eyebrow">
+                <span>02</span> The climb · scroll
+              </p>
+            )}
+            <h2 className="lp-h2">{b.title}</h2>
+            <p className="lp-sub">{b.sub}</p>
+            <Stat v={b.stat} k={b.k} />
+          </BeatLayer>
         ))}
       </div>
     </section>
   );
 }
 
-function BeatLayer({ beat, i, n, progress, store }: { beat: Beat; i: number; n: number; progress: MotionValue<number>; store: StageStore }) {
+function BeatLayer({ i, n, progress, children }: { i: number; n: number; progress: MotionValue<number>; children: ReactNode }) {
   const a = BEAT_AT[i];
   const b = BEAT_AT[i + 1];
-  // Strictly sequential crossfade: the outgoing caption is gone before the next one arrives — never two at once.
-  const f = 0.05;
+  const f = 0.045;
   const first = i === 0;
   const last = i === n - 1;
-  const input = [first ? -1 : a, first ? 0 : a + f, last ? 1 : b - f, last ? 2 : b];
+  // Strictly sequential: the outgoing caption is gone before the next arrives — never two at once.
+  const input = [first ? 0 : a, first ? 0.001 : a + f, last ? 0.999 : b - f, last ? 1 : b];
   const opacity = useTransform(progress, input, [first ? 1 : 0, 1, 1, last ? 1 : 0]);
-  const y = useTransform(progress, input, [first ? 0 : 36, 0, 0, last ? 0 : -36]);
-  const step = useStep(store);
+  const y = useTransform(progress, input, [first ? 0 : 24, 0, 0, last ? 0 : -24]);
   return (
-    <motion.div className="lp-beat" style={{ opacity, y }}>
-      <div>
-        {first && <p className="lp-beat-eyebrow">Watch it grow · scroll</p>}
-        <h2 className="lp-h2">{beat.title}</h2>
-      </div>
-      <BeatStat beat={beat} step={step} />
+    <motion.div className="lp-caption lp-beat" style={{ opacity, y }}>
+      {children}
     </motion.div>
-  );
-}
-
-function BeatStat({ beat, step, done = false }: { beat: Beat; step: number; done?: boolean }) {
-  const s = beat.stat(step, done);
-  return (
-    <div className="lp-stat">
-      <span className="lp-stat-v">{s.v}</span>
-      <span className="lp-stat-k">{s.k}</span>
-    </div>
-  );
-}
-
-/* ---- 3: the statement, revealed word by word as you scroll ---- */
-
-function Statement({ facts, reduced }: { facts: LandingFacts; reduced: boolean }) {
-  const ref = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const ending = facts.stop?.reason === "ceiling" ? "Stopped on its own." : "Stopped at its budget.";
-  const words = `${facts.nExperiments} experiments. ${facts.nKept} kept. ${ending}`.split(" ");
-  return (
-    <section ref={ref} className="lp-words" data-stage="dim" data-chapter="overview" style={reduced ? { height: "auto" } : undefined}>
-      <div className="lp-words-sticky" style={reduced ? { position: "relative", minHeight: "80svh" } : undefined}>
-        <p className="lp-words-text" aria-label={words.join(" ")}>
-          {words.map((w, i) => (
-            <Word key={i} progress={scrollYProgress} range={[0.08 + (i / words.length) * 0.62, 0.08 + ((i + 1) / words.length) * 0.62]} reduced={reduced} gold={/^\d+$/.test(w)}>
-              {w}
-            </Word>
-          ))}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function Word({ children, progress, range, reduced, gold }: { children: string; progress: MotionValue<number>; range: [number, number]; reduced: boolean; gold: boolean }) {
-  const opacity = useTransform(progress, range, [0.13, 1]);
-  return (
-    <>
-      <motion.span aria-hidden style={{ opacity: reduced ? 1 : opacity, color: gold ? "var(--lp-gold)" : undefined }}>
-        {children}
-      </motion.span>{" "}
-    </>
-  );
-}
-
-/* ---- 5: one idea ---- */
-
-function Idea({ title, children, more }: { title: string; children: ReactNode; more: { href: string; label: string } }) {
-  const external = more.href.startsWith("http");
-  return (
-    <div className="lp-idea lp-measure">
-      <h2 className="lp-h2">
-        <RiseWords text={title} />
-      </h2>
-      <Reveal delay={0.15}>
-        <p>{children}</p>
-        {external ? (
-          <a className="lp-more" href={more.href}>
-            {more.label} <span aria-hidden>→</span>
-          </a>
-        ) : (
-          <Link className="lp-more" href={more.href}>
-            {more.label} <span aria-hidden>→</span>
-          </Link>
-        )}
-      </Reveal>
-    </div>
   );
 }

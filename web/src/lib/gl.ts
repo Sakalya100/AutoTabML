@@ -1,5 +1,7 @@
 "use client";
 
+/* WebGL / motion / visibility probes shared by the survey panel and the gallery. */
+
 import { useSyncExternalStore } from "react";
 
 let cached: boolean | null = null;

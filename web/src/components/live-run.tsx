@@ -83,7 +83,7 @@ export function LiveRun({ id }: { id: string }) {
 
   if (error)
     return (
-      <main className="mx-auto max-w-[720px] px-4 py-20 sm:px-6">
+      <main data-terra className="mx-auto max-w-[720px] px-4 py-20 sm:px-6">
         <h1 className="font-display text-4xl">Run not found</h1>
         <p className="mt-3 text-ink-2">{error}</p>
         <p className="mt-6 flex gap-4 text-sm">
@@ -99,9 +99,9 @@ export function LiveRun({ id }: { id: string }) {
 
   if (!meta)
     return (
-      <main className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6">
+      <main data-terra className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6">
         <div className="h-10 w-2/3 animate-pulse rounded bg-paper-2" />
-        <div className="mt-8 h-[360px] animate-pulse rounded-md bg-paper-2" />
+        <div className="terra-frame mt-8 h-[clamp(360px,62vh,640px)] animate-pulse rounded-xl" />
       </main>
     );
 

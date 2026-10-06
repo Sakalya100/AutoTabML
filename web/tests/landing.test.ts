@@ -46,4 +46,11 @@ describe("landing facts (real breast_cancer replay)", () => {
     expect(facts.final?.test).toBeCloseTo(0.99363, 4);
     expect(facts.final?.gapText).toMatch(/no optimism/);
   });
+
+  it("survey numbers: baseline, mist (best SE) and the fitted ceiling come from the replay", () => {
+    expect(facts.survey.baseline).toBeCloseTo(0.9921945578231293, 12);
+    expect(facts.survey.best).toBeCloseTo(0.9979319727891156, 12);
+    expect(facts.survey.bestSe).toBeCloseTo(0.0009291298479550506, 12);
+    expect(facts.survey.ceiling).toBeCloseTo(0.9979319727891156 + 0.0008808720433843842, 12);
+  });
 });

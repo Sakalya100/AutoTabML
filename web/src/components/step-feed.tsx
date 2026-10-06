@@ -515,9 +515,13 @@ function ExperimentMsg({
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-ink-3">gate</span>
                 <span className={`flex items-center gap-1.5 text-sm font-semibold ${v.text}`}>
-                  <span aria-hidden className="font-mono">
-                    {v.icon}
-                  </span>
+                  {item.decision.verdict === "crash" ? (
+                    <span aria-hidden className="font-mono">
+                      {v.icon}
+                    </span>
+                  ) : (
+                    <Balance tip={item.decision.verdict === "keep"} />
+                  )}
                   {v.label}
                 </span>
                 {item.decision.gate.label && <span className="text-[12.5px] text-ink-2">{item.decision.gate.label}</span>}
@@ -536,6 +540,26 @@ function ExperimentMsg({
         )}
       </div>
     </motion.article>
+  );
+}
+
+/**
+ * The gate as a tiny two-pan balance (02-direction: "A's best idea survives"): the new probe (left pan) is weighed
+ * against the current best (right pan), and the beam tips only when the gate keeps it.
+ */
+function Balance({ tip }: { tip: boolean }) {
+  const enter = useEnter();
+  return (
+    <svg viewBox="0 0 16 13" className="terra-balance h-[13px] w-4" data-tip={tip ? "keep" : "level"} data-enter={enter} aria-hidden>
+      <path d="M8 5.2v6.3M5.5 12h5" stroke="currentColor" strokeOpacity=".55" strokeWidth="1.1" strokeLinecap="round" />
+      <g className="terra-balance-beam">
+        <path d="M1.5 5h13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M0.8 5.6 2 8.2 3.2 5.6" fill="none" stroke="currentColor" strokeOpacity=".7" strokeWidth=".9" strokeLinejoin="round" />
+        <path d="M12.8 5.6 14 8.2 15.2 5.6" fill="none" stroke="currentColor" strokeOpacity=".7" strokeWidth=".9" strokeLinejoin="round" />
+        <circle cx="2" cy="7.4" r="1.25" fill="currentColor" />
+      </g>
+      <circle cx="8" cy="5" r=".9" fill="currentColor" />
+    </svg>
   );
 }
 

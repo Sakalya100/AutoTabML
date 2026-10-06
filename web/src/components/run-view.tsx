@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AnyEvent, EventType } from "@/lib/events";
 import { buildFeed } from "@/lib/feed";
 import { fmtCost, fmtDuration } from "@/lib/format";
-import { formatScore } from "@/lib/metrics";
+import { formatScore, metricInfo } from "@/lib/metrics";
 import { buildView, type RunView as View } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
 import { ProposerBadge } from "./badges";
@@ -14,9 +14,10 @@ import { DataProfilePanel } from "./data-profile";
 import { DetailPanel } from "./detail-panel";
 import { EvolutionChart } from "./evolution-chart";
 import { Ledger } from "./ledger";
-import { ReefPanel } from "./reef-panel";
+import { SurveyPanel } from "./survey-panel";
 import { StepFeed } from "./step-feed";
 import { FinalScores, StopReport } from "./stop-report";
+import "./terra.css";
 
 interface Props {
   mode: "replay" | "live";
@@ -122,11 +123,12 @@ export function RunView({ mode, events, record, title, subtitle, active, liveBar
   const cfgMax = view.config.max_experiments ?? stopRule.max_experiments;
   const planned = plannedExperiments ?? (typeof cfgMax === "number" ? cfgMax : null);
   const totalExps = full?.experiments.length ?? null;
+  const nKept = view.experiments.filter((x) => x.status === "keep").length;
 
   return (
-    <div className="mx-auto max-w-[1320px] px-4 pt-8 pb-16 sm:px-6">
+    <div data-terra className="mx-auto max-w-[1320px] px-4 pt-8 pb-16 sm:px-6">
       <header className="rise">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <ProposerBadge proposer={view.proposer ?? record?.proposer ?? null} />
           {view.task?.description && <span className="text-sm text-ink-3">“{view.task.description}”</span>}
         </div>
@@ -139,7 +141,7 @@ export function RunView({ mode, events, record, title, subtitle, active, liveBar
             <div className="flex flex-wrap items-center gap-2.5">
               <button
                 onClick={startSimulation}
-                className="group inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-paper transition-transform hover:-translate-y-px active:translate-y-0"
+                className="group inline-flex items-center gap-2 rounded-full bg-best px-5 py-2.5 text-sm font-medium text-paper transition-transform duration-200 hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
               >
                 <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden>
                   <path d="M4 2.5v11l9-5.5z" fill="currentColor" />
@@ -150,18 +152,19 @@ export function RunView({ mode, events, record, title, subtitle, active, liveBar
                 href="/new"
                 className="inline-flex items-center rounded-full border border-rule-strong px-5 py-2.5 text-sm text-ink-2 transition-colors hover:border-ink hover:text-ink"
               >
-                {live ? "Start another run" : "Start a new run on your data"}
+                {live ? "Start another run" : "Survey your own data"}
               </Link>
             </div>
           )}
         </div>
-        <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3 border-y border-rule py-3 text-sm">
+        <dl className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-1.5 border-t border-rule pt-3 font-mono text-[12.5px] text-ink-3 tabular">
           <Fact label="experiments" value={`${view.experiments.length}${staging && (liveActive ? planned : totalExps) ? ` / ${liveActive ? planned : totalExps}` : ""}`} />
-          <Fact label={`best ${view.metric ?? ""}`.trim()} value={best?.cv ? `${formatScore(view.metric, best.cv.mean)}` : "—"} accent />
-          <Fact label="best id" value={view.bestId ?? "—"} />
-          {view.final && <Fact label="locked test" value={formatScore(view.metric, view.final.testScore)} />}
-          <Fact label="LLM cost" value={fmtCost(view.final?.totalCostUsd ?? view.totalCostUsd)} />
-          <Fact label="elapsed" value={fmtDuration(view.final?.wallTimeS ?? elapsed)} />
+          <Fact label="kept" value={String(nKept)} />
+          <Fact label={`best ${view.metric ? metricInfo(view.metric).label : ""}`.trim()} value={best?.cv ? `${formatScore(view.metric, best.cv.mean)}` : "—"} accent />
+          {view.bestId && <Fact label="at" value={view.bestId} />}
+          {view.final && <Fact label="test" value={formatScore(view.metric, view.final.testScore)} />}
+          <Fact label="cost" value={fmtCost(view.final?.totalCostUsd ?? view.totalCostUsd)} />
+          <Fact label="time" value={fmtDuration(view.final?.wallTimeS ?? elapsed)} />
           <Fact label="state" value={endState ?? phaseLabel(view)} />
         </dl>
       </header>
@@ -198,13 +201,13 @@ export function RunView({ mode, events, record, title, subtitle, active, liveBar
             )}
             <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
               <div className="sticky top-0 z-10 -mx-4 bg-paper px-4 pt-2 pb-2 sm:-mx-6 sm:px-6 lg:static lg:order-2 lg:m-0 lg:p-0">
-                <ReefPanel
+                <SurveyPanel
                   statusText={endState ?? undefined}
                   view={view}
                   domainView={full}
                   selectedId={selectedId}
-                  focusId={pinned}
                   onSelect={setPinned}
+                  staging
                   compact
                   heightClass="h-[34svh] min-h-[240px] lg:h-[min(74vh,740px)] lg:min-h-[520px]"
                 />
@@ -232,13 +235,13 @@ export function RunView({ mode, events, record, title, subtitle, active, liveBar
           <motion.div key="finished" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}>
             <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
               <div className="lg:sticky lg:top-4">
-                <ReefPanel
+                <SurveyPanel
                   statusText={endState ?? undefined}
                   view={view}
                   domainView={full}
                   selectedId={selectedId}
-                  focusId={pinned}
                   onSelect={setPinned}
+                  staging={false}
                   heightClass="h-[clamp(320px,52vh,520px)] lg:h-[clamp(480px,70vh,660px)]"
                 />
               </div>
@@ -318,9 +321,9 @@ function phaseLabel(v: View): string {
 
 function Fact({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div>
-      <dt className="text-[11px] uppercase tracking-[0.1em] text-ink-3">{label}</dt>
-      <dd className={`font-mono tabular ${accent ? "text-best" : "text-ink"}`}>{value}</dd>
+    <div className="flex items-baseline gap-1.5">
+      <dt>{label}</dt>
+      <dd className={accent ? "font-medium text-best" : "text-ink"}>{value}</dd>
     </div>
   );
 }

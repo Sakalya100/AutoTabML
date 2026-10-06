@@ -39,6 +39,16 @@ export interface LandingFacts {
   growth: GrowthStep[];
   /** Cursor of the whole run (the locked test opened). */
   end: number;
+  /** The survey's own numbers (oriented scores; null when the replay lacks them). */
+  survey: {
+    /** CV mean of the first probe (the baseline). */
+    baseline: number | null;
+    /** Best CV mean and its standard error (the mist). */
+    best: number | null;
+    bestSe: number | null;
+    /** Fitted ceiling = best + saturation.value (the cloud deck). */
+    ceiling: number | null;
+  };
 }
 
 const num = (x: unknown): number | null => (typeof x === "number" && Number.isFinite(x) ? x : null);
@@ -56,6 +66,18 @@ export function growthSteps(events: readonly AnyEvent[]): GrowthStep[] {
     const best = v.experiments.find((x) => x.id === v.bestId)?.cv?.mean ?? null;
     return { cursor, n: decided.length, kept: decided.filter((x) => x.status === "keep").length, best };
   });
+}
+
+function surveyNumbers(v: ReturnType<typeof buildView>): LandingFacts["survey"] {
+  const best = v.experiments.find((x) => x.id === v.bestId);
+  const sat = num(v.stop?.signals.find((s) => s.key === "saturation")?.value);
+  const bestMean = best?.cv?.mean ?? null;
+  return {
+    baseline: v.experiments[0]?.cv?.mean ?? null,
+    best: bestMean,
+    bestSe: best?.cv?.se ?? null,
+    ceiling: bestMean != null && sat != null ? bestMean + sat : null,
+  };
 }
 
 export function landingFacts(name: string, dataset: string, events: readonly AnyEvent[], rec: RunRecord): LandingFacts {
@@ -83,5 +105,6 @@ export function landingFacts(name: string, dataset: string, events: readonly Any
     final: f ? { devCv: f.devCvMean, select: f.selectScore, test: f.testScore, gap: f.optimismGap, gapText: describeGap(metric, f.optimismGap) } : null,
     growth: growthSteps(events),
     end: events.length,
+    survey: surveyNumbers(v),
   };
 }

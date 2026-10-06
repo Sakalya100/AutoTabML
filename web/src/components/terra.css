@@ -1,0 +1,106 @@
+/*
+ * Terra Incognita tokens for the run pages and the replay gallery (docs/creative/02-direction.md, "Visual system").
+ *
+ * Imported by components, so the stylesheet persists across client navigation: every rule is gated on a
+ * [data-terra] marker being on the page, which only run pages and the gallery render.
+ *
+ * Dark theme: the page *is* the void, with bone type, amber signal for kept/best and ember only on crashes.
+ * Light theme: the same survey printed on bone paper — the canvas frames stay void, the data stays readable,
+ * and amber is darkened so text clears 4.5:1.
+ */
+
+:root:has([data-terra]) {
+  --paper: oklch(96.2% 0.011 88);
+  --paper-2: oklch(93.4% 0.014 88);
+  --paper-3: oklch(89.6% 0.016 88);
+  --ink: oklch(19% 0.014 250);
+  --ink-2: oklch(36% 0.012 250);
+  --ink-3: oklch(50% 0.012 250);
+  --rule: oklch(86.5% 0.016 88);
+  --rule-strong: oklch(74% 0.018 88);
+  --best: oklch(55% 0.13 66);
+  --best-soft: oklch(78% 0.15 72 / 0.18);
+  --keep: oklch(55% 0.13 66);
+  --discard: oklch(62% 0.01 250);
+  --crash: oklch(55% 0.19 33);
+  --select: oklch(48% 0.07 190);
+  --test: oklch(19% 0.014 250);
+  --focus: oklch(55% 0.13 66);
+  --code-bg: oklch(94% 0.012 88);
+  --add-bg: oklch(78% 0.15 72 / 0.16);
+  --del-bg: oklch(62% 0.19 33 / 0.1);
+}
+
+:root[data-theme="dark"]:has([data-terra]) {
+  --paper: #05070a;
+  --paper-2: #0d1117;
+  --paper-3: #1b222b;
+  --ink: #ece7dc;
+  --ink-2: #c4beb0;
+  --ink-3: #8a8679;
+  --rule: #171d25;
+  --rule-strong: #2a323d;
+  --best: #ffb547;
+  --best-soft: rgb(255 181 71 / 0.1);
+  --keep: #ffb547;
+  --discard: #6b7079;
+  --crash: #ff5a3c;
+  --select: #7fd6d0;
+  --test: #eaf6ff;
+  --focus: #ffb547;
+  --code-bg: #0a0d12;
+  --add-bg: rgb(255 181 71 / 0.1);
+  --del-bg: rgb(255 90 60 / 0.1);
+}
+
+/* The canvas frame is the void in both themes; a hairline of bone keeps its edge on void paper. */
+.terra-frame {
+  background: #05070a;
+  box-shadow:
+    0 0 0 1px rgb(217 211 196 / 0.09),
+    0 40px 90px -50px rgb(5 7 10 / 0.7);
+}
+
+/* The gate's balance: the beam tips toward the new probe only on a keep. */
+.terra-balance-beam {
+  transform-box: view-box;
+  transform-origin: 8px 5px;
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.terra-balance[data-tip="keep"] .terra-balance-beam {
+  transform: rotate(-14deg);
+}
+.terra-balance[data-enter="true"][data-tip="keep"] .terra-balance-beam {
+  animation: terra-tip 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+}
+@keyframes terra-tip {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-14deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terra-balance[data-enter="true"][data-tip="keep"] .terra-balance-beam {
+    animation: none;
+  }
+}
+
+/* Gallery posters fade up out of the void once captured. */
+@keyframes terra-poster-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.poster-in {
+  animation: terra-poster-in 0.9s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .poster-in {
+    animation: none;
+  }
+}
