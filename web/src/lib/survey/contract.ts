@@ -42,6 +42,12 @@ export interface SurveyScrub {
    * Absent (run pages) = phase-driven.
    */
   gates?: SurveyGates;
+  /**
+   * Run pages' timeline: an experiment the shot should also keep in frame. The follow point becomes the midpoint of
+   * the bead and this probe, weighted by `aimW` (0..1). Absent on the landing.
+   */
+  aimId?: string | null;
+  aimW?: number;
 }
 
 export interface SurveyGates {

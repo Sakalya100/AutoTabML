@@ -3,10 +3,10 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { feedSignature, inFlight, type ExperimentItem, type FeedItem, type FinishedItem, type RunStartedItem, type StoppedItem } from "@/lib/feed";
-import { CATEGORY_LABEL, fmtCost, fmtDuration, fmtValue, SIGNAL_LABEL, STOP_REASON_LABEL } from "@/lib/format";
-import { describeGap, directionLabel, formatScore, formatSe, metricInfo } from "@/lib/metrics";
+import { CATEGORY_LABEL, fmtCost, fmtDuration, fmtValue, SIGNAL_LABEL } from "@/lib/format";
+import { describeGap, formatScore, formatSe, metricInfo } from "@/lib/metrics";
+import { answerKind, plainIdea, plainVerdict, stopPhrase } from "@/lib/story";
 import type { Metric } from "@/lib/schema";
-import { RadicalBadge } from "./badges";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -34,7 +34,10 @@ interface Props {
   className?: string;
 }
 
-/** The agent's activity as a transcript: one message group per experiment, plus run-level messages. */
+/**
+ * The agent's activity, in the landing's typographic language: one entry per idea, plain words first (what it tried,
+ * what happened), the precise numbers second, the gate's full reasoning on selection. No bubbles, no cards.
+ */
 export function StepFeed({ items, metric, selectedId, focusId, onSelect, streaming, emptyHint, heuristic, className = "" }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
@@ -108,35 +111,35 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
     });
   };
 
-  const nExp = items.filter((i) => i.kind === "experiment").length;
+  const nExp = items.filter((i) => i.kind === "experiment" && i.decision).length;
   const nKept = items.filter((i) => i.kind === "experiment" && i.decision?.verdict === "keep").length;
 
   return (
     <AnimateCtx.Provider value={ready}>
-      <section aria-label="Agent activity" className={`relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-rule bg-paper ${className}`}>
-        <header className="flex items-center gap-3 border-b border-rule px-4 py-3">
-          <span className="relative flex size-2" aria-hidden>
-            {streaming && <span className="absolute inline-flex size-full animate-ping rounded-full bg-keep opacity-60" />}
-            <span className={`relative inline-flex size-2 rounded-full ${streaming ? "bg-keep" : "bg-ink-3"}`} />
+      <section aria-label="What the agent is doing" className={`relative flex min-h-0 flex-col overflow-hidden ${className}`}>
+        <header className="flex items-baseline gap-3 px-5 pt-4 pb-3 sm:px-6">
+          <span className="relative flex size-1.5 translate-y-[-2px]" aria-hidden>
+            {streaming && <span className="absolute inline-flex size-full animate-ping rounded-full bg-best opacity-60" />}
+            <span className={`relative inline-flex size-1.5 rounded-full ${streaming ? "bg-best" : "bg-ink-3"}`} />
           </span>
-          <h2 className="text-sm font-medium">Agent activity</h2>
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-3">{streaming ? "Working" : "What it did"}</h2>
           <span className="ml-auto font-mono text-[11px] text-ink-3 tabular">
-            {nExp} experiment{nExp === 1 ? "" : "s"} · {nKept} kept
+            {nExp} tried · <span className="text-best">{nKept} kept</span>
           </span>
         </header>
 
         <div
           ref={scroller}
           onScroll={onScroll}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-4 pb-8 sm:px-4"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-2 pb-16 [mask-image:linear-gradient(to_bottom,transparent,#000_28px,#000_calc(100%-40px),transparent)] sm:px-6"
           role="log"
           aria-live="polite"
           aria-relevant="additions"
         >
-          {items.length === 0 && !streaming && <p className="px-2 py-10 text-center text-sm text-ink-3">No activity recorded.</p>}
-          <ol className="space-y-5">
+          {items.length === 0 && !streaming && <p className="py-10 text-sm text-ink-3">Nothing was recorded.</p>}
+          <ol>
             {items.map((it) => (
-              <li key={it.key}>
+              <li key={it.key} className="border-t border-[var(--lp-hair)] first:border-t-0">
                 {it.kind === "run_started" && <RunStartedMsg item={it} />}
                 {it.kind === "experiment" && <ExperimentMsg item={it} metric={metric} selected={it.id === selectedId} live={it === flying && streaming} onSelect={onSelect} />}
                 {it.kind === "stopped" && <StoppedMsg item={it} />}
@@ -151,16 +154,17 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, transition: { duration: 0.12 } }}
                   transition={{ duration: 0.3, ease: EASE }}
+                  className="border-t border-[var(--lp-hair)] py-4"
                 >
                   <Thinking
                     text={
                       items.length === 0
-                        ? (emptyHint ?? "Profiling the data")
+                        ? (emptyHint ?? "Reading the data")
                         : last?.kind === "stopped"
-                          ? "Refitting the best solution and scoring the locked test split"
+                          ? "Running the one final test, on data it has never seen"
                           : heuristic
                             ? "Choosing the next idea"
-                            : "Proposing the next idea"
+                            : "Thinking of the next idea"
                     }
                   />
                 </motion.li>
@@ -178,12 +182,12 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8, transition: { duration: 0.12 } }}
               transition={{ duration: 0.22, ease: EASE }}
-              className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink px-3.5 py-1.5 text-xs font-medium text-paper shadow-[0_8px_24px_-8px_rgba(0,0,0,0.45)]"
+              className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink px-3.5 py-1.5 text-xs font-medium text-paper"
             >
               <svg viewBox="0 0 12 12" className="size-3" aria-hidden>
                 <path d="M6 2v7M2.5 6 6 9.5 9.5 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Jump to latest
+              Latest
               {unseen > 0 && streaming ? <span className="text-paper/70">· new</span> : null}
             </motion.button>
           )}
@@ -230,30 +234,16 @@ function Typed({ text, play, cps = 140 }: { text: string; play: boolean; cps?: n
   );
 }
 
-function Speaker({ who, children }: { who: "agent" | "sandbox" | "gate" | "harness"; children?: React.ReactNode }) {
-  return (
-    <div className="mb-1 flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-[0.12em] text-ink-3">
-      <span>{who}</span>
-      {children}
-    </div>
-  );
-}
-
 function Thinking({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-2.5 pl-[3.25rem] text-sm text-ink-3">
+    <div className="flex items-center gap-2.5 pl-10 text-[14px] text-ink-3">
       <span className="flex gap-1" aria-hidden>
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
-            className="size-1.5 rounded-full bg-ink-3"
+            className="size-1 rounded-full bg-ink-3"
             animate={{ opacity: [0.25, 1, 0.25] }}
-            transition={{
-              duration: 1.1,
-              repeat: Infinity,
-              delay: i * 0.16,
-              ease: "easeInOut",
-            }}
+            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
           />
         ))}
       </span>
@@ -264,140 +254,116 @@ function Thinking({ text }: { text: string }) {
 
 /* ---- run-level messages ------------------------------------------------------------------------------ */
 
-function SystemCard({ kicker, tone, children }: { kicker: string; tone?: "best" | "keep"; children: React.ReactNode }) {
+/** A run-level moment: a small mono kicker, one display line, plain words, then the precise detail. */
+function Moment({ kicker, title, tone, children }: { kicker: string; title: React.ReactNode; tone?: "signal"; children?: React.ReactNode }) {
   return (
-    <Enter>
-      <div className={`rounded-xl border px-4 py-3.5 ${tone === "best" ? "border-best/40 bg-best-soft" : "border-rule bg-paper-2"}`}>
-        <p className={`font-mono text-[10.5px] uppercase tracking-[0.16em] ${tone === "best" ? "text-best" : "text-ink-3"}`}>{kicker}</p>
-        {children}
-      </div>
+    <Enter className="py-5">
+      <p className={`font-mono text-[10.5px] uppercase tracking-[0.2em] ${tone ? "text-best" : "text-ink-3"}`}>{kicker}</p>
+      <p className="mt-1.5 font-display text-[1.6rem] leading-[1.08] text-ink">{title}</p>
+      {children}
     </Enter>
   );
 }
 
 function RunStartedMsg({ item }: { item: RunStartedItem }) {
   const m = metricInfo(item.metric);
+  const kind = answerKind(item.problemType, null);
   return (
-    <SystemCard kicker="harness · run started">
-      <p className="mt-1.5 text-[15px] leading-snug text-ink">
-        {item.nRows != null && (
+    <Moment
+      kicker="The task"
+      title={
+        item.target ? (
           <>
-            <span className="font-mono tabular">{item.nRows.toLocaleString("en-US")}</span> rows × <span className="font-mono tabular">{item.nCols}</span> columns
+            Predict <span className="italic">{item.target}</span>
+            {kind ? <span className="text-ink-3"> ({kind})</span> : null}
           </>
-        )}
-        {item.problemType && <> · {item.problemType.replace(/_/g, " ")}</>}
-        {item.target && (
-          <>
-            {" "}
-            · predict <span className="font-mono text-[13px]">{item.target}</span>
-          </>
-        )}
-      </p>
-      <p className="mt-1 text-[13px] text-ink-2">
-        Scored on <span className="font-medium text-ink">{m.label}</span> ({directionLabel(item.metric)}) over repeated k-fold CV
-        {item.maxExperiments ? <> · up to {item.maxExperiments} experiments</> : null}.
-      </p>
-      {item.columnKinds.length > 0 && (
-        <p className="mt-2 flex flex-wrap gap-1.5">
-          {item.columnKinds.map(([k, n]) => (
-            <span key={k} className="rounded-full border border-rule-strong px-2 py-px text-[11px] text-ink-2">
-              {n} {k}
-            </span>
-          ))}
-          {item.flagged.slice(0, 3).map((f) => (
-            <span key={f.name} className="rounded-full border border-best/40 px-2 py-px text-[11px] text-best" title={f.flags.join(", ")}>
-              {f.name}: {f.flags[0].replace(/_/g, " ")}
-            </span>
-          ))}
+        ) : (
+          "A new survey"
+        )
+      }
+    >
+      {item.nRows != null && (
+        <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">
+          From {item.nCols != null ? `${Math.max(0, item.nCols - 1)} columns of ` : ""}
+          {item.nRows.toLocaleString("en-US")} rows. It only sees a summary and a few sample rows, and a slice of the data stays locked away for one
+          final test.
         </p>
       )}
-      <p className="mt-2.5 text-[12px] leading-snug text-ink-3">
-        The agent sees a code-generated profile and at most 5 sample rows — never the full table. The test split stays locked until the end.
+      <p className="mt-2 font-mono text-[11.5px] leading-relaxed text-ink-3 tabular">
+        {m.label} · {m.greaterIsBetter ? "higher is better" : "lower is better"} · repeated k-fold CV
+        {item.maxExperiments ? ` · up to ${item.maxExperiments} ideas` : ""}
+        {item.columnKinds.length > 0 && ` · ${item.columnKinds.map(([k, n]) => `${n} ${k}`).join(", ")}`}
       </p>
-    </SystemCard>
+      {item.flagged.length > 0 && (
+        <p className="mt-1 font-mono text-[11.5px] text-best">
+          flagged: {item.flagged.slice(0, 3).map((f) => `${f.name} (${f.flags[0].replace(/_/g, " ")})`).join(", ")}
+        </p>
+      )}
+    </Moment>
   );
 }
 
 function StoppedMsg({ item }: { item: StoppedItem }) {
+  const phrase = stopPhrase(item.reason);
+  const fired = item.signals.filter((s) => s.fired === true).length;
+  const known = item.signals.filter((s) => s.fired != null).length;
   return (
-    <SystemCard kicker="stop rule · run stopped" tone="best">
-      <p className="mt-1 font-display text-[1.35rem] leading-tight text-ink">{STOP_REASON_LABEL[item.reason] ?? item.reason}</p>
-      <ul className="mt-2.5 space-y-1.5">
+    <Moment kicker="It stopped" tone="signal" title={phrase ? `It ${phrase}.` : "It stopped."}>
+      <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">
+        {item.reason === "ceiling" ? "Progress had levelled off: more ideas were unlikely to beat chance. " : ""}
+        {known > 0 && `${fired} of ${known} stop signals agreed.`}
+      </p>
+      <ul className="mt-2.5 space-y-1">
         {item.signals.map((s) => (
-          <li key={s.key} className="grid grid-cols-[auto_1fr_auto] items-baseline gap-x-2 text-[13px]">
-            <span
-              aria-hidden
-              className={`size-2 translate-y-[-1px] rounded-full ${s.fired === true ? "bg-best" : s.fired === false ? "border-[1.5px] border-ink-3" : "border border-dashed border-ink-3"}`}
-            />
-            <span className={s.fired ? "text-ink" : "text-ink-3"}>
-              {SIGNAL_LABEL[s.key]?.title ?? s.key.replace(/_/g, " ")}
-              <span className="text-ink-3"> · {s.fired === true ? "fired" : s.fired === false ? "not fired" : "n/a"}</span>
+          <li key={s.key} className="grid grid-cols-[auto_1fr_auto] items-baseline gap-x-2 font-mono text-[11.5px] text-ink-3 tabular">
+            <span aria-hidden className={`size-1.5 translate-y-[-1px] rounded-full ${s.fired === true ? "bg-best" : s.fired === false ? "border border-ink-3" : "border border-dashed border-ink-3"}`} />
+            <span className={s.fired ? "text-ink-2" : ""}>
+              {(SIGNAL_LABEL[s.key]?.title ?? s.key.replace(/_/g, " ")).toLowerCase()} · {s.fired === true ? "yes" : s.fired === false ? "no" : "n/a"}
             </span>
             {s.fired != null && (
-              <span className="font-mono text-[11px] text-ink-3 tabular">
+              <span>
                 {fmtValue(s.value)} / {fmtValue(s.threshold)}
               </span>
             )}
           </li>
         ))}
       </ul>
-      <p className="mt-2.5 text-[12.5px] leading-snug text-ink-2">{item.summary}</p>
-    </SystemCard>
+      <p className="mt-2 text-[12.5px] leading-snug text-ink-3">{item.summary}</p>
+    </Moment>
   );
 }
 
 function FinishedMsg({ item, metric }: { item: FinishedItem; metric: Metric | null }) {
   return (
-    <SystemCard kicker="harness · locked test opened" tone="keep">
-      <div className="mt-2 grid grid-cols-3 gap-3">
-        <Num label="dev CV" value={formatScore(metric, item.devCvMean)} />
-        <Num label="select" value={formatScore(metric, item.select)} />
-        <Num label="test" value={formatScore(metric, item.test)} strong />
-      </div>
-      <p className="mt-2.5 text-[13px] leading-snug text-ink-2">
-        Optimism gap <span className="font-mono text-ink tabular">{Math.abs(item.gap).toFixed(4)}</span> — {describeGap(metric, item.gap)}.
+    <Moment
+      kicker="The final test"
+      tone="signal"
+      title={
+        <>
+          <span className="font-mono text-[1.45rem] tracking-tight tabular">{formatScore(metric, item.test)}</span>{" "}
+          <span className="text-ink-2">on data it never saw.</span>
+        </>
+      }
+    >
+      <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">
+        {item.gap > 0 ? "A little below its own estimate" : item.gap < 0 ? "Better than its own estimate" : "Exactly its own estimate"}: {describeGap(metric, item.gap)}.
       </p>
-      <p className="mt-1 text-[12px] text-ink-3">
-        best = <span className="font-mono">{item.bestId}</span> · {item.nExperiments} experiments · {fmtDuration(item.wallTimeS)} · {fmtCost(item.costUsd)}
+      <p className="mt-2 font-mono text-[11.5px] text-ink-3 tabular">
+        dev CV {formatScore(metric, item.devCvMean)} · select {formatScore(metric, item.select)} · test {formatScore(metric, item.test)} · best {item.bestId} · {item.nExperiments} ideas ·{" "}
+        {fmtDuration(item.wallTimeS)} · {fmtCost(item.costUsd)}
       </p>
-    </SystemCard>
-  );
-}
-
-function Num({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div>
-      <div className="text-[10.5px] uppercase tracking-[0.1em] text-ink-3">{label}</div>
-      <div className={`font-mono text-lg tabular ${strong ? "font-semibold text-ink" : "text-ink-2"}`}>{value}</div>
-    </div>
+    </Moment>
   );
 }
 
 /* ---- one experiment ---------------------------------------------------------------------------------- */
 
-const VERDICT = {
-  keep: {
-    label: "Kept",
-    icon: "✓",
-    box: "border-keep/45 bg-keep/10",
-    text: "text-keep",
-    dot: "bg-keep",
-  },
-  discard: {
-    label: "Discarded",
-    icon: "×",
-    box: "border-rule-strong bg-paper",
-    text: "text-ink-2",
-    dot: "border border-discard bg-paper",
-  },
-  crash: {
-    label: "Crashed",
-    icon: "!",
-    box: "border-crash/45 bg-crash/10",
-    text: "text-crash",
-    dot: "bg-crash",
-  },
-} as const;
+const DOT: Record<string, string> = {
+  kept: "bg-best",
+  dropped: "border border-ink-3",
+  broke: "bg-crash",
+  running: "bg-best",
+};
 
 function ExperimentMsg({
   item,
@@ -413,14 +379,17 @@ function ExperimentMsg({
   onSelect: (id: string) => void;
 }) {
   const enter = useEnter();
-  const v = item.decision ? VERDICT[item.decision.verdict] : null;
+  const status = item.decision ? item.decision.verdict : "running";
+  const v = plainVerdict({ status, reason: item.decision?.reason ?? "", index: item.index });
   const fails = item.attempts.filter((a) => !a.ok);
   const okAttempt = item.attempts.find((a) => a.ok);
+  const idea = plainIdea(item.idea);
+  const g = item.decision?.gate;
 
   return (
     <motion.article
       data-exp={item.id}
-      initial={enter ? { opacity: 0, y: 10 } : false}
+      initial={enter ? { opacity: 0, y: 8 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE }}
       onClick={() => onSelect(item.id)}
@@ -432,139 +401,96 @@ function ExperimentMsg({
       }}
       tabIndex={0}
       aria-current={selected || undefined}
-      aria-label={`Experiment ${item.id}: ${item.idea.title}`}
-      className={`group grid cursor-pointer grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2 rounded-xl py-2 pr-2 transition-colors ${selected ? "bg-best-soft" : "hover:bg-paper-2"}`}
+      aria-label={`Idea ${item.index + 1}: ${idea}. ${v.text}, ${v.outcome}.`}
+      className={`group relative -mx-3 grid cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 rounded-lg px-3 py-3.5 transition-colors duration-300 ${
+        selected ? "bg-[rgb(255_181_71/0.06)]" : "hover:bg-[rgb(236_231_220/0.03)]"
+      }`}
     >
-      {/* gutter: id + thread line */}
-      <div className="flex flex-col items-center pt-1">
-        <span className={`font-mono text-[11px] tabular ${item.decision?.newBest ? "font-semibold text-best" : selected ? "text-ink" : "text-ink-3"}`}>{item.id}</span>
-        <span className={`mt-1.5 size-2 shrink-0 rounded-full ${v ? v.dot : "bg-best"}`} aria-hidden>
-          {!v && <span className="block size-2 animate-ping rounded-full bg-best opacity-60" />}
-        </span>
-        <span className="mt-1.5 w-px flex-1 bg-rule" aria-hidden />
+      <div className="flex flex-col items-start pt-[0.42rem]">
+        <span className={`size-2 rounded-full ${DOT[v.tone]} ${v.tone === "running" ? "animate-pulse" : ""}`} aria-hidden />
+        <span className="mt-2 font-mono text-[10px] text-ink-3 tabular">{String(item.index + 1).padStart(2, "0")}</span>
       </div>
 
-      <div className="min-w-0 space-y-2.5">
-        {/* agent: the idea */}
-        <div>
-          <Speaker who="agent">
-            <span className="font-normal normal-case tracking-normal">· idea{item.parentId ? ` on ${item.parentId}` : ""}</span>
-          </Speaker>
-          <div className="rounded-2xl rounded-tl-md border border-rule bg-paper-2 px-3.5 py-2.5">
-            <p className="text-[15px] leading-snug font-medium text-ink">
-              <Typed text={item.idea.title} play={enter && live} cps={90} />
-            </p>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-[11px] tracking-wide text-ink-3">{CATEGORY_LABEL[item.idea.category] ?? item.idea.category}</span>
-              {item.idea.radical && <RadicalBadge />}
-            </div>
-            {item.idea.rationale && (
-              <p className={`mt-1.5 text-[13px] leading-relaxed text-ink-2 ${selected ? "" : "line-clamp-3"}`}>
-                <Typed text={item.idea.rationale} play={enter && live} cps={260} />
-              </p>
-            )}
-          </div>
+      <div className="min-w-0">
+        <p className="text-[16px] leading-snug text-ink">
+          <span className="text-ink-3 italic">Tried </span>
+          <Typed text={idea} play={enter && live} cps={80} />
+        </p>
+        <div className={`mt-1 text-[14px] ${v.tone === "kept" ? "text-best" : v.tone === "broke" ? "text-crash" : "text-ink-2"}`}>
+          {v.tone === "running" ? (
+            <Running repairing={fails.length > 0} />
+          ) : (
+            <Enter>
+              {v.text} <span aria-hidden>→</span> <span className="font-medium">{v.outcome}</span>
+              {item.decision?.newBest && item.index > 0 && <span className="ml-2 font-mono text-[11px] uppercase tracking-[0.14em]">new best</span>}
+            </Enter>
+          )}
         </div>
 
-        {/* sandbox */}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2.5">
-          <span className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-ink-3">sandbox</span>
-          <div className="min-w-0">
-            {item.llmCalls > 0 && (
-              <p className="mb-1 text-[11.5px] text-ink-3">
-                {item.llmCalls} LLM call{item.llmCalls === 1 ? "" : "s"} · {fmtCost(item.costUsd)}
-              </p>
-            )}
-            {fails.map((a) => (
-              <Enter key={a.attempt} className="mb-1.5">
-                <details className="group/err rounded-lg border border-crash/30 bg-[var(--del-bg)] px-3 py-1.5 text-[12.5px]" onClick={(e) => e.stopPropagation()}>
-                  <summary className="cursor-pointer list-none text-crash marker:hidden">
-                    attempt {a.attempt + 1} failed · <span className="font-mono">{a.errorKind ?? "error"}</span>
-                    {a.attempt + 1 < item.attempts.length || (!item.decision && item.attempts.at(-1) === a) ? (
-                      <span className="text-ink-3"> — the agent repairs the code</span>
-                    ) : null}
-                    <span className="ml-1 text-ink-3 group-open/err:hidden">· show tail</span>
-                  </summary>
-                  {a.errorTail && (
-                    <pre className="mt-1.5 max-h-40 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-ink-2">
-                      {a.errorTail.split("\n").slice(-8).join("\n")}
-                    </pre>
-                  )}
-                </details>
-              </Enter>
-            ))}
-            {item.stage === "running" && <Running repairing={fails.length > 0} />}
-            {item.scored && (
-              <Enter>
-                <p className="font-mono text-[12.5px] text-ink tabular">
-                  CV {formatScore(metric, item.scored.cvMean)} <span className="text-ink-3">± {formatSe(item.scored.cvSe)}</span>
-                  <span className="text-ink-3"> · </span>select {formatScore(metric, item.scored.select)}
-                  {okAttempt && <span className="text-ink-3"> · {fmtDuration(okAttempt.durationS)}</span>}
-                  {okAttempt && okAttempt.attempt > 0 && <span className="text-keep"> · repaired</span>}
-                </p>
-              </Enter>
-            )}
-            {!item.scored && item.decision?.verdict === "crash" && <p className="text-[12.5px] text-crash">No score — every attempt failed.</p>}
-          </div>
-        </div>
+        {/* the precise record, secondary */}
+        <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-ink-3 tabular">
+          {item.id}
+          {item.scored && (
+            <>
+              {" "}
+              · CV {formatScore(metric, item.scored.cvMean)} ± {formatSe(item.scored.cvSe)} · select {formatScore(metric, item.scored.select)}
+            </>
+          )}
+          {g?.gainSe != null && (
+            <>
+              {" "}
+              · {g.gainSe >= 0 ? "+" : "−"}
+              {Math.abs(g.gainSe).toFixed(2)} SE
+            </>
+          )}
+          {g?.p != null && <> · p {fmtP(g.p)}</>}
+          {okAttempt && <> · {fmtDuration(okAttempt.durationS)}</>}
+          {okAttempt && okAttempt.attempt > 0 && <span className="text-best"> · repaired</span>}
+          {item.llmCalls > 0 && (
+            <>
+              {" "}
+              · {item.llmCalls} LLM call{item.llmCalls === 1 ? "" : "s"} {fmtCost(item.costUsd)}
+            </>
+          )}
+          {" · "}
+          {(CATEGORY_LABEL[item.idea.category] ?? item.idea.category).toLowerCase()}
+          {item.idea.radical && " · radical"}
+        </p>
 
-        {/* gate */}
-        {item.decision && v && (
-          <Enter delay={0.05}>
-            <div className={`rounded-2xl rounded-tl-md border px-3.5 py-2.5 ${v.box}`}>
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-ink-3">gate</span>
-                <span className={`flex items-center gap-1.5 text-sm font-semibold ${v.text}`}>
-                  {item.decision.verdict === "crash" ? (
-                    <span aria-hidden className="font-mono">
-                      {v.icon}
-                    </span>
-                  ) : (
-                    <Balance tip={item.decision.verdict === "keep"} />
-                  )}
-                  {v.label}
-                </span>
-                {item.decision.gate.label && <span className="text-[12.5px] text-ink-2">{item.decision.gate.label}</span>}
-                {item.decision.gate.gainSe != null && (
-                  <Chip>
-                    {item.decision.gate.gainSe >= 0 ? "+" : "−"}
-                    {Math.abs(item.decision.gate.gainSe).toFixed(2)} SE
-                  </Chip>
-                )}
-                {item.decision.gate.p != null && <Chip>p = {fmtP(item.decision.gate.p)}</Chip>}
-                {item.decision.newBest && item.index > 0 && <span className="text-[12px] font-semibold text-best">★ new best</span>}
-              </p>
-              <p className={`mt-1 text-[12px] leading-snug text-ink-2 ${selected ? "" : "line-clamp-2"}`}>{item.decision.reason || "(no reason recorded)"}</p>
-            </div>
+        {fails.map((a) => (
+          <Enter key={a.attempt} className="mt-2">
+            <details className="group/err text-[12.5px]" onClick={(e) => e.stopPropagation()}>
+              <summary className="cursor-pointer list-none text-crash marker:hidden">
+                Attempt {a.attempt + 1} failed ({a.errorKind ?? "error"})
+                {a.attempt + 1 < item.attempts.length || (!item.decision && item.attempts.at(-1) === a) ? <span className="text-ink-3">, so it repaired the code</span> : null}
+                <span className="ml-1 text-ink-3 underline decoration-[var(--lp-hair)] underline-offset-4 group-open/err:hidden">show error</span>
+              </summary>
+              {a.errorTail && (
+                <pre className="mt-1.5 max-h-40 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-ink-3">{a.errorTail.split("\n").slice(-8).join("\n")}</pre>
+              )}
+            </details>
           </Enter>
-        )}
+        ))}
+
+        <AnimatePresence initial={false}>
+          {selected && (
+            <motion.div
+              key="more"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.1 } }}
+              transition={{ duration: 0.28, ease: EASE }}
+              className="mt-2.5 space-y-2 border-l border-[var(--lp-hair)] pl-3 text-[13px] leading-relaxed text-ink-2"
+            >
+              <p className="text-ink">{item.idea.title}</p>
+              {item.idea.rationale && <p>{item.idea.rationale}</p>}
+              {item.decision?.reason && <p className="font-mono text-[11px] text-ink-3">gate: {item.decision.reason}</p>}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.article>
   );
-}
-
-/**
- * The gate as a tiny two-pan balance (02-direction: "A's best idea survives"): the new probe (left pan) is weighed
- * against the current best (right pan), and the beam tips only when the gate keeps it.
- */
-function Balance({ tip }: { tip: boolean }) {
-  const enter = useEnter();
-  return (
-    <svg viewBox="0 0 16 13" className="terra-balance h-[13px] w-4" data-tip={tip ? "keep" : "level"} data-enter={enter} aria-hidden>
-      <path d="M8 5.2v6.3M5.5 12h5" stroke="currentColor" strokeOpacity=".55" strokeWidth="1.1" strokeLinecap="round" />
-      <g className="terra-balance-beam">
-        <path d="M1.5 5h13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-        <path d="M0.8 5.6 2 8.2 3.2 5.6" fill="none" stroke="currentColor" strokeOpacity=".7" strokeWidth=".9" strokeLinejoin="round" />
-        <path d="M12.8 5.6 14 8.2 15.2 5.6" fill="none" stroke="currentColor" strokeOpacity=".7" strokeWidth=".9" strokeLinejoin="round" />
-        <circle cx="2" cy="7.4" r="1.25" fill="currentColor" />
-      </g>
-      <circle cx="8" cy="5" r=".9" fill="currentColor" />
-    </svg>
-  );
-}
-
-function Chip({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-md bg-paper-3/80 px-1.5 py-px font-mono text-[11px] text-ink-2 tabular">{children}</span>;
 }
 
 function fmtP(p: number): string {
@@ -575,18 +501,18 @@ function fmtP(p: number): string {
 function Running({ repairing }: { repairing: boolean }) {
   const reduced = useReducedMotion();
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-[12.5px] text-ink-2">{repairing ? "re-running the repaired code…" : "running in sandbox · repeated k-fold CV…"}</span>
-      <span className="relative h-1 w-24 overflow-hidden rounded-full bg-paper-3" aria-hidden>
+    <span className="inline-flex items-center gap-3 text-ink-2">
+      {repairing ? "Re-running the repaired code…" : "Testing it…"}
+      <span className="relative inline-block h-px w-20 overflow-hidden bg-[var(--lp-hair)]" aria-hidden>
         {!reduced && (
           <motion.span
-            className="absolute inset-y-0 w-1/2 rounded-full bg-gradient-to-r from-transparent via-best/70 to-transparent"
+            className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-best to-transparent"
             initial={{ x: "-100%" }}
             animate={{ x: "200%" }}
-            transition={{ duration: 1.25, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
           />
         )}
       </span>
-    </div>
+    </span>
   );
 }

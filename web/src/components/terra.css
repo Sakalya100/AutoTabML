@@ -4,34 +4,19 @@
  * Imported by components, so the stylesheet persists across client navigation: every rule is gated on a
  * [data-terra] marker being on the page, which only run pages and the gallery render.
  *
- * Dark theme: the page *is* the void, with bone type, amber signal for kept/best and ember only on crashes.
- * Light theme: the same survey printed on bone paper — the canvas frames stay void, the data stays readable,
- * and amber is darkened so text clears 4.5:1.
+ * Always dark, in both site themes, like the landing: the page *is* the void the land sits in, so the world is never
+ * a lit box on paper (one world, not a canvas in a frame). Bone type, amber only for kept/best, ember only on crashes.
+ * The site's light theme still applies to the pages without a world (/new).
  */
 
 :root:has([data-terra]) {
-  --paper: oklch(96.2% 0.011 88);
-  --paper-2: oklch(93.4% 0.014 88);
-  --paper-3: oklch(89.6% 0.016 88);
-  --ink: oklch(19% 0.014 250);
-  --ink-2: oklch(36% 0.012 250);
-  --ink-3: oklch(50% 0.012 250);
-  --rule: oklch(86.5% 0.016 88);
-  --rule-strong: oklch(74% 0.018 88);
-  --best: oklch(55% 0.13 66);
-  --best-soft: oklch(78% 0.15 72 / 0.18);
-  --keep: oklch(55% 0.13 66);
-  --discard: oklch(62% 0.01 250);
-  --crash: oklch(55% 0.19 33);
-  --select: oklch(48% 0.07 190);
-  --test: oklch(19% 0.014 250);
-  --focus: oklch(55% 0.13 66);
-  --code-bg: oklch(94% 0.012 88);
-  --add-bg: oklch(78% 0.15 72 / 0.16);
-  --del-bg: oklch(62% 0.19 33 / 0.1);
-}
-
-:root[data-theme="dark"]:has([data-terra]) {
+  color-scheme: dark;
+  --lp-ink: oklch(91% 0.02 85);
+  --lp-ink-2: oklch(78% 0.016 85);
+  --lp-ink-3: oklch(60% 0.012 250);
+  --lp-hair: oklch(88% 0.02 85 / 0.12);
+  --lp-signal: #ffb547;
+  --lp-void: #05070a;
   --paper: #05070a;
   --paper-2: #0d1117;
   --paper-3: #1b222b;
@@ -51,6 +36,20 @@
   --code-bg: #0a0d12;
   --add-bg: rgb(255 181 71 / 0.1);
   --del-bg: rgb(255 90 60 / 0.1);
+}
+
+html:has([data-terra]),
+body:has([data-terra]) {
+  background: #05070a;
+}
+body:has([data-terra]) > header {
+  position: relative;
+  z-index: 30;
+  border-color: transparent;
+  background: #05070a;
+}
+body:has([data-terra]) > footer {
+  border-color: var(--lp-hair);
 }
 
 /* The canvas frame is the void in both themes; a hairline of bone keeps its edge on void paper. */

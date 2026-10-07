@@ -24,12 +24,14 @@ interface Props {
   className?: string;
   /** Overrides the status line (e.g. "cancelled"). */
   statusText?: string;
+  /** Edge-to-edge in its column, no frame (run pages, where the page itself is the void). */
+  bare?: boolean;
 }
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 /** The survey world framed for a run page: status, key, projection note and the two narrative moments. */
-export function SurveyPanel({ view, domainView, selectedId, onSelect, staging, heightClass = "h-[clamp(360px,62vh,640px)]", compact, quality = "full", className = "", statusText }: Props) {
+export function SurveyPanel({ view, domainView, selectedId, onSelect, staging, heightClass = "h-[clamp(360px,62vh,640px)]", compact, quality = "full", className = "", statusText, bare }: Props) {
   const webgl = useWebGLAvailable();
   const [keyOpen, setKeyOpen] = useState(false);
 
@@ -52,7 +54,7 @@ export function SurveyPanel({ view, domainView, selectedId, onSelect, staging, h
   const ceil = ceilingScore(view);
 
   return (
-    <section aria-label="Survey map of the run" className={`terra-frame relative isolate overflow-hidden rounded-xl ${className}`}>
+    <section aria-label="Survey map of the run" className={`${bare ? "h-full bg-[#05070a]" : "terra-frame rounded-xl"} relative isolate overflow-hidden ${className}`}>
       <div className={`relative ${heightClass}`}>
         {webgl ? (
           <SurveyCanvas

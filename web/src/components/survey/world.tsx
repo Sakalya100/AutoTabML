@@ -281,6 +281,15 @@ function Driver({ layout, frame, pose, progress, interactive, onSelect, animate,
         const [bx, bz] = climbPointXZ(frame.climb, sc.beadT);
         bead = [bx, field.sample(bx, bz), bz];
       }
+      if (sc.aimId && bead && (sc.aimW ?? 0) > 0) {
+        const pr = frame.probes.find((q) => q.id === sc.aimId);
+        if (pr) {
+          const k = 0.5 * Math.min(1, sc.aimW ?? 0);
+          const ax = bead[0] + (pr.pos[0] - bead[0]) * k;
+          const az = bead[2] + (pr.pos[2] - bead[2]) * k;
+          bead = [ax, field.sample(ax, az), az];
+        }
+      }
       const pf = { frame, now: layout, aspect, bead };
       c = cameraPose(sc.a, sc.pa, pf);
       if (sc.w > 0) c = blendPose(c, cameraPose(sc.b, sc.pb, pf), sc.w * sc.w * (3 - 2 * sc.w));
@@ -296,7 +305,13 @@ function Driver({ layout, frame, pose, progress, interactive, onSelect, animate,
         if (!v || !v.enabled || v.offsetX !== ox || v.offsetY !== oy || v.fullWidth !== size.width || v.fullHeight !== size.height)
           camera.setViewOffset(size.width, size.height, ox, oy, size.width, size.height);
       } else if (v?.enabled) camera.clearViewOffset();
-    } else c = cameraPose(pose, progress.current ?? 0, { frame, now: layout, aspect });
+    } else {
+      // Run pages: follow the bead where it is drawn (it rolls, damped, toward each new best), not the stepped best
+      // probe — so the camera glides along with the ball instead of jumping to the next keep and waiting for it.
+      const b = u.uBead.value;
+      const drawn: [number, number, number] | null = b.w > 0 ? [b.x, b.y - b.w * 0.8, b.z] : null;
+      c = cameraPose(pose, progress.current ?? 0, { frame, now: layout, aspect, bead: drawn });
+    }
     tmp.want.set(...c.pos);
     tmp.wantT.set(...c.target);
     if (tmp.first || !animate) {

@@ -118,43 +118,38 @@ export function LiveRun({ id }: { id: string }) {
   };
 
   const bar = (
-    <div className="mt-6 space-y-3">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-md border border-rule bg-paper-2 px-4 py-3 text-sm">
+    <div className="space-y-3 py-3">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[12px] text-ink-3">
         <span className="flex items-center gap-2">
-          <span className={`size-2 rounded-full ${active ? "animate-pulse bg-best" : meta.status === "finished" ? "bg-keep" : "bg-crash"}`} aria-hidden />
-          <span className="font-medium capitalize">{statusText(meta.status)}</span>
-          {active && <span className="text-xs text-ink-3">{connected ? "live" : "connecting…"}</span>}
+          <span className={`size-1.5 rounded-full ${active ? "animate-pulse bg-best" : meta.status === "finished" ? "bg-best" : "bg-crash"}`} aria-hidden />
+          <span className="text-ink">{statusText(meta.status)}</span>
+          {active && <span>{connected ? "· live" : "· connecting…"}</span>}
         </span>
-        {view.current && (
-          <span className="min-w-0 truncate text-ink-2">
-            now: <span className="font-mono text-xs">{view.current.id}</span> {view.current.idea.title}
-          </span>
-        )}
-        <span className="font-mono text-xs text-ink-2 tabular" title="LLM spend so far (heuristic runs cost nothing)">
-          {fmtCost(view.totalCostUsd)} · {fmtInt(view.totalInputTokens + view.totalOutputTokens)} tok
+        <span className="tabular" title="LLM spend so far (runs without an LLM cost nothing)">
+          {fmtCost(view.totalCostUsd)} · {fmtInt(view.totalInputTokens + view.totalOutputTokens)} tokens
         </span>
-        <span className="text-xs text-ink-3">
-          {meta.fileName} · {meta.llm === "heuristic" ? "offline heuristic" : "Anthropic"} · up to {meta.maxExperiments} experiments
+        <span>
+          {meta.llm === "heuristic" ? "no LLM: built-in search" : "ideas by Claude"} · up to {meta.maxExperiments} ideas
         </span>
         {active && (
           <button
             onClick={cancel}
             disabled={cancelling}
-            className="ml-auto rounded-full border border-crash/50 px-3 py-1 text-xs font-medium text-crash transition-colors hover:bg-crash/10 disabled:opacity-50"
+            className="ml-auto rounded-full border border-crash/50 px-3 py-1 font-sans text-xs text-crash transition-colors hover:bg-crash/10 disabled:opacity-50"
           >
             {cancelling ? "Cancelling…" : "Cancel run"}
           </button>
         )}
       </div>
       {meta.status === "failed" && (
-        <div className="rounded-md border border-crash/40 p-4">
-          <p className="font-medium text-crash">{meta.error ?? "The run failed."}</p>
+        <div className="border-l border-crash/60 pl-4">
+          <p className="text-crash">{meta.error ?? "The run failed."}</p>
           {meta.errorTail && (
-            <pre className="mt-3 max-h-72 overflow-auto rounded bg-code p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-ink-2">{meta.errorTail}</pre>
+            <pre className="mt-3 max-h-72 overflow-auto font-mono text-xs leading-relaxed whitespace-pre-wrap text-ink-3">{meta.errorTail}</pre>
           )}
         </div>
       )}
-      {meta.status === "cancelled" && <p className="text-sm text-ink-3">This run was cancelled. Everything recorded up to that point is shown below.</p>}
+      {meta.status === "cancelled" && <p className="text-sm text-ink-3">This run was cancelled. Everything recorded up to then is below.</p>}
     </div>
   );
 
@@ -164,11 +159,7 @@ export function LiveRun({ id }: { id: string }) {
       events={events}
       record={record}
       title={meta.description ? meta.description : `Predicting ${meta.target}`}
-      subtitle={
-        <span className="text-sm">
-          {meta.fileName} · target <span className="font-mono">{meta.target}</span>
-        </span>
-      }
+      kicker={`Your run · ${meta.fileName}`}
       liveBar={bar}
       active={active}
       endedAs={meta.status === "cancelled" || meta.status === "failed" ? meta.status : null}

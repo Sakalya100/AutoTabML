@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { RunView } from "@/components/run-view";
 import { listReplays, loadReplay } from "@/lib/replays";
+import { humanName } from "@/lib/story";
 
 export async function generateStaticParams() {
   return (await listReplays()).map((r) => ({ name: r.name }));
@@ -10,7 +11,7 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/replays/[name]">): Promise<Metadata> {
   const { name } = await params;
   const info = (await listReplays()).find((r) => r.name === name);
-  return { title: info ? `Replay: ${info.title}` : "Replay" };
+  return { title: info ? `${humanName(info.name)}: a recorded run` : "Replay" };
 }
 
 export default async function ReplayPage({ params, searchParams }: PageProps<"/replays/[name]">) {
@@ -25,18 +26,9 @@ export default async function ReplayPage({ params, searchParams }: PageProps<"/r
       events={events}
       record={record}
       initialSimulate={sp.simulate !== undefined}
-      title={info.title}
-      subtitle={
-        <span className="text-sm">
-          {info.dataset} · target <span className="font-mono">{record.task.target}</span>
-          {info.fixture && (
-            <>
-              {" "}
-              · <span title={info.blurb}>hand-written fixture, not a recorded engine run</span>
-            </>
-          )}
-        </span>
-      }
+      title={humanName(info.name)}
+      kicker="A recorded run"
+      note={info.fixture ? "A hand-written example, not a recorded engine run." : undefined}
     />
   );
 }
