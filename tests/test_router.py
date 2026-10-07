@@ -391,7 +391,7 @@ def test_reason_defaults_to_gpt_oss_on_groq_and_qwen_is_opt_in() -> None:
 
 
 def test_router_log_redacts_account_ids() -> None:
-    msg = "Rate limit reached for model `m` in organization `org_01jnfrnzbgecm9reyzycnkvy8h` service tier"
+    msg = "Rate limit reached for model `m` in organization `org_0000example0000redacted00` service tier"
     router, _, _ = make(lambda r: httpx.Response(200, json=ok_body()))
     router._note(msg)
-    assert "org_01jnfrnz" not in router.events[-1] and "<redacted>" in router.events[-1]
+    assert "org_0000exam" not in router.events[-1] and "<redacted>" in router.events[-1]
