@@ -11,7 +11,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { MotionConfig, motion, useScroll, useTransform, type MotionValue } from "motion/react";
+import { MotionConfig, motion, useMotionValue, useScroll, useTransform, type MotionValue } from "motion/react";
 import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { EvolutionChart } from "@/components/evolution-chart";
 import type { AnyEvent } from "@/lib/events";
@@ -135,7 +135,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
         const r = el.getBoundingClientRect();
         if (r.top <= vh * 0.5 && r.bottom > vh * 0.5) {
           pose = el.dataset.pose as SurveyPose;
-          p = el.dataset.pin != null ? -r.top / Math.max(1, r.height - vh) : (vh * 0.5 - r.top) / Math.max(1, r.height);
+          p = el.dataset.pin != null ? (vh * 0.5 - r.top) / Math.max(1, r.height - vh * 0.5) : (vh * 0.5 - r.top) / Math.max(1, r.height);
           break;
         }
         if (r.top > vh * 0.5) break;
@@ -208,7 +208,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
         </section>
 
         {/* 2 — FIRST PROBE */}
-        <Chapter pose="first-probe" n="01" eyebrow="First probe" title="Every experiment is a probe." height={150}>
+        <Chapter store={store} pose="first-probe" n="01" eyebrow="First probe" title="Every experiment is a probe." height={150}>
           <p className="lp-sub">Where it lands, ground appears. Its height is the real score.</p>
           {sv.baseline != null && <Stat v={formatScore(facts.metric, sv.baseline)} k={`baseline · cross-validated ${label}`} />}
         </Chapter>
@@ -217,13 +217,13 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
         <Climb facts={facts} store={store} reduced={reduced} />
 
         {/* 4 — THE MIST */}
-        <Chapter pose="mist" n="03" eyebrow="The mist" title="Gains smaller than the mist are noise." height={160}>
+        <Chapter store={store} pose="mist" n="03" eyebrow="The mist" title="Gains smaller than the mist are noise." height={160}>
           <p className="lp-sub">The mist is as thick as the best score&apos;s standard error. A probe inside it is a tie, so it is not kept.</p>
           {sv.bestSe != null && <Stat v={`± ${formatSe(sv.bestSe)}`} k="standard error of the best" />}
         </Chapter>
 
         {/* 5 — THE CEILING */}
-        <Chapter pose="ceiling" n="04" eyebrow="The ceiling" title="It stops when the rest is in the clouds." height={170}>
+        <Chapter store={store} pose="ceiling" n="04" eyebrow="The ceiling" title="It stops when the rest is in the clouds." height={170}>
           <p className="lp-sub">The stop rule fits the climb and settles a cloud deck at the asymptote, just above the summit.</p>
           {sv.ceiling != null ? (
             <Stat
@@ -236,7 +236,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
         </Chapter>
 
         {/* 6 — THE TRUTH */}
-        <Chapter pose="truth" n="05" eyebrow="The locked test" title="One locked test, opened once." height={170}>
+        <Chapter store={store} pose="truth" n="05" eyebrow="The locked test" title="One locked test, opened once." height={170}>
           <p className="lp-sub">A split it never saw, scored a single time at the very end.</p>
           {facts.final && (
             <Stat
@@ -308,15 +308,45 @@ function Loader({ ready, reduced }: { ready: boolean; reduced: boolean }) {
 
 /* ---- one chapter: a sticky caption that fades in and out with its section ---- */
 
-function Chapter({ pose, n, eyebrow, title, height, children }: { pose: SurveyPose; n: string; eyebrow: string; title: string; height: number; children: ReactNode }) {
-  const ref = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const opacity = useTransform(scrollYProgress, [0.22, 0.36, 0.7, 0.82], [0, 1, 1, 0]);
-  const y = useTransform(scrollYProgress, [0.22, 0.36, 0.7, 0.82], [28, 0, 0, -20]);
+/* ---- captions: exactly one on screen, driven by the same store as the 3D stage ---- */
+
+const smooth = (e0: number, e1: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+};
+/** A chapter's caption: fades in after its section becomes active, holds, and is gone before the section ends. */
+const chapterWindow = (p: number) => smooth(0.1, 0.24, p) * (1 - smooth(0.76, 0.9, p));
+/** The pinned climb: its beats handle their own hand-offs; the gate only fades the whole block in and out. */
+const climbWindow = (p: number) => smooth(0, 0.05, p) * (1 - smooth(0.93, 0.99, p));
+
+/**
+ * 0..1 visibility for one section's caption. Only the section the stage store says is active can be above 0, so
+ * two captions can never share the screen; captions are fixed overlays, so they crossfade in place instead of
+ * scrolling away half-visible.
+ */
+function useCaptionGate(store: StageStore, pose: SurveyPose, win: (p: number) => number) {
+  const gate = useMotionValue(0);
+  const progress = useMotionValue(0);
+  useEffect(() => {
+    const sync = () => {
+      const st = store.get();
+      const active = st.pose === pose;
+      if (active) progress.set(st.progress);
+      gate.set(active ? win(st.progress) : 0);
+    };
+    sync();
+    return store.sub(sync);
+  }, [store, pose, win, gate, progress]);
+  return { gate, progress };
+}
+
+function Chapter({ store, pose, n, eyebrow, title, height, children }: { store: StageStore; pose: SurveyPose; n: string; eyebrow: string; title: string; height: number; children: ReactNode }) {
+  const { gate } = useCaptionGate(store, pose, chapterWindow);
+  const y = useTransform(gate, [0, 1], [16, 0]);
   return (
-    <section ref={ref} className="lp-sec lp-chapter" data-pose={pose} style={{ height: `${height}svh` }}>
+    <section className="lp-sec lp-chapter" data-pose={pose} style={{ height: `${height}svh` }}>
       <div className="lp-sticky">
-        <motion.div className="lp-caption" style={{ opacity, y }}>
+        <motion.div className="lp-caption" style={{ opacity: gate, y }}>
           <p className="lp-eyebrow">
             <span>{n}</span> {eyebrow}
           </p>
@@ -342,8 +372,7 @@ function Stat({ v, k }: { v: ReactNode; k: string }) {
 const BEAT_AT = [0, 0.34, 0.67, 1];
 
 function Climb({ facts, store, reduced }: { facts: LandingFacts; store: StageStore; reduced: boolean }) {
-  const ref = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const { gate, progress } = useCaptionGate(store, "climb", climbWindow);
   const step = useSyncExternalStore(store.sub, () => store.get().step, () => 0);
   const g = facts.growth;
   const at = g[Math.min(step, g.length - 1)];
@@ -398,10 +427,10 @@ function Climb({ facts, store, reduced }: { facts: LandingFacts; store: StageSto
       </section>
     );
   return (
-    <section ref={ref} className="lp-sec lp-pin" data-pose="climb" data-pin="" aria-label="The climb">
+    <section className="lp-sec lp-pin" data-pose="climb" data-pin="" aria-label="The climb">
       <div className="lp-sticky">
         {beats.map((b, i) => (
-          <BeatLayer key={i} i={i} n={beats.length} progress={scrollYProgress}>
+          <BeatLayer key={i} i={i} n={beats.length} progress={progress} gate={gate}>
             {i === 0 && (
               <p className="lp-eyebrow">
                 <span>02</span> The climb · scroll
@@ -417,16 +446,18 @@ function Climb({ facts, store, reduced }: { facts: LandingFacts; store: StageSto
   );
 }
 
-function BeatLayer({ i, n, progress, children }: { i: number; n: number; progress: MotionValue<number>; children: ReactNode }) {
+function BeatLayer({ i, n, progress, gate, children }: { i: number; n: number; progress: MotionValue<number>; gate: MotionValue<number>; children: ReactNode }) {
   const a = BEAT_AT[i];
   const b = BEAT_AT[i + 1];
   const f = 0.045;
   const first = i === 0;
   const last = i === n - 1;
-  // Strictly sequential: the outgoing caption is gone before the next arrives — never two at once.
+  // Strictly sequential: the outgoing caption is gone before the next arrives — never two at once. The gate fades the
+  // whole climb in/out and is 0 whenever another section is active.
   const input = [first ? 0 : a, first ? 0.001 : a + f, last ? 0.999 : b - f, last ? 1 : b];
-  const opacity = useTransform(progress, input, [first ? 1 : 0, 1, 1, last ? 1 : 0]);
-  const y = useTransform(progress, input, [first ? 0 : 24, 0, 0, last ? 0 : -24]);
+  const beat = useTransform(progress, input, [first ? 1 : 0, 1, 1, last ? 1 : 0]);
+  const opacity = useTransform([beat, gate], ([x, g]: number[]) => x * g);
+  const y = useTransform(progress, input, [first ? 0 : 16, 0, 0, last ? 0 : -16]);
   return (
     <motion.div className="lp-caption lp-beat" style={{ opacity, y }}>
       {children}

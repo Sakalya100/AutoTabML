@@ -180,6 +180,7 @@ function Driver({ layout, frame, pose, progress, interactive, onSelect, animate,
       hit: new Vector3(),
       fov: { x: 34, v: 0 },
       par: { x: 0, y: 0 },
+      lift: 0,
       first: true,
       hitOk: false,
     }),
@@ -279,6 +280,30 @@ function Driver({ layout, frame, pose, progress, interactive, onSelect, animate,
     const az = Math.atan2(tmp.off.x, tmp.off.z) + yaw;
     const el = Math.min(1.5, Math.max(-0.2, Math.asin(Math.min(1, Math.max(-1, tmp.off.y / Math.max(r, 1e-6)))) + pitch));
     camera.position.set(tmp.target.x.x + Math.sin(az) * Math.cos(el) * r, tmp.target.x.y + Math.sin(el) * r, tmp.target.x.z + Math.cos(az) * Math.cos(el) * r);
+    // Never inside the land. While the camera eases after the bead up a slope it can cut through a ridge; the terrain
+    // is one-sided, so from below it vanished and only stakes/path/bead floated on black. Lift the camera so its line
+    // of sight to the target clears the ground (sampled where the GPU shows it this frame), then ease that lift so it
+    // never pops.
+    {
+      const cx = camera.position.x;
+      const cz = camera.position.z;
+      const tx = tmp.target.x.x;
+      const ty = tmp.target.x.y;
+      const tz = tmp.target.x.z;
+      let need = 0;
+      for (let k = 0; k < 6; k++) {
+        const f = k / 6; // 0 = camera … 5/6 = near the target
+        const x = cx + (tx - cx) * f;
+        const z = cz + (tz - cz) * f;
+        const lineY = camera.position.y + (ty - camera.position.y) * f;
+        const margin = k === 0 ? 0.55 : 0.25;
+        const ground = field.sample(x, z) + margin;
+        if (ground > lineY) need = Math.max(need, (ground - lineY) / Math.max(1 - f, 0.2));
+      }
+      tmp.lift += (need - tmp.lift) * (1 - Math.exp(-(need > tmp.lift ? 18 : 2.5) * dt));
+      if (!animate || tmp.first) tmp.lift = need;
+      camera.position.y += Math.max(0, tmp.lift);
+    }
     camera.lookAt(tmp.target.x);
     if (Math.abs(camera.fov - tmp.fov.x) > 1e-3) {
       camera.fov = tmp.fov.x;

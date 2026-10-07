@@ -434,9 +434,13 @@ body:has([data-landing]) > footer {
 }
 
 /* ---- chapters: a sticky caption bottom-left, one at a time ---- */
+/* Fixed, not sticky: a caption never scrolls away half-visible. Only the active section's caption has opacity > 0
+   (see useCaptionGate), so the overlays crossfade in place, one at a time. */
 .lp-sticky {
-  position: sticky;
-  top: 0;
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
   height: 100svh;
   display: grid;
   align-items: end;
