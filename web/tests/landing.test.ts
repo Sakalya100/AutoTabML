@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { landingFacts } from "@/components/landing/facts";
+import { cursorFor, landingFacts } from "@/components/landing/facts";
 import { parseEventsJsonl } from "@/lib/events";
 import { buildView } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
@@ -52,5 +52,25 @@ describe("landing facts (real breast_cancer replay)", () => {
     expect(facts.survey.best).toBeCloseTo(0.9979319727891156, 12);
     expect(facts.survey.bestSe).toBeCloseTo(0.0009291298479550506, 12);
     expect(facts.survey.ceiling).toBeCloseTo(0.9979319727891156 + 0.0008808720433843842, 12);
+  });
+});
+
+describe("landing scroll → replay moment", () => {
+  it("never rewinds while scrolling down the page (the bead never vanishes and reappears)", () => {
+    const order = ["orbit", "approach", "first-probe", "climb", "mist", "ceiling", "truth", "chart"] as const;
+    let prev = -1;
+    for (const pose of order) {
+      for (let p = 0; p <= 1.0001; p += 0.05) {
+        const { cursor } = cursorFor(pose, Math.min(1, p), facts, false);
+        expect(cursor).toBeGreaterThanOrEqual(prev);
+        prev = cursor;
+      }
+    }
+    expect(prev).toBe(facts.end);
+  });
+
+  it("the bead is on the land from the very first screen", () => {
+    const { cursor } = cursorFor("approach", 0, facts, false);
+    expect(buildView(events.slice(0, cursor)).experiments.length).toBeGreaterThanOrEqual(1);
   });
 });

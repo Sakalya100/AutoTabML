@@ -137,6 +137,14 @@ const CLOUD_STRENGTH: Partial<Record<SurveyPose, number>> = {
 const StudioEnv = memo(function StudioEnv() {
   return (
   <Environment resolution={128} frames={1}>
+    {/* Soft surround fill: liquid metal only shows what it reflects, and against an all-black studio the bead read
+        as a black ball with a few highlights. Four dim, wide walls + a cool sky panel give it a silver body from any
+        camera pose without adding geometry to the scene. */}
+    <Lightformer form="rect" intensity={0.55} color="#7f8fa3" scale={[40, 10, 1]} position={[0, 2, -14]} />
+    <Lightformer form="rect" intensity={0.45} color="#6b7a8d" scale={[40, 10, 1]} position={[0, 2, 14]} rotation-y={Math.PI} />
+    <Lightformer form="rect" intensity={0.45} color="#6b7a8d" scale={[40, 10, 1]} position={[-14, 2, 0]} rotation-y={Math.PI / 2} />
+    <Lightformer form="rect" intensity={0.45} color="#6b7a8d" scale={[40, 10, 1]} position={[14, 2, 0]} rotation-y={-Math.PI / 2} />
+    <Lightformer form="rect" intensity={0.9} color="#c9d6e6" scale={[40, 40, 1]} position={[0, 14, 0]} rotation-x={Math.PI / 2} />
     <Lightformer form="rect" intensity={2.6} color="#e4ecf7" scale={[12, 3, 1]} position={[0, 6, -7]} />
     <Lightformer form="rect" intensity={1.8} color="#d5dfec" scale={[14, 14, 1]} position={[0, 9, 0]} rotation-x={Math.PI / 2} />
     <Lightformer form="rect" intensity={1.1} color="#aebccc" scale={[16, 2, 1]} position={[0, 1.5, 8]} rotation-y={Math.PI} />

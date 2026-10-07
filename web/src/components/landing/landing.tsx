@@ -20,7 +20,7 @@ import { formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import { buildView, type RunView } from "@/lib/run-state";
 import { useWebGLAvailable } from "@/lib/gl";
 import type { SurveyPose } from "@/lib/survey/contract";
-import type { LandingFacts } from "./facts";
+import { cursorFor, type LandingFacts } from "./facts";
 import { MagneticLink, Ticker } from "./primitives";
 
 // three.js stays out of the server render and the first paint; the void + loader show until it streams in.
@@ -99,30 +99,6 @@ const Stage = memo(function Stage({ events, full, store, narrow, onReady }: { ev
 });
 
 /* ---- page ---- */
-
-/** Section → which moment of the replay it shows. */
-function cursorFor(pose: SurveyPose, p: number, facts: LandingFacts, reduced: boolean): { cursor: number; step: number } {
-  const g = facts.growth;
-  const last = g.length - 1; // the stop
-  const preStop = Math.max(0, last - 1);
-  switch (pose) {
-    case "first-probe":
-      return { cursor: g[Math.min(1, last)].cursor, step: Math.min(1, last) };
-    case "climb": {
-      if (reduced) return { cursor: g[preStop].cursor, step: preStop };
-      const t = Math.min(1, Math.max(0, (p - 0.02) / 0.9));
-      const i = Math.min(preStop, Math.max(1, 1 + Math.round(t * (preStop - 1))));
-      return { cursor: g[i].cursor, step: i };
-    }
-    case "ceiling":
-      return { cursor: g[last].cursor, step: last };
-    case "truth":
-    case "chart":
-      return { cursor: facts.end, step: last };
-    default:
-      return { cursor: g[preStop].cursor, step: preStop };
-  }
-}
 
 export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingFacts }) {
   const reduced = useSyncExternalStore(reducedQ.sub, reducedQ.get, () => false);

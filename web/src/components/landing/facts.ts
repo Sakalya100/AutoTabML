@@ -1,3 +1,4 @@
+import type { SurveyPose } from "@/lib/survey/contract";
 /**
  * Everything the landing page states as a number, derived from ONE real replay (run.json + events.jsonl).
  * Pure and server-safe: page.tsx computes it once and hands a small serialisable object to the client.
@@ -107,4 +108,37 @@ export function landingFacts(name: string, dataset: string, events: readonly Any
     end: events.length,
     survey: surveyNumbers(v),
   };
+}
+
+/**
+ * Section → which moment of the replay it shows. Strictly monotonic down the page (hero = the start, chart = the end)
+ * so scrolling only ever moves the run forward or backward along its own timeline: the bead never vanishes and
+ * reappears, it just keeps rolling. Order of poses on the page: orbit/approach → first-probe → climb → mist →
+ * ceiling → truth → chart.
+ */
+export function cursorFor(pose: SurveyPose, p: number, facts: LandingFacts, reduced: boolean): { cursor: number; step: number } {
+  const g = facts.growth;
+  const last = g.length - 1; // the stop
+  const preStop = Math.max(1, last - 1);
+  const first = Math.min(1, last); // the baseline probe (e000) has landed and the bead sits on it
+  switch (pose) {
+    case "orbit":
+    case "approach":
+    case "first-probe":
+      return { cursor: g[first].cursor, step: first };
+    case "climb": {
+      if (reduced) return { cursor: g[preStop].cursor, step: preStop };
+      const t = Math.min(1, Math.max(0, (p - 0.02) / 0.9));
+      const i = Math.min(preStop, Math.max(first, first + Math.round(t * (preStop - first))));
+      return { cursor: g[i].cursor, step: i };
+    }
+    case "mist":
+      return { cursor: g[preStop].cursor, step: preStop };
+    case "ceiling":
+      return { cursor: g[last].cursor, step: last };
+    case "truth":
+    case "chart":
+    default:
+      return { cursor: facts.end, step: last };
+  }
 }
