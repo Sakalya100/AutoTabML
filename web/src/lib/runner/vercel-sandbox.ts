@@ -7,14 +7,15 @@
  *
  *   POST /api/runs ─► after(): Sandbox.create → install engine → upload CSV + run.sh + forward.py
  *                     → lock the firewall down → runCommand({ detached: true }) → return
- *   in the sandbox:   python -m autotinker evolve … --events-stdout | python forward.py
+ *   in the sandbox:   python -m autotinker run <url|input.csv> --target … --events-stdout | python forward.py
  *                     forward.py POSTs batches of JSONL to /api/runs/<id>/ingest (Bearer per-run token),
  *                     then posts the exit code, a redacted stderr tail and run.json.
  *   UI:               GET /api/runs/<id>/stream tails the Store (Redis in production), never the sandbox.
  *   cancel:           Sandbox.get({ name }).stop()
  *
- * BYOK: the Anthropic key never enters the sandbox. The firewall's credentials brokering injects the
- * `x-api-key` header on requests to api.anthropic.com; the engine only sees a placeholder env var.
+ * Keys: the Groq/Gemini keys never enter the sandbox. The firewall's credentials brokering injects the
+ * `Authorization` header on requests to the provider hosts; the engine only sees placeholder env vars.
+ * UNVERIFIED: whether brokering an OpenAI-style `Authorization: Bearer` header works like the documented x-api-key case.
  *
  * Env: AUTOTINKER_PUBLIC_URL (or VERCEL_PROJECT_PRODUCTION_URL / VERCEL_URL) — the URL the sandbox posts events to;
  *      AUTOTINKER_SANDBOX_PACKAGE — pip spec for the engine (default: the GitHub v2 branch);
@@ -25,6 +26,7 @@
 import { randomBytes } from "node:crypto";
 import { Sandbox, type NetworkPolicy } from "@vercel/sandbox";
 import { sha256 } from "../api";
+import { serverEnv } from "../server-env";
 import { getStore } from "../store";
 import type { RunMeta } from "../store/types";
 import { engineArgs, type Runner, type StartOptions } from "./types";
@@ -68,7 +70,7 @@ if buf: post("\n".join(buf), "events")
 export class VercelSandboxRunner implements Runner {
   readonly kind = "vercel-sandbox" as const;
 
-  async start({ meta, csv, llmSpec, apiKey }: StartOptions): Promise<void> {
+  async start({ meta, csv }: StartOptions): Promise<void> {
     const store = getStore();
     const token = randomBytes(32).toString("hex");
     const appHost = new URL(publicUrl()).host;
@@ -100,7 +102,9 @@ export class VercelSandboxRunner implements Runner {
         throw Object.assign(new Error("Installing the engine in the sandbox failed."), { tail });
       }
 
-      const args = engineArgs({ csvPath: `${WORKDIR}/input.csv`, target: meta.target, llmSpec, maxExperiments: meta.maxExperiments, outDir: `${WORKDIR}/out`, description: meta.description });
+      const fromUrl = meta.source === "url" && !!meta.sourceUrl;
+      if (!fromUrl && !csv) throw new Error("Nothing to run: no link and no uploaded file.");
+      const args = engineArgs({ source: fromUrl ? meta.sourceUrl! : `${WORKDIR}/input.csv`, target: meta.target, metric: meta.metric, goal: meta.description, maxExperiments: meta.maxExperiments, outDir: `${WORKDIR}/out` });
       const quoted = args.map((a) => `'${a.replace(/'/g, `'\\''`)}'`).join(" ");
       const runSh = `#!/bin/bash
 set -o pipefail
@@ -110,15 +114,19 @@ code=$?
 .venv/bin/python forward.py --final "$code" stderr.log out/run.json
 `;
       await sandbox.writeFiles([
-        { path: `${WORKDIR}/input.csv`, content: csv },
+        ...(fromUrl ? [] : [{ path: `${WORKDIR}/input.csv`, content: csv! }]),
         { path: `${WORKDIR}/forward.py`, content: Buffer.from(FORWARD_PY) },
         { path: `${WORKDIR}/run.sh`, content: Buffer.from(runSh), mode: 0o755 },
       ]);
 
-      // Run phase: lock egress down to our ingest host (+ Anthropic with the key brokered at the firewall).
+      // Run phase: lock egress down to our ingest host, the dataset host (link runs; redirects to other hosts such as
+      // *.googleusercontent.com would be blocked — unverified) and the LLM providers with keys brokered at the firewall.
       const allow: Record<string, { transform?: { headers: Record<string, string> }[] }[]> = { [appHost]: [] };
-      const key = apiKey || (meta.llm === "anthropic" ? process.env.AUTOTINKER_SERVER_ANTHROPIC_KEY : undefined);
-      if (meta.llm === "anthropic" && key) allow["api.anthropic.com"] = [{ transform: [{ headers: { "x-api-key": key } }] }];
+      if (fromUrl) allow[new URL(meta.sourceUrl!).host] = [];
+      const groq = serverEnv("GROQ_API_KEY");
+      const gemini = serverEnv("GEMINI_API_KEY");
+      if (groq) allow["api.groq.com"] = [{ transform: [{ headers: { Authorization: `Bearer ${groq}` } }] }];
+      if (gemini) allow["generativelanguage.googleapis.com"] = [{ transform: [{ headers: { Authorization: `Bearer ${gemini}` } }] }];
       await sandbox.update({ networkPolicy: { allow } as NetworkPolicy });
 
       const cmd = await sandbox.runCommand({
@@ -130,8 +138,9 @@ code=$?
           AUTOTINKER_INGEST_URL: `${publicUrl()}/api/runs/${meta.id}/ingest`,
           AUTOTINKER_INGEST_TOKEN: token,
           PYTHONUNBUFFERED: "1",
-          // Placeholder so the SDK client initialises; the real key is injected by the firewall.
-          ...(meta.llm === "anthropic" ? { ANTHROPIC_API_KEY: "brokered-by-vercel-firewall" } : {}),
+          // Placeholders so the engine's router enables the providers; the real keys are injected by the firewall.
+          ...(groq ? { GROQ_API_KEY: "brokered-by-vercel-firewall" } : {}),
+          ...(gemini ? { GEMINI_API_KEY: "brokered-by-vercel-firewall" } : {}),
         },
       });
       await store.updateMeta(meta.id, { status: "running", commandId: cmd.cmdId });

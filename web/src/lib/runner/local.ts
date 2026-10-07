@@ -2,7 +2,11 @@
  * Local runner (default in dev): spawns the Python engine as a child process on this machine and turns its
  * stdout JSONL into stored events.
  *
- *   <AUTOTINKER_PYTHON_CMD> -m autotinker evolve <csv> --target <t> --llm <spec> --max-experiments N --out <dir> --events-stdout
+ *   <AUTOTINKER_PYTHON_CMD> -m autotinker run <url|csv> --target <t> [--metric m] [--goal g] --max-experiments N --out <dir> --events-stdout
+ *
+ * Environment: a small allow-list of system variables, plus the LLM provider keys and AUTOTINKER_* engine settings
+ * (from process.env or the repo-root .env, see lib/server-env.ts). DATABASE_URL and other credentials never reach the
+ * engine; they are set to "" so the engine's own .env loader (python-dotenv, override=False) can't pick them up.
  *
  * AUTOTINKER_PYTHON_CMD defaults to `uv run --project <repo root> python` (repo root = parent of web/). It is split
  * on whitespace, so paths in it must not contain spaces. Generated pipelines are sandboxed by the engine's own
@@ -15,6 +19,7 @@ import { JsonlEventDecoder } from "../events";
 import type { RunRecord } from "../schema";
 import { getStore } from "../store";
 import type { RunMeta } from "../store/types";
+import { engineEnv, knownSecrets } from "../server-env";
 import { redact } from "../upload";
 import { engineArgs, type Runner, type StartOptions } from "./types";
 
@@ -26,7 +31,9 @@ interface Live {
 const g = globalThis as unknown as { __autotinkerLocalRuns?: Map<string, Live> };
 const live = (g.__autotinkerLocalRuns ??= new Map());
 
-const ENV_ALLOW = /^(PATH|HOME|USER|LANG|LC_[A-Z]+|TMPDIR|TEMP|TMP|SHELL|UV_[A-Z_]+|PYTHON[A-Z_]*|VIRTUAL_ENV|CONDA_[A-Z_]+|SYSTEMROOT|OMP_NUM_THREADS|AUTOTINKER_ENGINE_[A-Z_]+)$/;
+const ENV_ALLOW = /^(PATH|HOME|USER|LANG|LC_[A-Z]+|TMPDIR|TEMP|TMP|SHELL|UV_[A-Z_]+|PYTHON[A-Z_]*|VIRTUAL_ENV|CONDA_[A-Z_]+|SYSTEMROOT|OMP_NUM_THREADS)$/;
+/** Set to "" in the engine env so python-dotenv won't load them from the repo-root .env. */
+const BLOCKED_FROM_DOTENV = ["DATABASE_URL", "DATABASE_URL_POOLED", "DATABASE_URL_UNPOOLED", "POSTGRES_URL", "ANTHROPIC_API_KEY"];
 
 export function activeLocalRuns(): number {
   return live.size;
@@ -67,23 +74,28 @@ async function findRunJson(outDir: string): Promise<string | null> {
 export class LocalRunner implements Runner {
   readonly kind = "local" as const;
 
-  async start({ meta, csv, llmSpec, apiKey }: StartOptions): Promise<void> {
+  async start({ meta, csv }: StartOptions): Promise<void> {
     const store = getStore();
     const dir = path.join(dataRoot(), "runs", meta.id);
     const outDir = path.join(dir, "out");
     const csvPath = path.join(dir, "input.csv");
     await fs.mkdir(outDir, { recursive: true });
-    await fs.writeFile(csvPath, csv);
+    let source: string;
+    if (meta.source === "url" && meta.sourceUrl) source = meta.sourceUrl;
+    else if (csv) {
+      await fs.writeFile(csvPath, csv);
+      source = csvPath;
+    } else throw new Error("nothing to run: no link and no uploaded file");
 
     const [cmd, ...pre] = pythonCommand();
-    const args = [...pre, ...engineArgs({ csvPath, target: meta.target, llmSpec, maxExperiments: meta.maxExperiments, outDir, description: meta.description })];
+    const args = [...pre, ...engineArgs({ source, target: meta.target, metric: meta.metric, goal: meta.description, maxExperiments: meta.maxExperiments, outDir })];
 
     const env: Record<string, string | undefined> = {};
     for (const [k, v] of Object.entries(process.env)) if (ENV_ALLOW.test(k)) env[k] = v;
+    Object.assign(env, engineEnv());
+    for (const k of BLOCKED_FROM_DOTENV) env[k] = "";
     env.PYTHONUNBUFFERED = "1";
-    if (apiKey) env.ANTHROPIC_API_KEY = apiKey;
-    else if (meta.llm === "anthropic" && process.env.AUTOTINKER_SERVER_ANTHROPIC_KEY) env.ANTHROPIC_API_KEY = process.env.AUTOTINKER_SERVER_ANTHROPIC_KEY;
-    const secrets = [apiKey, env.ANTHROPIC_API_KEY];
+    const secrets = knownSecrets();
 
     // argv only — never the env, which may hold the key.
     console.info(`[run ${meta.id}] spawn: ${cmd} ${args.join(" ")}`);
@@ -143,12 +155,19 @@ export class LocalRunner implements Runner {
         }
       }
       await fs.rm(csvPath, { force: true }); // uploads are not kept after the run
-      const errorTail = tail.slice(-40).join("\n");
+      // Local paths (run directory, tracebacks) stay in the server log, not in what the browser sees.
+      const errorTail = tail
+        .slice(-40)
+        .filter((l) => !/^run directory:/.test(l))
+        .map((l) => l.split(repoRoot()).join("…"))
+        .join("\n");
       let patch: Partial<RunMeta>;
       if (entry.cancelled) patch = { status: "cancelled", error: "Cancelled by user." };
       else if (spawnError)
         patch = { status: "failed", error: `Could not start the engine (${spawnError.message}). Is uv installed and AUTOTINKER_PYTHON_CMD correct?` };
       else if (code === 0) patch = { status: "finished" };
+      // Exit 3 = the agents gave up early (proposer_failure). The engine still scored the locked test and reported.
+      else if (code === 3 && runJson) patch = { status: "finished", error: "The agents stopped early after repeated failures; the best model so far was scored on the locked test." };
       else patch = { status: "failed", error: `The engine exited with ${code !== null ? `code ${code}` : `signal ${signal}`}.`, errorTail };
       await store.updateMeta(meta.id, { ...patch, finishedAt: new Date().toISOString() });
       console.info(`[run ${meta.id}] ${patch.status}`);

@@ -2,14 +2,8 @@ import type { RunMeta } from "../store/types";
 
 export interface StartOptions {
   meta: RunMeta;
-  csv: Buffer;
-  /** The engine's --llm value, e.g. "heuristic" or "anthropic". */
-  llmSpec: string;
-  /**
-   * BYOK key for this run only. Runners must pass it to the engine's environment (local) or broker it at the
-   * network edge (vercel-sandbox), and must never write it to the store, to disk, or to logs.
-   */
-  apiKey?: string | null;
+  /** Uploaded CSV (source "file"). Absent for link runs: the engine downloads `meta.sourceUrl` itself. */
+  csv?: Buffer | null;
 }
 
 export interface Runner {
@@ -20,9 +14,15 @@ export interface Runner {
   cancel(meta: RunMeta): Promise<boolean>;
 }
 
-/** The engine CLI arguments after `python`. Shared by both runners so they run the same command. */
-export function engineArgs(o: { csvPath: string; target: string; llmSpec: string; maxExperiments: number; outDir: string; description?: string }): string[] {
-  const args = ["-m", "autotinker", "evolve", o.csvPath, "--target", o.target, "--llm", o.llmSpec, "--max-experiments", String(o.maxExperiments), "--out", o.outDir, "--max-cost", process.env.AUTOTINKER_MAX_COST_USD || "1", "--events-stdout"];
-  if (o.description && process.env.AUTOTINKER_PASS_DESCRIPTION !== "0") args.push("--description", o.description);
+/**
+ * The engine CLI arguments after `python`: the AGENTIC path,
+ *   -m autotinker run <url|path> --target T [--metric M] [--goal G] --max-experiments N --out DIR --events-stdout
+ * Shared by both runners so they run the same command. argv, not a shell string: nothing here is interpolated.
+ */
+export function engineArgs(o: { source: string; target: string; maxExperiments: number; outDir: string; metric?: string | null; goal?: string | null }): string[] {
+  const args = ["-m", "autotinker", "run", o.source, "--target", o.target];
+  if (o.metric) args.push("--metric", o.metric);
+  if (o.goal && process.env.AUTOTINKER_PASS_DESCRIPTION !== "0") args.push("--goal", o.goal);
+  args.push("--max-experiments", String(o.maxExperiments), "--out", o.outDir, "--events-stdout");
   return args;
 }

@@ -247,16 +247,15 @@ ROLES: dict[str, RoleSpec[Any]] = {
 
 
 def intake_input(preview_csv: str, columns_summary: str, goal: str, hint_target: str | None) -> str:
+    """preview_csv="" -> schema-only input (safe for providers that train on inputs)."""
     hint = f"\nThe user says the target column is {hint_target!r}." if hint_target else ""
-    return (
-        f"User's sentence: {goal.strip() or '(none)'}{hint}\n\n"
-        f"Columns (code-computed):\n{columns_summary}\n\n"
-        f"Preview (header + first rows):\n{preview_csv}"
-    )
+    preview = f"\n\nPreview (header + first rows):\n{preview_csv}" if preview_csv else ""
+    head = f"User's sentence: {goal.strip() or '(none)'}{hint}"
+    return f"{head}\n\nColumns (code-computed):\n{columns_summary}{preview}"
 
 
-def profiler_input(profile: DataProfile, goal: str) -> str:
-    return f"Goal: {goal or '(not stated)'}\n\n{profile_text(profile, rows=True)}"
+def profiler_input(profile: DataProfile, goal: str, *, rows: bool = True) -> str:
+    return f"Goal: {goal or '(not stated)'}\n\n{profile_text(profile, rows=rows)}"
 
 
 def planner_input(

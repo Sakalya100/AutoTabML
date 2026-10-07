@@ -16,9 +16,19 @@ export interface RunMeta {
   status: RunStatus;
   runner: "local" | "vercel-sandbox";
   target: string;
+  /** The user's sentence ("predict churn"); passed to the engine as --goal. */
   description: string;
   maxExperiments: number;
-  llm: "heuristic" | "anthropic";
+  /** Metric the user confirmed (engine id); absent = the engine's default for the problem type. */
+  metric?: string;
+  /** "url": the engine downloads `sourceUrl` itself. "file": an uploaded CSV. Absent on runs made before Phase 2. */
+  source?: "url" | "file";
+  sourceUrl?: string;
+  /** Agentic engine (Phase 2+). Older runs recorded the legacy proposer here. */
+  engine?: "agentic";
+  /** Legacy (pre-agentic) runs only. */
+  llm?: "heuristic" | "anthropic";
+  /** File name, or the link's last path segment. */
   fileName: string;
   fileBytes: number;
   /** Short, user-safe failure message. */

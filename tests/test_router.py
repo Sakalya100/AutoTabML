@@ -125,9 +125,23 @@ def test_disabled_provider_is_never_called() -> None:
         return httpx.Response(200, json=ok_body())
 
     router, _, seen = make(handler, env=ENV)  # default: cerebras disabled
-    with pytest.raises(LLMError):
-        router.chat(req("code"))
+    res = router.chat(req("code"))  # Groq down -> Gemini fallback, never Cerebras
+    assert res.provider == "gemini"
     assert seen and all("cerebras" not in host(r) for r in seen)
+
+
+def test_code_falls_back_to_gemini_when_groq_quota_is_gone_but_rows_never_go_there() -> None:
+    def handler(r: httpx.Request) -> httpx.Response:
+        if "groq" in host(r):
+            msg = "Rate limit reached ... on requests per day (RPD): Limit 1000, Used 1000"
+            return httpx.Response(429, json={"error": {"message": msg}})
+        return httpx.Response(200, json=ok_body())
+
+    router, _, _ = make(handler, env={**ENV, "AUTOTINKER_DISABLED_PROVIDERS": "cerebras"})
+    assert router.chat(req("code")).provider == "gemini"
+    assert router.chat(req("reason")).provider == "gemini"
+    with pytest.raises(LLMError):
+        router.chat(req("reason", privacy=True))  # data rows: Gemini is not allowed
 
 
 def test_bucket_refill_and_headers() -> None:

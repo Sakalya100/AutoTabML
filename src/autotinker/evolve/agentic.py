@@ -184,19 +184,23 @@ def run_intake(
     out: IntakeOut | None = None
     step: AgentStep | None = None
     if backend is not None:
-        try:
-            call = run_role(
-                backend,
-                specs.INTAKE,
-                specs.intake_input(preview_csv(df), columns_summary(df), goal, target),
-                privacy=True,  # the preview holds data rows
-                input_summary=f"preview of {len(df.columns)} columns; user: {goal[:120] or '(none)'}",
-            )
-            out, step = call.output, call.step
-        except RoleFailed as exc:
-            step = exc.step
-            if is_fatal_llm_error(exc):
-                raise
+        # With rows first (row-safe providers only); if none can serve, retry schema-only so any provider can.
+        for rows in (True, False):
+            try:
+                call = run_role(
+                    backend,
+                    specs.INTAKE,
+                    specs.intake_input(preview_csv(df) if rows else "", columns_summary(df), goal, target),
+                    privacy=rows,  # the preview holds data rows
+                    input_summary=f"{'preview' if rows else 'schema'} of {len(df.columns)} columns; "
+                    f"user: {goal[:120] or '(none)'}",
+                )
+                out, step = call.output, call.step
+                break
+            except RoleFailed as exc:
+                step = exc.step
+                if is_fatal_llm_error(exc):
+                    raise
     tgt = target
     if tgt is None and out is not None and out.target in df.columns:
         tgt = out.target
@@ -696,22 +700,32 @@ class AgenticRunner(_Runner):
     # -------------------------------------------------- stages
 
     def profile_stage(self) -> None:
-        try:
-            call = self._role(
-                specs.PROFILER,
-                specs.profiler_input(self.h.profile, self.goal),
-                None,
-                privacy=True,  # sample rows
-                input_summary=f"profile: {self.h.profile.n_rows} rows x {len(self.h.profile.columns)} cols",
-            )
-        except RoleFailed as exc:
-            if is_fatal_llm_error(exc):
-                raise
-            return
-        out = cast(ProfilerOut, call.output)
         names = {c.name for c in self.h.profile.columns}
+        # Deterministic safety net: columns the code-computed profile flags as IDs are always excluded, even
+        # if no LLM answers (seen live: with the row-safe provider down, the baseline kept an `Id` column).
+        flagged = [c.name for c in self.h.profile.columns if "id_like" in c.flags]
+        self.drop_columns = flagged
+        out: ProfilerOut | None = None
+        # With sample rows first (row-safe providers only); if none can serve, retry schema-only.
+        for rows in (True, False):
+            try:
+                call = self._role(
+                    specs.PROFILER,
+                    specs.profiler_input(self.h.profile, self.goal, rows=rows),
+                    None,
+                    privacy=rows,  # sample rows
+                    input_summary=f"profile{'' if rows else ' (schema only)'}: "
+                    f"{self.h.profile.n_rows} rows x {len(self.h.profile.columns)} cols",
+                )
+                out = cast(ProfilerOut, call.output)
+                break
+            except RoleFailed as exc:
+                if is_fatal_llm_error(exc):
+                    raise
+        if out is None:
+            return
         self.risks = out.risks[:8]
-        self.drop_columns = [c for c in out.drop_columns if c in names]
+        self.drop_columns = sorted({*flagged, *(c for c in out.drop_columns if c in names)})
 
     def baseline(self) -> None:
         exp = self._start("e000", "baseline")

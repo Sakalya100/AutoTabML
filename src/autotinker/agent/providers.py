@@ -2,7 +2,7 @@
 limits and list price.
 
 Aliases, not provider names, are what roles ask for:
-  code    gpt-oss-120b          Groq <-> Cerebras
+  code    gpt-oss-120b          Groq <-> Cerebras, then Gemini 3.5 Flash-Lite (no data rows)
   reason  gpt-oss-120b, reasoning_effort=medium, Groq (Cerebras: qwen). Qwen 3.8 on Groq is opt-in via
           AUTOTINKER_REASON_MODEL=qwen: Groq's free tier allows qwen only ~1K output tokens/min, which its own
           reasoning exhausts (measured 2026-10-07: 12 of 21 calls hit 429).
@@ -106,10 +106,20 @@ GEMINI = ProviderSpec(
         "fast": ModelSpec(
             "gemini-3.1-flash-lite", tpm=250000, rpm=15, rpd=500, max_output=8192, price=(0.10, 0.40, 0.025)
         ),
+        # Last-resort fallbacks for when Groq's free daily quota is used up (seen live 2026-10-08). A separate
+        # Flash-Lite keeps them off the `fast` quota. Never gets data rows (only Intake/Profiler send rows;
+        # `privacy=True` requests never go to providers that train on inputs).
+        "code": ModelSpec(
+            "gemini-3.5-flash-lite", tpm=250000, rpm=15, rpd=500, max_output=8192, price=(0.10, 0.40, 0.025)
+        ),
+        "reason": ModelSpec(
+            "gemini-3.5-flash-lite", tpm=250000, rpm=15, rpd=500, max_output=8192, price=(0.10, 0.40, 0.025)
+        ),
     },
 )
 
-DEFAULT_PROVIDERS: tuple[ProviderSpec, ...] = (GROQ, GEMINI, CEREBRAS)
+# Order = preference for a shared alias: Gemini last, as the weaker, train-on-inputs fallback for code/reason.
+DEFAULT_PROVIDERS: tuple[ProviderSpec, ...] = (GROQ, CEREBRAS, GEMINI)
 
 
 def disabled_providers(env: Mapping[str, str] | None = None) -> set[str]:

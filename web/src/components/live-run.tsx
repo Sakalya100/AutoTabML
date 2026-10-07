@@ -125,11 +125,12 @@ export function LiveRun({ id }: { id: string }) {
           <span className="text-ink">{statusText(meta.status)}</span>
           {active && <span>{connected ? "· live" : "· connecting…"}</span>}
         </span>
-        <span className="tabular" title="LLM spend so far (runs without an LLM cost nothing)">
+        <span className="tabular" title="LLM spend so far (free-tier models cost nothing)">
           {fmtCost(view.totalCostUsd)} · {fmtInt(view.totalInputTokens + view.totalOutputTokens)} tokens
         </span>
         <span>
-          {meta.llm === "heuristic" ? "no LLM: built-in search" : "ideas by Claude"} · up to {meta.maxExperiments} ideas
+          {meta.engine === "agentic" || !meta.llm ? "agents on free Groq / Gemini models" : meta.llm === "heuristic" ? "no LLM: built-in search" : "ideas by Claude"} · up to{" "}
+          {meta.maxExperiments} experiments
         </span>
         {active && (
           <button
@@ -149,6 +150,7 @@ export function LiveRun({ id }: { id: string }) {
           )}
         </div>
       )}
+      {meta.status === "finished" && meta.error && <p className="text-sm text-ink-3">{meta.error}</p>}
       {meta.status === "cancelled" && <p className="text-sm text-ink-3">This run was cancelled. Everything recorded up to then is below.</p>}
     </div>
   );
@@ -163,7 +165,7 @@ export function LiveRun({ id }: { id: string }) {
       liveBar={bar}
       active={active}
       endedAs={meta.status === "cancelled" || meta.status === "failed" ? meta.status : null}
-      emptyHint={meta.runner === "vercel-sandbox" ? "Creating a sandbox and installing the engine — a minute or two" : "Starting the engine and profiling your data"}
+      emptyHint={meta.runner === "vercel-sandbox" ? "Creating a sandbox and installing the engine — a minute or two" : meta.source === "url" ? "Downloading your data and starting the agents" : "Starting the engine and profiling your data"}
       plannedExperiments={meta.maxExperiments}
     />
   );

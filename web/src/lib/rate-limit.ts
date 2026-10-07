@@ -40,6 +40,13 @@ export function runLimiter(): RateLimiter {
   return g.__autotinkerRunLimiter;
 }
 
+const gp = globalThis as unknown as { __autotinkerPreviewLimiter?: RateLimiter };
+/** Link previews: cheap-ish (≤ 2 MB fetch + maybe one small LLM call), so a per-minute budget. */
+export function previewLimiter(): RateLimiter {
+  gp.__autotinkerPreviewLimiter ??= new RateLimiter(Number(process.env.AUTOTINKER_PREVIEWS_PER_IP_PER_MIN ?? 20), 60 * 1000);
+  return gp.__autotinkerPreviewLimiter;
+}
+
 export function clientIp(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();

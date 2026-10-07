@@ -1,13 +1,17 @@
 /**
- * Upload validation shared by the /new form (client) and POST /api/runs (server). No Node-only imports.
+ * Run-request validation shared by the /new form (client) and POST /api/runs (server). No Node-only imports.
+ * Two sources: a public https link (the engine downloads it) or an uploaded CSV file.
  */
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
-export const MAX_EXPERIMENTS_PUBLIC = 30;
+export const MAX_EXPERIMENTS_PUBLIC = 10;
+export const DEFAULT_EXPERIMENTS = 10;
 export const MIN_DATA_ROWS = 20;
 export const MAX_DESCRIPTION = 2000;
-export const LLM_CHOICES = ["heuristic", "anthropic"] as const;
-export type LlmChoice = (typeof LLM_CHOICES)[number];
+export const MAX_URL_LENGTH = 2048;
+/** Metric ids the engine accepts (autotinker.contracts.Metric). */
+export const ENGINE_METRICS = ["roc_auc", "log_loss", "accuracy", "f1_macro", "rmse", "mae", "r2"] as const;
+export type EngineMetric = (typeof ENGINE_METRICS)[number];
 
 /** Split one CSV record (RFC 4180 quoting, "" escapes). Does not handle newlines inside quotes. */
 export function splitCsvLine(line: string, delimiter = ","): string[] {
@@ -52,37 +56,83 @@ export function previewCsv(text: string, maxRows = 5): CsvPreview {
   return { columns, rows: dataLines.slice(0, maxRows).map((l) => splitCsvLine(l)), rowCount: dataLines.length };
 }
 
-export interface RunRequestInput {
+/** The run options common to both sources. */
+export interface RunOptionsInput {
+  target: string;
+  /** The user's sentence ("predict churn"). Passed to the engine as --goal. */
+  goal?: string;
+  metric?: string | null;
+  maxExperiments: number | string;
+}
+
+export interface ValidRunOptions {
+  target: string;
+  goal: string;
+  metric: EngineMetric | null;
+  maxExperiments: number;
+}
+
+export type Invalid = { ok: false; field: string; error: string };
+export type Valid<T> = { ok: true; value: T };
+const bad = (field: string, error: string): Invalid => ({ ok: false, field, error });
+
+export function validateRunOptions(input: RunOptionsInput, columns: string[] | null, opts: { maxExperiments?: number } = {}): Valid<ValidRunOptions> | Invalid {
+  const maxExp = opts.maxExperiments ?? MAX_EXPERIMENTS_PUBLIC;
+  const target = (input.target ?? "").trim();
+  if (!target) return bad("target", "Pick the column to predict.");
+  if (target.length > 200 || /[\r\n\u0000]/.test(target)) return bad("target", "That column name is not valid.");
+  if (columns && !columns.includes(target)) return bad("target", `Column "${target}" is not in the CSV header.`);
+
+  const n = typeof input.maxExperiments === "number" ? input.maxExperiments : Number(input.maxExperiments);
+  if (!Number.isInteger(n) || n < 1 || n > maxExp) return bad("maxExperiments", `Experiments must be a whole number from 1 to ${maxExp}.`);
+
+  const goal = (input.goal ?? "").trim();
+  if (goal.length > MAX_DESCRIPTION) return bad("goal", `Keep the sentence under ${MAX_DESCRIPTION} characters.`);
+
+  const m = (input.metric ?? "").trim();
+  if (m && !(ENGINE_METRICS as readonly string[]).includes(m)) return bad("metric", "Choose one of the listed metrics.");
+
+  return { ok: true, value: { target, goal, metric: (m || null) as EngineMetric | null, maxExperiments: n } };
+}
+
+/** A public link: https only here; the SSRF checks happen server-side (preview) and again in the engine. */
+export function validateUrlRunRequest(input: RunOptionsInput & { url: string }, opts: { maxExperiments?: number } = {}): Valid<ValidRunOptions & { url: string }> | Invalid {
+  const raw = (input.url ?? "").trim();
+  if (!raw) return bad("url", "Paste a link to a CSV file.");
+  if (raw.length > MAX_URL_LENGTH) return bad("url", "That link is too long.");
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return bad("url", "That isn't a valid link. Paste the full address, starting with https://");
+  }
+  if (u.protocol !== "https:") return bad("url", "Only https:// links are supported.");
+  if (u.username || u.password) return bad("url", "Links with a user name or password in them aren't allowed.");
+  const v = validateRunOptions(input, null, opts);
+  if (!v.ok) return v;
+  return { ok: true, value: { ...v.value, url: u.toString() } };
+}
+
+export interface RunRequestInput extends RunOptionsInput {
   fileName: string;
   fileBytes: number;
   /** The beginning (or all) of the file as text. */
   head: string;
   /** True if `head` is the whole file. */
   complete: boolean;
-  target: string;
-  description: string;
-  maxExperiments: number | string;
-  llm: string;
-  apiKey?: string | null;
 }
 
-export interface ValidRunRequest {
-  target: string;
-  description: string;
-  maxExperiments: number;
-  llm: LlmChoice;
+export interface ValidRunRequest extends ValidRunOptions {
   columns: string[];
 }
 
-export type ValidationResult = { ok: true; value: ValidRunRequest } | { ok: false; field: string; error: string };
+export type ValidationResult = Valid<ValidRunRequest> | Invalid;
 
-const bad = (field: string, error: string): ValidationResult => ({ ok: false, field, error });
-
+/** An uploaded CSV file. */
 export function validateRunRequest(input: RunRequestInput, opts: { maxExperiments?: number } = {}): ValidationResult {
-  const maxExp = opts.maxExperiments ?? MAX_EXPERIMENTS_PUBLIC;
   if (!input.fileName || !/\.csv$/i.test(input.fileName)) return bad("file", "Upload a .csv file.");
   if (input.fileBytes <= 0) return bad("file", "The file is empty.");
-  if (input.fileBytes > MAX_UPLOAD_BYTES) return bad("file", `The file is ${(input.fileBytes / 1048576).toFixed(1)} MB; the limit is 5 MB.`);
+  if (input.fileBytes > MAX_UPLOAD_BYTES) return bad("file", `The file is ${(input.fileBytes / 1048576).toFixed(1)} MB; the limit for uploads is 5 MB. Paste a link instead (up to 50 MB).`);
   if (input.head.slice(0, 4096).includes("\u0000")) return bad("file", "This doesn't look like a text CSV file.");
 
   const { columns, rowCount } = previewCsv(input.head, 0);
@@ -92,28 +142,18 @@ export function validateRunRequest(input: RunRequestInput, opts: { maxExperiment
   if (dup) return bad("file", `Column "${dup}" appears twice in the header.`);
   if (input.complete && rowCount < MIN_DATA_ROWS) return bad("file", `Need at least ${MIN_DATA_ROWS} data rows; found ${rowCount}.`);
 
-  const target = (input.target ?? "").trim();
-  if (!target) return bad("target", "Pick the column to predict.");
-  if (!columns.includes(target)) return bad("target", `Column "${target}" is not in the CSV header.`);
-
-  const n = typeof input.maxExperiments === "number" ? input.maxExperiments : Number(input.maxExperiments);
-  if (!Number.isInteger(n) || n < 1 || n > maxExp) return bad("maxExperiments", `Max experiments must be a whole number from 1 to ${maxExp}.`);
-
-  const description = (input.description ?? "").trim();
-  if (description.length > MAX_DESCRIPTION) return bad("description", `Keep the description under ${MAX_DESCRIPTION} characters.`);
-
-  if (!(LLM_CHOICES as readonly string[]).includes(input.llm)) return bad("llm", "Choose the offline heuristic or Anthropic.");
-  if (input.apiKey != null && input.apiKey !== "") {
-    if (input.llm !== "anthropic") return bad("apiKey", "An API key is only used with the Anthropic proposer.");
-    if (input.apiKey.length > 300 || /\s/.test(input.apiKey)) return bad("apiKey", "That doesn't look like an API key.");
-  }
-
-  return { ok: true, value: { target, description, maxExperiments: n, llm: input.llm as LlmChoice, columns } };
+  const v = validateRunOptions(input, columns, opts);
+  if (!v.ok) return v;
+  return { ok: true, value: { ...v.value, columns } };
 }
 
-/** Replace any occurrence of the given secrets (and anything shaped like an Anthropic key) in log text. */
+/** Provider-key shapes: Anthropic, Groq, Google (AQ. / AIza), Cerebras, Neon Postgres passwords. */
+const KEY_PATTERNS = [/sk-ant-[A-Za-z0-9_-]{8,}/g, /gsk_[A-Za-z0-9]{8,}/g, /\bAQ\.[A-Za-z0-9_-]{8,}/g, /AIza[A-Za-z0-9_-]{20,}/g, /csk-[A-Za-z0-9]{8,}/g, /npg_[A-Za-z0-9]{6,}/g];
+
+/** Replace any occurrence of the given secrets (and anything shaped like a provider key) in log text. */
 export function redact(text: string, secrets: (string | null | undefined)[] = []): string {
   let out = text;
   for (const s of secrets) if (s && s.length >= 8) out = out.split(s).join("[redacted]");
-  return out.replace(/sk-ant-[A-Za-z0-9_-]{8,}/g, "[redacted]");
+  for (const re of KEY_PATTERNS) out = out.replace(re, "[redacted]");
+  return out;
 }

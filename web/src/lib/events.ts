@@ -19,6 +19,12 @@ export const EVENT_TYPES: readonly EventType[] = [
   "decision",
   "stopped",
   "run_finished",
+  "agent_step_started",
+  "agent_reasoning",
+  "agent_step_finished",
+  "sandbox_log",
+  "hpo_trial",
+  "report_ready",
 ] as const;
 
 const REQUIRED: Record<EventType, readonly string[]> = {
@@ -30,6 +36,13 @@ const REQUIRED: Record<EventType, readonly string[]> = {
   decision: ["exp_id", "decision", "best_exp_id", "best_cv_mean"],
   stopped: ["reason", "report", "summary"],
   run_finished: ["best_exp_id", "dev_cv_mean", "select_score", "test_score", "optimism_gap"],
+  // Agentic engine (v3, additive). Older replays simply never contain these.
+  agent_step_started: ["step_id", "role"],
+  agent_reasoning: ["step_id", "role", "text"],
+  agent_step_finished: ["step"],
+  sandbox_log: ["exp_id", "lines"],
+  hpo_trial: ["exp_id", "trial"],
+  report_ready: ["report"],
 };
 
 export function isEventType(t: unknown): t is EventType {
@@ -46,6 +59,12 @@ export function coerceEvent(obj: unknown): AnyEvent | null {
   if (!isEventType(o.type) || typeof o.run_id !== "string") return null;
   if (typeof o.seq !== "number" || !Number.isInteger(o.seq) || o.seq < 0) return null;
   for (const k of REQUIRED[o.type]) if (!(k in o)) return null;
+  if (o.type === "agent_step_finished") {
+    const step = o.step as Record<string, unknown> | null;
+    if (!step || typeof step !== "object" || typeof step.role !== "string") return null;
+  }
+  if (o.type === "sandbox_log" && !Array.isArray(o.lines)) return null;
+  if (o.type === "report_ready" && (!o.report || typeof o.report !== "object")) return null;
   return { ...o, ts: typeof o.ts === "string" ? o.ts : new Date().toISOString() } as unknown as AnyEvent;
 }
 

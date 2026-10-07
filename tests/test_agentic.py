@@ -293,3 +293,13 @@ def test_intake_infers_target_and_validates_metric() -> None:
     )
     d3 = run_intake(chat3, df, target="churn")
     assert d3.metric is not None and d3.metric.value == "accuracy"
+
+
+def test_id_like_columns_are_dropped_even_when_the_profiler_cannot_answer(tmp_path: Path) -> None:
+    h = FakeHarness()
+    col = h.profile.columns[0]
+    h.profile.columns[0] = col.model_copy(update={"name": "Id", "flags": [*col.flags, "id_like"]})
+    chat = ScriptedChat({"profiler": ["nonsense"] * 4, "reporter": [reporter()]})
+    rec = _run(chat, tmp_path, _cfg(max_experiments=1, n_drafts=0), h=h)
+    e0 = rec.experiments[0]
+    assert "Id" in e0.idea.title and "DROP_COLUMNS" in e0.code

@@ -2,7 +2,20 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { feedSignature, inFlight, type ExperimentItem, type FeedItem, type FinishedItem, type RunStartedItem, type StoppedItem } from "@/lib/feed";
+import {
+  feedSignature,
+  inFlight,
+  roleDoing,
+  roleLabel,
+  type AgentStepItem,
+  type AgentStepLine,
+  type ExperimentItem,
+  type FeedItem,
+  type FinishedItem,
+  type ReportItem,
+  type RunStartedItem,
+  type StoppedItem,
+} from "@/lib/feed";
 import { CATEGORY_LABEL, fmtCost, fmtDuration, fmtValue, SIGNAL_LABEL } from "@/lib/format";
 import { describeGap, formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import { answerKind, plainIdea, plainVerdict, stopPhrase } from "@/lib/story";
@@ -31,6 +44,8 @@ interface Props {
   /** Shown while the run has produced no events yet. */
   emptyHint?: string;
   heuristic?: boolean;
+  /** The agent step running right now, if any (agentic runs): names who is working in the "thinking" line. */
+  activity?: { role: string; expId: string | null } | null;
   className?: string;
 }
 
@@ -38,7 +53,7 @@ interface Props {
  * The agent's activity, in the landing's typographic language: one entry per idea, plain words first (what it tried,
  * what happened), the precise numbers second, the gate's full reasoning on selection. No bubbles, no cards.
  */
-export function StepFeed({ items, metric, selectedId, focusId, onSelect, streaming, emptyHint, heuristic, className = "" }: Props) {
+export function StepFeed({ items, metric, selectedId, focusId, onSelect, streaming, emptyHint, heuristic, activity, className = "" }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const lastTop = useRef(0);
@@ -54,7 +69,7 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
   const sig = feedSignature(items);
   const flying = inFlight(items);
   const last = items.at(-1);
-  const thinking = streaming && !flying && last?.kind !== "finished";
+  const thinking = streaming && !flying && last?.kind !== "finished" && last?.kind !== "report" && !(last?.kind === "agent_step" && last.running);
 
   // Follow the newest message unless the reader scrolled up.
   useLayoutEffect(() => {
@@ -144,6 +159,8 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
                 {it.kind === "experiment" && <ExperimentMsg item={it} metric={metric} selected={it.id === selectedId} live={it === flying && streaming} onSelect={onSelect} />}
                 {it.kind === "stopped" && <StoppedMsg item={it} />}
                 {it.kind === "finished" && <FinishedMsg item={it} metric={metric} />}
+                {it.kind === "agent_step" && <RunStepMsg item={it} />}
+                {it.kind === "report" && <ReportMsg item={it} />}
               </li>
             ))}
             <AnimatePresence initial={false}>
@@ -158,9 +175,13 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
                 >
                   <Thinking
                     text={
-                      items.length === 0
+                      activity && !activity.expId
+                        ? `${roleDoing(activity.role)}…`
+                        : items.length === 0
                         ? (emptyHint ?? "Reading the data")
-                        : last?.kind === "stopped"
+                        : activity
+                          ? `${roleDoing(activity.role)}…`
+                          : last?.kind === "stopped"
                           ? "Running the one final test, on data it has never seen"
                           : heuristic
                             ? "Choosing the next idea"
@@ -385,6 +406,7 @@ function ExperimentMsg({
   const okAttempt = item.attempts.find((a) => a.ok);
   const idea = plainIdea(item.idea);
   const g = item.decision?.gate;
+  const runningStep = live ? item.steps.findLast((x) => x.running) : undefined;
 
   return (
     <motion.article
@@ -418,7 +440,7 @@ function ExperimentMsg({
         </p>
         <div className={`mt-1 text-[14px] ${v.tone === "kept" ? "text-best" : v.tone === "broke" ? "text-crash" : "text-ink-2"}`}>
           {v.tone === "running" ? (
-            <Running repairing={fails.length > 0} />
+            <Running repairing={fails.length > 0} label={runningStep ? `${roleDoing(runningStep.role)}…` : undefined} />
           ) : (
             <Enter>
               {v.text} <span aria-hidden>→</span> <span className="font-medium">{v.outcome}</span>
@@ -456,6 +478,23 @@ function ExperimentMsg({
           {(CATEGORY_LABEL[item.idea.category] ?? item.idea.category).toLowerCase()}
           {item.idea.radical && " · radical"}
         </p>
+
+        {item.steps.length > 0 && (
+          <ol className="mt-2 space-y-0.5" aria-label="Agent steps">
+            {item.steps.map((st, i) => (
+              <StepLine key={st.stepId || i} step={st} />
+            ))}
+          </ol>
+        )}
+        {item.hpoTrials > 0 && <p className="mt-1 font-mono text-[11px] text-ink-3 tabular">{item.hpoTrials} tuning trials</p>}
+        {item.logs.length > 0 && (
+          <details className="group/log mt-1.5 text-[12px]" onClick={(e) => e.stopPropagation()}>
+            <summary className="cursor-pointer list-none font-mono text-[11px] text-ink-3 marker:hidden">
+              <span className="underline decoration-[var(--lp-hair)] underline-offset-4">sandbox log · {item.logs.length} line{item.logs.length === 1 ? "" : "s"}</span>
+            </summary>
+            <pre className="mt-1.5 max-h-48 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-ink-3">{item.logs.join("\n")}</pre>
+          </details>
+        )}
 
         {fails.map((a) => (
           <Enter key={a.attempt} className="mt-2">
@@ -498,11 +537,11 @@ function fmtP(p: number): string {
   return p >= 0.1 ? p.toFixed(2) : p.toFixed(3);
 }
 
-function Running({ repairing }: { repairing: boolean }) {
+function Running({ repairing, label }: { repairing: boolean; label?: string }) {
   const reduced = useReducedMotion();
   return (
     <span className="inline-flex items-center gap-3 text-ink-2">
-      {repairing ? "Re-running the repaired code…" : "Testing it…"}
+      {label ?? (repairing ? "Re-running the repaired code…" : "Testing it…")}
       <span className="relative inline-block h-px w-20 overflow-hidden bg-[var(--lp-hair)]" aria-hidden>
         {!reduced && (
           <motion.span
@@ -514,5 +553,56 @@ function Running({ repairing }: { repairing: boolean }) {
         )}
       </span>
     </span>
+  );
+}
+
+/* ---- agent steps (agentic engine) -------------------------------------------------------------------- */
+
+/** One agent step as a single line: mono role label, then its plain one-liner. Amber while it runs. */
+function StepLine({ step }: { step: AgentStepLine }) {
+  const text = step.running ? (step.inputSummary ? `working on ${step.inputSummary}` : "working…") : step.plain || (step.status === "error" ? "failed" : "done");
+  return (
+    <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-2 text-[12.5px] leading-snug">
+      <span className={`truncate font-mono text-[10.5px] uppercase tracking-[0.14em] ${step.running ? "animate-pulse text-best" : step.status === "error" ? "text-crash" : "text-ink-3"}`} title={step.model ?? undefined}>
+        {roleLabel(step.role)}
+        {step.attempt > 0 ? ` ${step.attempt + 1}` : ""}
+      </span>
+      <span className={step.running ? "text-ink-3 italic" : step.status === "error" ? "text-crash" : "text-ink-2"}>{text}</span>
+    </li>
+  );
+}
+
+function RunStepMsg({ item }: { item: AgentStepItem }) {
+  return (
+    <Enter className="py-3">
+      <ol>
+        <StepLine step={item} />
+      </ol>
+    </Enter>
+  );
+}
+
+function ReportMsg({ item }: { item: ReportItem }) {
+  const list = (title: string, xs: string[]) =>
+    xs.length > 0 && (
+      <div className="mt-3">
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-ink-3">{title}</p>
+        <ul className="mt-1 space-y-1 text-[14px] leading-relaxed text-ink-2">
+          {xs.map((x, i) => (
+            <li key={i} className="grid grid-cols-[0.9rem_minmax(0,1fr)]">
+              <span aria-hidden className="text-ink-3">–</span>
+              <span>{x}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  return (
+    <Moment kicker="The report" tone="signal" title={item.plain ?? "What it found"}>
+      {item.summary && <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">{item.summary}</p>}
+      {list("What worked", item.whatWorked)}
+      {list("Caveats", item.caveats)}
+      {list("Next steps", item.nextSteps)}
+    </Moment>
   );
 }

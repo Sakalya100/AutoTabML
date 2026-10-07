@@ -21,8 +21,3 @@ export function getRunner(kind: RunnerKind = runnerKind()): Runner {
 export function liveRunsEnabled(): boolean {
   return process.env.AUTOTINKER_LIVE_RUNS !== "0";
 }
-
-/** Engine --llm value for a UI choice. "anthropic:" (empty model) = the engine's default Anthropic model. */
-export function llmSpec(choice: "heuristic" | "anthropic"): string {
-  return choice === "heuristic" ? "heuristic" : process.env.AUTOTINKER_ANTHROPIC_LLM_SPEC || "anthropic:";
-}
