@@ -1,0 +1,555 @@
+@import "tailwindcss";
+
+/* Theme: html[data-theme] is set before paint by the inline script in layout.tsx (system preference by default). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  color-scheme: light;
+  /* warm paper + blue-black ink; hues kept close so neutrals feel related */
+  --paper: oklch(97.4% 0.009 85);
+  --paper-2: oklch(94.6% 0.012 85);
+  --paper-3: oklch(91% 0.014 85);
+  --ink: oklch(23% 0.025 262);
+  --ink-2: oklch(40% 0.022 262);
+  --ink-3: oklch(55% 0.018 262);
+  --rule: oklch(85% 0.014 85);
+  --rule-strong: oklch(72% 0.016 85);
+  /* data colours */
+  --best: oklch(57% 0.17 42); /* burnt orange: the best-so-far line, the one thing to follow */
+  --best-soft: oklch(57% 0.17 42 / 0.13);
+  --keep: oklch(52% 0.11 165);
+  --discard: oklch(62% 0.02 262);
+  --crash: oklch(55% 0.2 25);
+  --select: oklch(45% 0.12 262);
+  --test: oklch(23% 0.025 262);
+  --focus: oklch(57% 0.17 42);
+  --code-bg: oklch(95.2% 0.011 85);
+  --add-bg: oklch(52% 0.11 165 / 0.12);
+  --del-bg: oklch(55% 0.2 25 / 0.1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: oklch(17.5% 0.018 262);
+  --paper-2: oklch(21% 0.02 262);
+  --paper-3: oklch(25.5% 0.022 262);
+  --ink: oklch(93% 0.012 85);
+  --ink-2: oklch(78% 0.014 85);
+  --ink-3: oklch(63% 0.016 262);
+  --rule: oklch(30% 0.02 262);
+  --rule-strong: oklch(40% 0.022 262);
+  --best: oklch(74% 0.15 55);
+  --best-soft: oklch(74% 0.15 55 / 0.14);
+  --keep: oklch(74% 0.12 165);
+  --discard: oklch(58% 0.02 262);
+  --crash: oklch(68% 0.18 28);
+  --select: oklch(76% 0.1 250);
+  --test: oklch(93% 0.012 85);
+  --focus: oklch(74% 0.15 55);
+  --code-bg: oklch(20% 0.02 262);
+  --add-bg: oklch(74% 0.12 165 / 0.13);
+  --del-bg: oklch(68% 0.18 28 / 0.13);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-best: var(--best);
+  --color-best-soft: var(--best-soft);
+  --color-keep: var(--keep);
+  --color-discard: var(--discard);
+  --color-crash: var(--crash);
+  --color-select: var(--select);
+  --color-test: var(--test);
+  --color-code: var(--code-bg);
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+html {
+  background: var(--paper);
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+}
+
+::selection {
+  background: var(--best-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* faint graph-paper texture used behind the hero chart */
+.graph-paper {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--rule) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--rule) 55%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.7s var(--ease-out-quart) both;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.pulse-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse-ring 1.4s var(--ease-out-quart) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .pulse-ring {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* landing ------------------------------------------------------------------------------------------------
+ * Terra Incognita: the home page is a scroll journey through one fixed 3D survey world (components/survey).
+ * Night cartography: void, bone type, one warm signal. Text sits directly on the scene — no panels, no blur.
+ * Everything is scoped to [data-landing] / .lp-* so the rest of the site and its tokens are untouched.
+ * ------------------------------------------------------------------------------------------------------- */
+html:has([data-landing]),
+body:has([data-landing]) {
+  background: #05070a;
+}
+.lp-root,
+body:has([data-landing]) > header,
+body:has([data-landing]) > footer {
+  color-scheme: dark;
+  /* site tokens, re-pointed so shared components (header, fallback chart) sit on the void */
+  --paper: oklch(14% 0.012 250);
+  --paper-2: oklch(18% 0.014 250);
+  --ink: oklch(90% 0.018 85);
+  --ink-2: oklch(76% 0.014 85);
+  --ink-3: oklch(60% 0.012 250);
+  --rule: oklch(30% 0.012 250 / 0.7);
+  --rule-strong: oklch(44% 0.014 250);
+  --best: #ffb547;
+  --best-soft: rgb(255 181 71 / 0.16);
+  --keep: #ffb547;
+  --discard: oklch(60% 0.012 85);
+  --crash: #ff5a3c;
+  --focus: #ffb547;
+  --lp-ink: oklch(91% 0.02 85); /* bone */
+  --lp-ink-2: oklch(78% 0.016 85);
+  --lp-ink-3: oklch(60% 0.012 250);
+  --lp-signal: #ffb547;
+  --lp-hair: oklch(88% 0.02 85 / 0.12);
+  --lp-void: #05070a;
+}
+body:has([data-landing]) > header {
+  position: relative;
+  z-index: 30;
+  background: linear-gradient(to bottom, rgb(5 7 10 / 0.7), rgb(5 7 10 / 0));
+  border-color: transparent;
+  color: var(--ink);
+}
+body:has([data-landing]) > footer {
+  position: relative;
+  z-index: 2;
+  background: var(--lp-void, #05070a);
+  border-color: var(--lp-hair);
+  color: var(--ink);
+}
+.lp-root {
+  position: relative;
+  color: var(--lp-ink);
+  isolation: isolate;
+  overflow-x: clip;
+}
+.lp-root ::selection {
+  background: rgb(255 181 71 / 0.28);
+}
+
+/* ---- the stage: one fixed world behind every section ---- */
+.lp-stage-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+.lp-canvas {
+  position: absolute;
+  inset: 0;
+}
+.lp-fallback-chart {
+  position: absolute;
+  left: 62%;
+  top: 24%;
+  width: min(84vw, 560px);
+  transform: translateX(-50%);
+  opacity: 0.75;
+}
+/* reading scrim: a soft dark field on the copy rail's side (left on desktop, bottom on phones), a whisper at the top */
+.lp-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgb(5 7 10 / 0.72) 0%, rgb(5 7 10 / 0.42) 26%, transparent 46%),
+    linear-gradient(to bottom, rgb(5 7 10 / 0.55) 0%, transparent 14%);
+}
+
+/* ---- loader: "Surveying…" and a counter; the first frame behind it is the intro shot ---- */
+.lp-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  background: var(--lp-void);
+  transition:
+    opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s,
+    visibility 0s linear 1.1s;
+}
+.lp-loader[data-done] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.lp-loader-word {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  color: var(--lp-ink-2);
+}
+.lp-loader-n {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  color: var(--lp-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- sections: plain scroll spacers (the stage store reads data-pose) ---- */
+.lp-sec {
+  position: relative;
+  z-index: 1;
+  pointer-events: none; /* the world underneath hears press-and-hold */
+}
+
+/* ---- the copy rail: one fixed slot, exactly one message at a time ---- */
+.lp-rail {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none; /* only links take the pointer; everything else reaches the canvas */
+  display: grid;
+  align-content: center;
+  padding: 72px clamp(20px, 5vw, 76px) 48px;
+}
+.lp-rail a,
+.lp-rail button {
+  pointer-events: auto;
+}
+.lp-rail-inner {
+  width: min(34rem, 40vw);
+}
+.lp-msg {
+  will-change: opacity, transform;
+}
+.lp-ticks {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 1.6rem;
+}
+.lp-ticks li {
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: oklch(88% 0.02 85 / 0.16);
+  transition:
+    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.32s;
+}
+.lp-ticks li[data-on] {
+  background: oklch(88% 0.02 85 / 0.45);
+}
+.lp-ticks li[data-here] {
+  width: 30px;
+  background: var(--lp-signal);
+}
+.lp-h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 5.6vw, 5.9rem);
+  line-height: 0.94;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+.lp-h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.3rem, 4vw, 3.9rem);
+  line-height: 0.98;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+.lp-h1 em,
+.lp-h2 em {
+  font-style: italic;
+  color: var(--lp-signal);
+}
+.lp-sub {
+  margin-top: 1.1rem;
+  max-width: 34ch;
+  font-size: clamp(1.05rem, 1.25vw, 1.22rem);
+  line-height: 1.5;
+  color: var(--lp-ink-2);
+  text-wrap: pretty;
+}
+.lp-signal {
+  color: var(--lp-signal);
+}
+
+/* ---- CTAs ---- */
+.lp-ctas {
+  margin-top: 1.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+.lp-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 999px;
+  padding: 0.8rem 1.35rem;
+  font-size: 15px;
+  font-weight: 500;
+  will-change: transform;
+  transition:
+    background-color 0.3s,
+    border-color 0.3s,
+    color 0.3s;
+}
+.lp-cta-primary {
+  background: var(--lp-signal);
+  color: #140d02;
+}
+.lp-cta-primary:hover {
+  background: #ffc979;
+}
+.lp-cta-ghost {
+  border: 1px solid oklch(88% 0.02 85 / 0.28);
+  color: var(--lp-ink);
+}
+.lp-cta-ghost:hover {
+  border-color: oklch(88% 0.02 85 / 0.7);
+}
+.lp-cta-arrow {
+  transition: transform 0.35s var(--ease-out-quart);
+}
+.lp-cta:hover .lp-cta-arrow {
+  transform: translateX(4px);
+}
+
+/* ---- hero extras ---- */
+.lp-hint {
+  margin-top: 2.2rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 0.55rem;
+  font-size: 13px;
+  color: var(--lp-ink-3);
+}
+.lp-hint-line {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: linear-gradient(to bottom, transparent, var(--lp-ink-3));
+  animation: lp-drip 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  transform-origin: top;
+}
+.lp-hint-alt {
+  color: oklch(60% 0.012 250 / 0.8);
+}
+@keyframes lp-drip {
+  0% {
+    transform: scaleY(0);
+    opacity: 1;
+  }
+  60% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 0;
+  }
+}
+/* the hero's first entrance, once, released when the stage is ready */
+.lp-rail[data-intro] .lp-in {
+  animation: lp-fade 1.1s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms) both;
+  animation-play-state: paused;
+}
+.lp-root[data-ready] .lp-rail[data-intro] .lp-in {
+  animation-play-state: running;
+}
+@keyframes lp-fade {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* ---- numbers ---- */
+.lp-stat {
+  margin-top: 1.7rem;
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--lp-hair);
+  max-width: 24rem;
+}
+.lp-stat-v {
+  font-family: var(--font-mono);
+  font-size: clamp(1.7rem, 2.4vw, 2.2rem);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--lp-ink);
+}
+.lp-stat-dim {
+  color: var(--lp-ink-3);
+}
+.lp-stat-k {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lp-ink-3);
+}
+
+/* ---- the map (closing message) ---- */
+.lp-links {
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.6rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lp-ink-3);
+}
+.lp-links a:hover {
+  color: var(--lp-ink);
+}
+.lp-colophon {
+  margin-top: 1.2rem;
+  max-width: 44ch;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--lp-ink-3);
+}
+
+/* ---- phones: the rail sits at the bottom, the land above it ---- */
+@media (max-width: 767px) {
+  .lp-scrim {
+    background:
+      linear-gradient(to top, rgb(5 7 10 / 0.9) 0%, rgb(5 7 10 / 0.6) 30%, transparent 55%),
+      linear-gradient(to bottom, rgb(5 7 10 / 0.5) 0%, transparent 12%);
+  }
+  .lp-fallback-chart {
+    top: 12%;
+    left: 50%;
+  }
+  /* the closing message carries the site links; the footer would scroll in under the bottom-anchored rail */
+  body:has([data-landing]) > footer {
+    display: none;
+  }
+  .lp-rail {
+    align-content: end;
+    padding: 0 20px 28px;
+  }
+  .lp-rail-inner {
+    width: 100%;
+  }
+  .lp-ticks {
+    margin-bottom: 1rem;
+  }
+  .lp-h1 {
+    font-size: clamp(2.5rem, 11vw, 3.1rem);
+  }
+  .lp-h2 {
+    font-size: clamp(1.9rem, 8.4vw, 2.4rem);
+  }
+  .lp-sub {
+    margin-top: 0.75rem;
+    font-size: 1rem;
+  }
+  .lp-ctas {
+    margin-top: 1.2rem;
+  }
+  .lp-hint {
+    margin-top: 1.1rem;
+  }
+  .lp-hint-alt {
+    display: none;
+  }
+  .lp-stat {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+  }
+  .lp-links {
+    margin-top: 1.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-rail[data-intro] .lp-in,
+  .lp-hint-line {
+    animation: none;
+  }
+  .lp-loader {
+    transition: none;
+  }
+}
+/* /landing */

@@ -1,0 +1,1098 @@
+{
+  "version": 1,
+  "run_id": "iris_na-evolve_ceiling",
+  "created_at": "2026-10-06T15:20:04.340528+00:00",
+  "mode": "evolve",
+  "proposer": "heuristic",
+  "task": {
+    "target": "variety",
+    "problem_type": "multiclass",
+    "metric": "log_loss",
+    "description": "",
+    "seed": 0,
+    "cv_folds": 5,
+    "cv_repeats": 2,
+    "select_frac": 0.15,
+    "test_frac": 0.15,
+    "experiment_timeout_s": 120.0,
+    "experiment_memory_mb": 2048
+  },
+  "profile": {
+    "n_rows": 150,
+    "n_cols": 5,
+    "target": "variety",
+    "problem_type": "multiclass",
+    "metric": "log_loss",
+    "columns": [
+      {
+        "name": "sepal.length",
+        "dtype": "float64",
+        "kind": "numeric",
+        "missing_frac": 0.0,
+        "n_unique": 35,
+        "examples": [
+          5.1,
+          4.9,
+          4.7,
+          4.6,
+          5.0
+        ],
+        "stats": {
+          "min": 4.3,
+          "max": 7.9,
+          "mean": 5.843333333333334,
+          "std": 0.828066127977863,
+          "q25": 5.1,
+          "q50": 5.8,
+          "q75": 6.4,
+          "skew": 0.3149109566369728
+        },
+        "top_values": null,
+        "flags": []
+      },
+      {
+        "name": "sepal.width",
+        "dtype": "float64",
+        "kind": "numeric",
+        "missing_frac": 0.013333,
+        "n_unique": 23,
+        "examples": [
+          3.0,
+          3.2,
+          3.6,
+          3.9,
+          3.4
+        ],
+        "stats": {
+          "min": 2.0,
+          "max": 4.4,
+          "mean": 3.054054054054054,
+          "std": 0.4372733042806456,
+          "q25": 2.8,
+          "q50": 3.0,
+          "q75": 3.3,
+          "skew": 0.33589906715442897
+        },
+        "top_values": null,
+        "flags": []
+      },
+      {
+        "name": "petal.length",
+        "dtype": "float64",
+        "kind": "numeric",
+        "missing_frac": 0.006667,
+        "n_unique": 43,
+        "examples": [
+          1.4,
+          1.5,
+          1.7,
+          1.6,
+          1.1
+        ],
+        "stats": {
+          "min": 1.0,
+          "max": 6.9,
+          "mean": 3.774496644295302,
+          "std": 1.7596127630823142,
+          "q25": 1.6,
+          "q50": 4.4,
+          "q75": 5.1,
+          "skew": -0.28929886632225826
+        },
+        "top_values": null,
+        "flags": []
+      },
+      {
+        "name": "petal.width",
+        "dtype": "float64",
+        "kind": "numeric",
+        "missing_frac": 0.006667,
+        "n_unique": 22,
+        "examples": [
+          0.2,
+          0.4,
+          0.3,
+          0.1,
+          0.5
+        ],
+        "stats": {
+          "min": 0.1,
+          "max": 2.5,
+          "mean": 1.2060402684563762,
+          "std": 0.7603544859560184,
+          "q25": 0.3,
+          "q50": 1.3,
+          "q75": 1.8,
+          "skew": -0.11571865875543727
+        },
+        "top_values": null,
+        "flags": []
+      }
+    ],
+    "target_summary": {
+      "kind": "classes",
+      "n_classes": 3,
+      "class_counts": {
+        "Setosa": 50,
+        "Versicolor": 50,
+        "Virginica": 50
+      },
+      "majority_frac": 0.333333
+    },
+    "warnings": [],
+    "sample_rows": [
+      {
+        "sepal.length": 5.0,
+        "sepal.width": 3.5,
+        "petal.length": 1.3,
+        "petal.width": 0.3,
+        "variety": "Setosa"
+      },
+      {
+        "sepal.length": 5.5,
+        "sepal.width": 2.5,
+        "petal.length": 4.0,
+        "petal.width": 1.3,
+        "variety": "Versicolor"
+      },
+      {
+        "sepal.length": 5.4,
+        "sepal.width": 3.9,
+        "petal.length": 1.7,
+        "petal.width": 0.4,
+        "variety": "Setosa"
+      },
+      {
+        "sepal.length": 6.1,
+        "sepal.width": 3.0,
+        "petal.length": 4.6,
+        "petal.width": 1.4,
+        "variety": "Versicolor"
+      },
+      {
+        "sepal.length": 6.7,
+        "sepal.width": 3.3,
+        "petal.length": 5.7,
+        "petal.width": 2.1,
+        "variety": "Virginica"
+      }
+    ]
+  },
+  "config": {
+    "mode": "evolve",
+    "proposer": "heuristic",
+    "max_repairs": 3,
+    "env": {
+      "python": "3.12.13",
+      "llm": "heuristic",
+      "seed": 0
+    },
+    "source": "dataframe",
+    "gate": {
+      "alpha": 0.1,
+      "min_gain_se": 0.5,
+      "select_tol_se": 1.0,
+      "simplify_gain_se": 0.25,
+      "simplify_loc_frac": 0.15,
+      "simplify_time_ratio": 0.5,
+      "test_train_ratio": 0.25,
+      "name": "stat"
+    },
+    "stop_rule": {
+      "until": "ceiling",
+      "min_experiments": 10,
+      "noise_k": 3,
+      "noise_window": 10,
+      "radical_k": 4,
+      "saturation_min_points": 6,
+      "external_ref": null,
+      "external_eps": 0.0,
+      "max_experiments": 80,
+      "max_cost_usd": 5.0,
+      "max_time_s": null
+    }
+  },
+  "experiments": [
+    {
+      "id": "e000",
+      "parent_id": null,
+      "idea": {
+        "title": "Baseline: unmodified starter solution",
+        "rationale": "",
+        "category": "baseline",
+        "radical": false
+      },
+      "code": "\"\"\"Baseline: impute, one-hot encode categoricals, gradient boosting.\"\"\"\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import OneHotEncoder\n\n\ndef build_pipeline(profile: dict):\n    columns = profile[\"columns\"]\n    numeric = [c[\"name\"] for c in columns if c[\"kind\"] == \"numeric\"]\n    categorical = [c[\"name\"] for c in columns if c[\"kind\"] in (\"categorical\", \"boolean\")]\n\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", SimpleImputer(strategy=\"median\"), numeric))\n    if categorical:\n        cat = Pipeline(\n            [\n                (\"impute\", SimpleImputer(strategy=\"most_frequent\")),\n                (\"onehot\", OneHotEncoder(handle_unknown=\"ignore\", sparse_output=False, max_categories=30)),\n            ]\n        )\n        transformers.append((\"cat\", cat, categorical))\n    preprocess = ColumnTransformer(transformers, remainder=\"drop\")\n\n    if profile[\"problem_type\"] == \"regression\":\n        model = HistGradientBoostingRegressor(random_state=0)\n    else:\n        model = HistGradientBoostingClassifier(random_state=0)\n    return Pipeline([(\"preprocess\", preprocess), (\"model\", model)])\n",
+      "diff": "",
+      "status": "keep",
+      "reason": "baseline",
+      "cv": {
+        "mean": -0.49135569566734905,
+        "se": 0.16197100544127138,
+        "folds": [
+          -0.3341329509092923,
+          -0.0925056852214537,
+          -1.4959309961043838,
+          -0.33032220419547037,
+          -0.14966834612223687,
+          -0.40658825011532834,
+          -0.9558893733608513,
+          -1.0977297422533172,
+          -0.04205115200957807,
+          -0.008738256381578675
+        ]
+      },
+      "select_score": -0.09968271704455522,
+      "fit_time_s": 0.036789841682184486,
+      "loc": 27,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.3212990839965641,
+      "started_at": "2026-10-06T15:20:04.340620+00:00"
+    },
+    {
+      "id": "e001",
+      "parent_id": "e000",
+      "idea": {
+        "title": "Switch model family: HistGradientBoosting -> RandomForest",
+        "rationale": "escape a local optimum with a different inductive bias",
+        "category": "model_family",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Switch model family: HistGradientBoosting -> RandomForest\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"rf\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import RandomForestClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", RandomForestClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n    ])\n",
+      "diff": "--- e000/solution.py\n+++ e001/solution.py\n@@ -1,32 +1,68 @@\n-\"\"\"Baseline: impute, one-hot encode categoricals, gradient boosting.\"\"\"\n+\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n+\n+Idea: Switch model family: HistGradientBoosting -> RandomForest\n+build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n+all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n+\"\"\"\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"rf\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}\n+import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor\n+from sklearn.ensemble import RandomForestClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n-from sklearn.preprocessing import OneHotEncoder\n+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n+\n+NUMERIC_KINDS = (\"numeric\",)\n+CATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n \n \n-def build_pipeline(profile: dict):\n-    columns = profile[\"columns\"]\n-    numeric = [c[\"name\"] for c in columns if c[\"kind\"] == \"numeric\"]\n-    categorical = [c[\"name\"] for c in columns if c[\"kind\"] in (\"categorical\", \"boolean\")]\n+def _as_str(X):\n+    return X.astype(str)\n \n+\n+def _signed_log1p(X):\n+    X = np.asarray(X, dtype=float)\n+    return np.sign(X) * np.log1p(np.abs(X))\n+\n+\n+def _row_stats(X):\n+    X = np.asarray(X, dtype=float)\n+    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n+\n+\n+def _split_columns(profile):\n+    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n+    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n+    return numeric, categorical\n+\n+\n+def _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n+    numeric, categorical = _split_columns(profile)\n+    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n+    if \"log1p\" in fe:\n+        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n+    if \"row_stats\" in fe:\n+        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n+    if scale == \"standard\":\n+        num_steps.append((\"scale\", StandardScaler()))\n+    elif scale == \"power\":\n+        num_steps.append((\"scale\", PowerTransformer()))\n+    if cat == \"ordinal\":\n+        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n+    else:\n+        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n+    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n     transformers = []\n     if numeric:\n-        transformers.append((\"num\", SimpleImputer(strategy=\"median\"), numeric))\n+        transformers.append((\"num\", Pipeline(num_steps), numeric))\n     if categorical:\n-        cat = Pipeline(\n-            [\n-                (\"impute\", SimpleImputer(strategy=\"most_frequent\")),\n-                (\"onehot\", OneHotEncoder(handle_unknown=\"ignore\", sparse_output=False, max_categories=30)),\n-            ]\n-        )\n-        transformers.append((\"cat\", cat, categorical))\n-    preprocess = ColumnTransformer(transformers, remainder=\"drop\")\n+        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n+    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n \n-    if profile[\"problem_type\"] == \"regression\":\n-        model = HistGradientBoostingRegressor(random_state=0)\n-    else:\n-        model = HistGradientBoostingClassifier(random_state=0)\n-    return Pipeline([(\"preprocess\", preprocess), (\"model\", model)])\n+\n+def build_pipeline(profile):\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", RandomForestClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.478 >= alpha=0.1; gain 0.02399 (+0.15 SE, SE=0.162), p=0.478, select -0.093 vs best -0.09968 (floor -0.2617)",
+      "cv": {
+        "mean": -0.4673686986851647,
+        "se": 0.2139811252540044,
+        "folds": [
+          -0.08569261247422846,
+          -0.0583104781258431,
+          -0.3701659873190087,
+          -1.6802941706717835,
+          -0.10785095753715154,
+          -0.10301315310472083,
+          -1.7754701277147835,
+          -0.39138520086249234,
+          -0.07546690344062704,
+          -0.026037395601007755
+        ]
+      },
+      "select_score": -0.09300307390086882,
+      "fit_time_s": 0.11004757090704516,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 2.2575633329106495,
+      "started_at": "2026-10-06T15:20:05.662862+00:00"
+    },
+    {
+      "id": "e002",
+      "parent_id": "e000",
+      "idea": {
+        "title": "HistGradientBoosting: set learning_rate 0.1 -> 0.05",
+        "rationale": "tune learning_rate one grid step",
+        "category": "hyperparameters",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n    ])\n",
+      "diff": "--- e000/solution.py\n+++ e002/solution.py\n@@ -1,32 +1,68 @@\n-\"\"\"Baseline: impute, one-hot encode categoricals, gradient boosting.\"\"\"\n+\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n+\n+Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n+all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n+\"\"\"\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor\n+from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n-from sklearn.preprocessing import OneHotEncoder\n+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n+\n+NUMERIC_KINDS = (\"numeric\",)\n+CATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n \n \n-def build_pipeline(profile: dict):\n-    columns = profile[\"columns\"]\n-    numeric = [c[\"name\"] for c in columns if c[\"kind\"] == \"numeric\"]\n-    categorical = [c[\"name\"] for c in columns if c[\"kind\"] in (\"categorical\", \"boolean\")]\n+def _as_str(X):\n+    return X.astype(str)\n \n+\n+def _signed_log1p(X):\n+    X = np.asarray(X, dtype=float)\n+    return np.sign(X) * np.log1p(np.abs(X))\n+\n+\n+def _row_stats(X):\n+    X = np.asarray(X, dtype=float)\n+    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n+\n+\n+def _split_columns(profile):\n+    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n+    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n+    return numeric, categorical\n+\n+\n+def _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n+    numeric, categorical = _split_columns(profile)\n+    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n+    if \"log1p\" in fe:\n+        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n+    if \"row_stats\" in fe:\n+        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n+    if scale == \"standard\":\n+        num_steps.append((\"scale\", StandardScaler()))\n+    elif scale == \"power\":\n+        num_steps.append((\"scale\", PowerTransformer()))\n+    if cat == \"ordinal\":\n+        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n+    else:\n+        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n+    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n     transformers = []\n     if numeric:\n-        transformers.append((\"num\", SimpleImputer(strategy=\"median\"), numeric))\n+        transformers.append((\"num\", Pipeline(num_steps), numeric))\n     if categorical:\n-        cat = Pipeline(\n-            [\n-                (\"impute\", SimpleImputer(strategy=\"most_frequent\")),\n-                (\"onehot\", OneHotEncoder(handle_unknown=\"ignore\", sparse_output=False, max_categories=30)),\n-            ]\n-        )\n-        transformers.append((\"cat\", cat, categorical))\n-    preprocess = ColumnTransformer(transformers, remainder=\"drop\")\n+        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n+    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n \n-    if profile[\"problem_type\"] == \"regression\":\n-        model = HistGradientBoostingRegressor(random_state=0)\n-    else:\n-        model = HistGradientBoostingClassifier(random_state=0)\n-    return Pipeline([(\"preprocess\", preprocess), (\"model\", model)])\n+\n+def build_pipeline(profile):\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+    ])\n",
+      "status": "keep",
+      "reason": "improvement: gain 0.1713 (+1.06 SE, SE=0.162), p=0.094, select -0.06571 vs best -0.09968 (floor -0.2617)",
+      "cv": {
+        "mean": -0.32007820160737255,
+        "se": 0.09864788387040291,
+        "folds": [
+          -0.19397884916116823,
+          -0.06433148797327921,
+          -0.9395011328566225,
+          -0.28391935442390115,
+          -0.13073851158812394,
+          -0.26982301803795955,
+          -0.5692353597674413,
+          -0.6925018555105213,
+          -0.038197978132896666,
+          -0.018554468621811097
+        ]
+      },
+      "select_score": -0.06571230439029041,
+      "fit_time_s": 0.04548282098257914,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.4643436659825966,
+      "started_at": "2026-10-06T15:20:07.921888+00:00"
+    },
+    {
+      "id": "e003",
+      "parent_id": "e002",
+      "idea": {
+        "title": "HistGradientBoosting: set l2_regularization 0.0 -> 0.1",
+        "rationale": "tune l2_regularization one grid step",
+        "category": "hyperparameters",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: HistGradientBoosting: set l2_regularization 0.0 -> 0.1\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.1, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(l2_regularization=0.1, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n    ])\n",
+      "diff": "--- e002/solution.py\n+++ e003/solution.py\n@@ -1,10 +1,10 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+Idea: HistGradientBoosting: set l2_regularization 0.0 -> 0.1\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.1, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n@@ -64,5 +64,5 @@\n def build_pipeline(profile):\n     return Pipeline([\n         (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+        (\"model\", HistGradientBoostingClassifier(l2_regularization=0.1, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n     ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.137 >= alpha=0.1; gain 0.02592 (+0.26 SE, SE=0.09865), p=0.137, select -0.06114 vs best -0.06571 (floor -0.1644)",
+      "cv": {
+        "mean": -0.2941597552339704,
+        "se": 0.08789764939894391,
+        "folds": [
+          -0.16007611768912516,
+          -0.057092975907402685,
+          -0.8310729779946404,
+          -0.2853724797900023,
+          -0.14777639106514975,
+          -0.23950991097691046,
+          -0.5226654609358592,
+          -0.6365780508813229,
+          -0.0389028310647417,
+          -0.022550356034550145
+        ]
+      },
+      "select_score": -0.06114242853042961,
+      "fit_time_s": 0.03532618329627439,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.3309510418912396,
+      "started_at": "2026-10-06T15:20:09.387552+00:00"
+    },
+    {
+      "id": "e004",
+      "parent_id": "e002",
+      "idea": {
+        "title": "HistGradientBoosting: set min_samples_leaf 20 -> 40",
+        "rationale": "tune min_samples_leaf one grid step",
+        "category": "hyperparameters",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: HistGradientBoosting: set min_samples_leaf 20 -> 40\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 40}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=40, random_state=0)),\n    ])\n",
+      "diff": "--- e002/solution.py\n+++ e004/solution.py\n@@ -1,10 +1,10 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+Idea: HistGradientBoosting: set min_samples_leaf 20 -> 40\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 40}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n@@ -64,5 +64,5 @@\n def build_pipeline(profile):\n     return Pipeline([\n         (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+        (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=40, random_state=0)),\n     ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.969 >= alpha=0.1; gain -0.3096 (-3.14 SE, SE=0.09865), p=0.969, select -0.3909 vs best -0.06571 (floor -0.1644)",
+      "cv": {
+        "mean": -0.6296337297978349,
+        "se": 0.03932899086179612,
+        "folds": [
+          -0.5448933484738891,
+          -0.4406969319376376,
+          -0.8001525906619447,
+          -0.8320668346629942,
+          -0.5543649001887878,
+          -0.5627818312161835,
+          -0.6328002805208198,
+          -0.7419990297097429,
+          -0.5725159597197143,
+          -0.6140655908866363
+        ]
+      },
+      "select_score": -0.39091202651035084,
+      "fit_time_s": 0.033884762600064275,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.3227664170553908,
+      "started_at": "2026-10-06T15:20:10.719680+00:00"
+    },
+    {
+      "id": "e005",
+      "parent_id": "e002",
+      "idea": {
+        "title": "Feature engineering: add row mean/std features",
+        "rationale": "give the model a transformed view of the numeric features",
+        "category": "feature_engineering",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Feature engineering: add row mean/std features\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [\"row_stats\"], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=('row_stats',))),\n        (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n    ])\n",
+      "diff": "--- e002/solution.py\n+++ e005/solution.py\n@@ -1,10 +1,10 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+Idea: Feature engineering: add row mean/std features\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [\"row_stats\"], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n@@ -63,6 +63,6 @@\n \n def build_pipeline(profile):\n     return Pipeline([\n-        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=('row_stats',))),\n+        (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n     ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.765 >= alpha=0.1; gain -0.01345 (-0.14 SE, SE=0.09865), p=0.765, select -0.02266 vs best -0.06571 (floor -0.1644)",
+      "cv": {
+        "mean": -0.33352562399021485,
+        "se": 0.10597496342837401,
+        "folds": [
+          -0.18360954922432957,
+          -0.0535940075120617,
+          -1.0215952154321843,
+          -0.31328091919282824,
+          -0.14689526887301968,
+          -0.24358034898327613,
+          -0.5830563076179837,
+          -0.722210278572346,
+          -0.038387734925278076,
+          -0.029046609568841253
+        ]
+      },
+      "select_score": -0.022664217657789178,
+      "fit_time_s": 0.04665235840948299,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.5360145409358665,
+      "started_at": "2026-10-06T15:20:12.044252+00:00"
+    },
+    {
+      "id": "e006",
+      "parent_id": "e002",
+      "idea": {
+        "title": "Encode categoricals with ordinal encoding",
+        "rationale": "a different categorical representation",
+        "category": "preprocessing",
+        "radical": false
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Encode categoricals with ordinal encoding\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"ordinal\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='ordinal', fe=())),\n        (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n    ])\n",
+      "diff": "--- e002/solution.py\n+++ e006/solution.py\n@@ -1,10 +1,10 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+Idea: Encode categoricals with ordinal encoding\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+# autotinker-spec: {\"cat\": \"ordinal\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n@@ -63,6 +63,6 @@\n \n def build_pipeline(profile):\n     return Pipeline([\n-        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='ordinal', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n     ])\n",
+      "status": "discard",
+      "reason": "not significant: p=1 >= alpha=0.1; gain 0 (+0.00 SE, SE=0.09865), p=1, select -0.06571 vs best -0.06571 (floor -0.1644)",
+      "cv": {
+        "mean": -0.32007820160737255,
+        "se": 0.09864788387040291,
+        "folds": [
+          -0.19397884916116823,
+          -0.06433148797327921,
+          -0.9395011328566225,
+          -0.28391935442390115,
+          -0.13073851158812394,
+          -0.26982301803795955,
+          -0.5692353597674413,
+          -0.6925018555105213,
+          -0.038197978132896666,
+          -0.018554468621811097
+        ]
+      },
+      "select_score": -0.06571230439029041,
+      "fit_time_s": 0.059800879389513284,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.6361453749705106,
+      "started_at": "2026-10-06T15:20:13.583262+00:00"
+    },
+    {
+      "id": "e007",
+      "parent_id": "e002",
+      "idea": {
+        "title": "Switch model family: HistGradientBoosting -> GradientBoosting",
+        "rationale": "escape a local optimum with a different inductive bias",
+        "category": "model_family",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Switch model family: HistGradientBoosting -> GradientBoosting\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"gb\", \"params\": {\"learning_rate\": 0.1, \"max_depth\": 3, \"n_estimators\": 150, \"subsample\": 1.0}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import GradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", GradientBoostingClassifier(n_estimators=150, learning_rate=0.1, max_depth=3, subsample=1.0, random_state=0)),\n    ])\n",
+      "diff": "--- e002/solution.py\n+++ e007/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+Idea: Switch model family: HistGradientBoosting -> GradientBoosting\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"gb\", \"params\": {\"learning_rate\": 0.1, \"max_depth\": 3, \"n_estimators\": 150, \"subsample\": 1.0}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import HistGradientBoostingClassifier\n+from sklearn.ensemble import GradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -64,5 +64,5 @@\n def build_pipeline(profile):\n     return Pipeline([\n         (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+        (\"model\", GradientBoostingClassifier(n_estimators=150, learning_rate=0.1, max_depth=3, subsample=1.0, random_state=0)),\n     ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.913 >= alpha=0.1; gain -0.4779 (-4.84 SE, SE=0.09865), p=0.913, select -0.934 vs best -0.06571 (floor -0.1644)",
+      "cv": {
+        "mean": -0.797949121218647,
+        "se": 0.265285388915839,
+        "folds": [
+          -0.44566906812086676,
+          -0.2886424472291296,
+          -2.58242965918923,
+          -0.8453623009567577,
+          -0.058024025244257184,
+          -0.6627862921711055,
+          -0.8729687084049012,
+          -1.936012501141434,
+          -0.28759591417437164,
+          -2.9555441736804217e-7
+        ]
+      },
+      "select_score": -0.9339623482441738,
+      "fit_time_s": 0.08144733760273085,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.8027902919566259,
+      "started_at": "2026-10-06T15:20:15.222205+00:00"
+    },
+    {
+      "id": "e008",
+      "parent_id": "e002",
+      "idea": {
+        "title": "Stacking ensemble of top kept solutions (e002, e000 + ExtraTrees)",
+        "rationale": "blend diverse strong models; often the last gains on tabular data",
+        "category": "ensembling",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Stacking ensemble of top kept solutions (e002, e000 + ExtraTrees)\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"ens\": \"stack\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, StackingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return StackingClassifier(\n        estimators=[\n            (\"m0\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n            ])),\n            (\"m1\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n            ])),\n            (\"m2\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n            ])),\n        ],\n        final_estimator=LogisticRegression(max_iter=2000),\n        cv=3,\n    )\n",
+      "diff": "--- e002/solution.py\n+++ e008/solution.py\n@@ -1,15 +1,16 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+Idea: Stacking ensemble of top kept solutions (e002, e000 + ExtraTrees)\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+# autotinker-spec: {\"ens\": \"stack\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import HistGradientBoostingClassifier\n+from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, StackingClassifier\n from sklearn.impute import SimpleImputer\n+from sklearn.linear_model import LogisticRegression\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n \n@@ -62,7 +63,21 @@\n \n \n def build_pipeline(profile):\n-    return Pipeline([\n-        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-    ])\n+    return StackingClassifier(\n+        estimators=[\n+            (\"m0\", Pipeline([\n+                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n+            ])),\n+            (\"m1\", Pipeline([\n+                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+            ])),\n+            (\"m2\", Pipeline([\n+                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n+            ])),\n+        ],\n+        final_estimator=LogisticRegression(max_iter=2000),\n+        cv=3,\n+    )\n",
+      "status": "discard",
+      "reason": "not significant: p=0.227 >= alpha=0.1; gain 0.07053 (+0.72 SE, SE=0.09865), p=0.227, select -0.1641 vs best -0.06571 (floor -0.1644)",
+      "cv": {
+        "mean": -0.2495432382327052,
+        "se": 0.05266420073997834,
+        "folds": [
+          -0.1687105881435984,
+          -0.15227102982839216,
+          -0.5382333686745151,
+          -0.1847068127374937,
+          -0.17193246586448385,
+          -0.19816224636875912,
+          -0.4267160010701028,
+          -0.48032017872926014,
+          -0.09199606365980352,
+          -0.08238362725064294
+        ]
+      },
+      "select_score": -0.16414598032221236,
+      "fit_time_s": 0.5754245499731041,
+      "loc": 67,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 7.497857125010341,
+      "started_at": "2026-10-06T15:20:17.028149+00:00"
+    },
+    {
+      "id": "e009",
+      "parent_id": "e002",
+      "idea": {
+        "title": "Switch model family: HistGradientBoosting -> linear model",
+        "rationale": "escape a local optimum with a different inductive bias",
+        "category": "model_family",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Switch model family: HistGradientBoosting -> linear model\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"linear\", \"params\": {\"C\": 1.0, \"alpha\": 1.0}, \"scale\": \"standard\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='standard', cat='onehot', fe=())),\n        (\"model\", LogisticRegression(C=1.0, max_iter=2000)),\n    ])\n",
+      "diff": "--- e002/solution.py\n+++ e009/solution.py\n@@ -1,15 +1,15 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+Idea: Switch model family: HistGradientBoosting -> linear model\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"linear\", \"params\": {\"C\": 1.0, \"alpha\": 1.0}, \"scale\": \"standard\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n+from sklearn.linear_model import LogisticRegression\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n \n@@ -63,6 +63,6 @@\n \n def build_pipeline(profile):\n     return Pipeline([\n-        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+        (\"prep\", _preprocessor(profile, impute='median', scale='standard', cat='onehot', fe=())),\n+        (\"model\", LogisticRegression(C=1.0, max_iter=2000)),\n     ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.214 >= alpha=0.1; gain 0.1167 (+1.18 SE, SE=0.09865), p=0.214, select -0.1414 vs best -0.06571 (floor -0.1644)",
+      "cv": {
+        "mean": -0.2033508169684025,
+        "se": 0.02503116658725008,
+        "folds": [
+          -0.1512993314107014,
+          -0.15764252051815134,
+          -0.3656775353934587,
+          -0.178416538953217,
+          -0.16873623606052932,
+          -0.15928938084180744,
+          -0.2929123802825326,
+          -0.27327258288194956,
+          -0.16879452413278892,
+          -0.11746713920888882
+        ]
+      },
+      "select_score": -0.14136902313676764,
+      "fit_time_s": 0.00352800409309566,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.0057020409731194,
+      "started_at": "2026-10-06T15:20:24.531076+00:00"
+    },
+    {
+      "id": "e010",
+      "parent_id": "e002",
+      "idea": {
+        "title": "Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)",
+        "rationale": "blend diverse strong models; often the last gains on tabular data",
+        "category": "ensembling",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return VotingClassifier(\n        estimators=[\n            (\"m0\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n            ])),\n            (\"m1\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n            ])),\n            (\"m2\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n            ])),\n        ], voting=\"soft\",\n    )\n",
+      "diff": "--- e002/solution.py\n+++ e010/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: HistGradientBoosting: set learning_rate 0.1 -> 0.05\n+Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n+# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import HistGradientBoostingClassifier\n+from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,7 +62,19 @@\n \n \n def build_pipeline(profile):\n-    return Pipeline([\n-        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-    ])\n+    return VotingClassifier(\n+        estimators=[\n+            (\"m0\", Pipeline([\n+                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n+            ])),\n+            (\"m1\", Pipeline([\n+                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+            ])),\n+            (\"m2\", Pipeline([\n+                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n+            ])),\n+        ], voting=\"soft\",\n+    )\n",
+      "status": "keep",
+      "reason": "improvement: gain 0.1185 (+1.20 SE, SE=0.09865), p=0.0964, select -0.0846 vs best -0.06571 (floor -0.1644)",
+      "cv": {
+        "mean": -0.2015737971454831,
+        "se": 0.055159682832294527,
+        "folds": [
+          -0.11885671779194219,
+          -0.07862401941280528,
+          -0.5159644571772516,
+          -0.13591680808920065,
+          -0.12414494553059177,
+          -0.1596067339963088,
+          -0.35974514538469854,
+          -0.44907282759444894,
+          -0.05204942776735721,
+          -0.021756888710225845
+        ]
+      },
+      "select_score": -0.08459602842010472,
+      "fit_time_s": 0.15398704978870228,
+      "loc": 64,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 2.9062675840687007,
+      "started_at": "2026-10-06T15:20:25.541301+00:00"
+    },
+    {
+      "id": "e011",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Soft-voting ensemble of top kept solutions (e010)",
+        "rationale": "blend diverse strong models; often the last gains on tabular data",
+        "category": "ensembling",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Soft-voting ensemble of top kept solutions (e010)\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return VotingClassifier(\n        estimators=[\n            (\"m0\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", ExtraTreesClassifier(max_depth=None, max_features='sqrt', min_samples_leaf=1, n_estimators=300, random_state=0)),\n            ])),\n            (\"m1\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n            ])),\n            (\"m2\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.1, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n            ])),\n        ], voting=\"soft\",\n    )\n",
+      "diff": "--- e010/solution.py\n+++ e011/solution.py\n@@ -1,10 +1,10 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Soft-voting ensemble of top kept solutions (e010)\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n@@ -66,15 +66,15 @@\n         estimators=[\n             (\"m0\", Pipeline([\n                 (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n+                (\"model\", ExtraTreesClassifier(max_depth=None, max_features='sqrt', min_samples_leaf=1, n_estimators=300, random_state=0)),\n             ])),\n             (\"m1\", Pipeline([\n                 (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n             ])),\n             (\"m2\", Pipeline([\n                 (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n+                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.1, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n             ])),\n         ], voting=\"soft\",\n     )\n",
+      "status": "discard",
+      "reason": "not significant: p=1 >= alpha=0.1; gain 6.939e-19 (+0.00 SE, SE=0.05516), p=1, select -0.0846 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.2015737971454831,
+        "se": 0.055159682832294527,
+        "folds": [
+          -0.11885671779194219,
+          -0.07862401941280528,
+          -0.5159644571772516,
+          -0.13591680808920065,
+          -0.12414494553059177,
+          -0.15960673399630879,
+          -0.35974514538469854,
+          -0.44907282759444894,
+          -0.05204942776735722,
+          -0.021756888710225852
+        ]
+      },
+      "select_score": -0.08459602842010473,
+      "fit_time_s": 0.1479645168525167,
+      "loc": 64,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 2.708420292008668,
+      "started_at": "2026-10-06T15:20:28.453066+00:00"
+    },
+    {
+      "id": "e012",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Stacking ensemble of top kept solutions (e010)",
+        "rationale": "blend diverse strong models; often the last gains on tabular data",
+        "category": "ensembling",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Stacking ensemble of top kept solutions (e010)\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"ens\": \"stack\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, StackingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return StackingClassifier(\n        estimators=[\n            (\"m0\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", ExtraTreesClassifier(max_depth=None, max_features='sqrt', min_samples_leaf=1, n_estimators=300, random_state=0)),\n            ])),\n            (\"m1\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n            ])),\n            (\"m2\", Pipeline([\n                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.1, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n            ])),\n        ],\n        final_estimator=LogisticRegression(max_iter=2000),\n        cv=3,\n    )\n",
+      "diff": "--- e010/solution.py\n+++ e012/solution.py\n@@ -1,15 +1,16 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Stacking ensemble of top kept solutions (e010)\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"ens\": \"stack\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, StackingClassifier\n from sklearn.impute import SimpleImputer\n+from sklearn.linear_model import LogisticRegression\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n \n@@ -62,19 +63,21 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n+    return StackingClassifier(\n         estimators=[\n             (\"m0\", Pipeline([\n                 (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n+                (\"model\", ExtraTreesClassifier(max_depth=None, max_features='sqrt', min_samples_leaf=1, n_estimators=300, random_state=0)),\n             ])),\n             (\"m1\", Pipeline([\n                 (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n+                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n             ])),\n             (\"m2\", Pipeline([\n                 (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n+                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.1, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n             ])),\n-        ], voting=\"soft\",\n+        ],\n+        final_estimator=LogisticRegression(max_iter=2000),\n+        cv=3,\n     )\n",
+      "status": "discard",
+      "reason": "not significant: p=1 >= alpha=0.1; gain -0.04797 (-0.87 SE, SE=0.05516), p=1, select -0.1641 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.24954323823270513,
+        "se": 0.05266420073997832,
+        "folds": [
+          -0.1687105881435984,
+          -0.15227102982839197,
+          -0.5382333686745149,
+          -0.18470681273749368,
+          -0.17193246586448377,
+          -0.19816224636875907,
+          -0.4267160010701028,
+          -0.48032017872926014,
+          -0.0919960636598035,
+          -0.08238362725064304
+        ]
+      },
+      "select_score": -0.16414598032221234,
+      "fit_time_s": 0.5838822959922254,
+      "loc": 67,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 7.534082208061591,
+      "started_at": "2026-10-06T15:20:31.168136+00:00"
+    },
+    {
+      "id": "e013",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Switch model family: HistGradientBoosting -> ExtraTrees",
+        "rationale": "escape a local optimum with a different inductive bias",
+        "category": "model_family",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Switch model family: HistGradientBoosting -> ExtraTrees\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import ExtraTreesClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n    ])\n",
+      "diff": "--- e010/solution.py\n+++ e013/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Switch model family: HistGradientBoosting -> ExtraTrees\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import ExtraTreesClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,19 +62,7 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n-        estimators=[\n-            (\"m0\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n-            ])),\n-            (\"m1\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-            ])),\n-            (\"m2\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n-            ])),\n-        ], voting=\"soft\",\n-    )\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.136 >= alpha=0.1; gain 0.0352 (+0.64 SE, SE=0.05516), p=0.136, select -0.1012 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.16637235831111014,
+        "se": 0.0405065651507889,
+        "folds": [
+          -0.10211543520136723,
+          -0.1000287816746684,
+          -0.40919620975219617,
+          -0.09949245775180036,
+          -0.108869287933045,
+          -0.10563703090219756,
+          -0.2630248331194348,
+          -0.3558096768655293,
+          -0.07919135319145558,
+          -0.04035851671940689
+        ]
+      },
+      "select_score": -0.10119700312197014,
+      "fit_time_s": 0.0732594248955138,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.8791101250099018,
+      "started_at": "2026-10-06T15:20:38.709157+00:00"
+    },
+    {
+      "id": "e014",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Random HistGradientBoosting configuration #14",
+        "rationale": "idea bank exhausted",
+        "category": "hyperparameters",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Random HistGradientBoosting configuration #14\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 1.0, \"learning_rate\": 0.05, \"max_depth\": 6, \"max_iter\": 200, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 5}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=200, max_leaf_nodes=31, l2_regularization=1.0, min_samples_leaf=5, max_depth=6, random_state=0)),\n    ])\n",
+      "diff": "--- e010/solution.py\n+++ e014/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Random HistGradientBoosting configuration #14\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 1.0, \"learning_rate\": 0.05, \"max_depth\": 6, \"max_iter\": 200, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 5}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,19 +62,7 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n-        estimators=[\n-            (\"m0\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n-            ])),\n-            (\"m1\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-            ])),\n-            (\"m2\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n-            ])),\n-        ], voting=\"soft\",\n-    )\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=200, max_leaf_nodes=31, l2_regularization=1.0, min_samples_leaf=5, max_depth=6, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.941 >= alpha=0.1; gain -0.1437 (-2.61 SE, SE=0.05516), p=0.941, select -0.04967 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.3452737245547154,
+        "se": 0.09666132863068226,
+        "folds": [
+          -0.140247308752198,
+          -0.1143170691247479,
+          -0.8444727004933664,
+          -0.37444405802623304,
+          -0.25078386618338855,
+          -0.19733273199877116,
+          -0.6888427665250303,
+          -0.7515498363181107,
+          -0.07439591308363894,
+          -0.016350995041669206
+        ]
+      },
+      "select_score": -0.04966898141110012,
+      "fit_time_s": 0.07853805420454592,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.8711510000284761,
+      "started_at": "2026-10-06T15:20:40.594124+00:00"
+    },
+    {
+      "id": "e015",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Random HistGradientBoosting configuration #15",
+        "rationale": "idea bank exhausted",
+        "category": "hyperparameters",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Random HistGradientBoosting configuration #15\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.02, \"max_depth\": 6, \"max_iter\": 100, \"max_leaf_nodes\": 15, \"min_samples_leaf\": 5}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(learning_rate=0.02, max_iter=100, max_leaf_nodes=15, l2_regularization=0.0, min_samples_leaf=5, max_depth=6, random_state=0)),\n    ])\n",
+      "diff": "--- e010/solution.py\n+++ e015/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Random HistGradientBoosting configuration #15\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.02, \"max_depth\": 6, \"max_iter\": 100, \"max_leaf_nodes\": 15, \"min_samples_leaf\": 5}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,19 +62,7 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n-        estimators=[\n-            (\"m0\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n-            ])),\n-            (\"m1\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-            ])),\n-            (\"m2\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n-            ])),\n-        ], voting=\"soft\",\n-    )\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(learning_rate=0.02, max_iter=100, max_leaf_nodes=15, l2_regularization=0.0, min_samples_leaf=5, max_depth=6, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.935 >= alpha=0.1; gain -0.06132 (-1.11 SE, SE=0.05516), p=0.935, select -0.1031 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.26289473266016283,
+        "se": 0.06840539729646669,
+        "folds": [
+          -0.11450755874885384,
+          -0.09910087195390868,
+          -0.5891371577592122,
+          -0.28978535478676914,
+          -0.14310052828900546,
+          -0.18594471526911485,
+          -0.524476671296668,
+          -0.5654965303796337,
+          -0.08586246966332427,
+          -0.03153546845513848
+        ]
+      },
+      "select_score": -0.10313112866187574,
+      "fit_time_s": 0.09051871257834136,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.9123681250493973,
+      "started_at": "2026-10-06T15:20:42.470769+00:00"
+    },
+    {
+      "id": "e016",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Random HistGradientBoosting configuration #16",
+        "rationale": "idea bank exhausted",
+        "category": "hyperparameters",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Random HistGradientBoosting configuration #16\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.1, \"learning_rate\": 0.2, \"max_depth\": null, \"max_iter\": 200, \"max_leaf_nodes\": 63, \"min_samples_leaf\": 40}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(learning_rate=0.2, max_iter=200, max_leaf_nodes=63, l2_regularization=0.1, min_samples_leaf=40, max_depth=None, random_state=0)),\n    ])\n",
+      "diff": "--- e010/solution.py\n+++ e016/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Random HistGradientBoosting configuration #16\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.1, \"learning_rate\": 0.2, \"max_depth\": null, \"max_iter\": 200, \"max_leaf_nodes\": 63, \"min_samples_leaf\": 40}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,19 +62,7 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n-        estimators=[\n-            (\"m0\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n-            ])),\n-            (\"m1\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-            ])),\n-            (\"m2\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n-            ])),\n-        ], voting=\"soft\",\n-    )\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(learning_rate=0.2, max_iter=200, max_leaf_nodes=63, l2_regularization=0.1, min_samples_leaf=40, max_depth=None, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=1 >= alpha=0.1; gain -0.5279 (-9.57 SE, SE=0.05516), p=1, select -0.3831 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.7294435716145334,
+        "se": 0.08291150106304863,
+        "folds": [
+          -0.5304922978272882,
+          -0.41966796386315086,
+          -1.1332301076924607,
+          -1.098990440083872,
+          -0.5444973968797253,
+          -0.5568882901954906,
+          -0.9336084675037748,
+          -0.9111829822481767,
+          -0.5519763081131895,
+          -0.6139014617382056
+        ]
+      },
+      "select_score": -0.38309544811420687,
+      "fit_time_s": 0.04615994160994887,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.4504578750347719,
+      "started_at": "2026-10-06T15:20:44.389292+00:00"
+    },
+    {
+      "id": "e017",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Random HistGradientBoosting configuration #17",
+        "rationale": "idea bank exhausted",
+        "category": "hyperparameters",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Random HistGradientBoosting configuration #17\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.1, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 200, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=200, max_leaf_nodes=31, l2_regularization=0.1, min_samples_leaf=20, max_depth=None, random_state=0)),\n    ])\n",
+      "diff": "--- e010/solution.py\n+++ e017/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Random HistGradientBoosting configuration #17\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.1, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 200, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,19 +62,7 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n-        estimators=[\n-            (\"m0\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n-            ])),\n-            (\"m1\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-            ])),\n-            (\"m2\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n-            ])),\n-        ], voting=\"soft\",\n-    )\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=200, max_leaf_nodes=31, l2_regularization=0.1, min_samples_leaf=20, max_depth=None, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.927 >= alpha=0.1; gain -0.2921 (-5.30 SE, SE=0.05516), p=0.927, select -0.1246 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.49366416585745754,
+        "se": 0.15263596418213216,
+        "folds": [
+          -0.2915061789834527,
+          -0.12029405397214488,
+          -1.432713246650388,
+          -0.407649405472217,
+          -0.2168414401401729,
+          -0.42595952800610964,
+          -0.8389747667551278,
+          -1.1308755673668205,
+          -0.06547840855717235,
+          -0.006349062670968593
+        ]
+      },
+      "select_score": -0.12463566234957922,
+      "fit_time_s": 0.061593170883134006,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.6529005829943344,
+      "started_at": "2026-10-06T15:20:45.845735+00:00"
+    },
+    {
+      "id": "e018",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Random HistGradientBoosting configuration #18",
+        "rationale": "idea bank exhausted",
+        "category": "hyperparameters",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Random HistGradientBoosting configuration #18\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.1, \"learning_rate\": 0.2, \"max_depth\": 6, \"max_iter\": 200, \"max_leaf_nodes\": 15, \"min_samples_leaf\": 40}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(learning_rate=0.2, max_iter=200, max_leaf_nodes=15, l2_regularization=0.1, min_samples_leaf=40, max_depth=6, random_state=0)),\n    ])\n",
+      "diff": "--- e010/solution.py\n+++ e018/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Random HistGradientBoosting configuration #18\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.1, \"learning_rate\": 0.2, \"max_depth\": 6, \"max_iter\": 200, \"max_leaf_nodes\": 15, \"min_samples_leaf\": 40}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,19 +62,7 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n-        estimators=[\n-            (\"m0\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n-            ])),\n-            (\"m1\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-            ])),\n-            (\"m2\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n-            ])),\n-        ], voting=\"soft\",\n-    )\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(learning_rate=0.2, max_iter=200, max_leaf_nodes=15, l2_regularization=0.1, min_samples_leaf=40, max_depth=6, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=1 >= alpha=0.1; gain -0.5279 (-9.57 SE, SE=0.05516), p=1, select -0.3831 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.7294435716145334,
+        "se": 0.08291150106304863,
+        "folds": [
+          -0.5304922978272882,
+          -0.41966796386315086,
+          -1.1332301076924607,
+          -1.098990440083872,
+          -0.5444973968797253,
+          -0.5568882901954906,
+          -0.9336084675037748,
+          -0.9111829822481767,
+          -0.5519763081131895,
+          -0.6139014617382056
+        ]
+      },
+      "select_score": -0.38309544811420687,
+      "fit_time_s": 0.04343873322941363,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.36675262497738,
+      "started_at": "2026-10-06T15:20:47.505190+00:00"
+    },
+    {
+      "id": "e019",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Random HistGradientBoosting configuration #19",
+        "rationale": "idea bank exhausted",
+        "category": "hyperparameters",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Random HistGradientBoosting configuration #19\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 1.0, \"learning_rate\": 0.02, \"max_depth\": 6, \"max_iter\": 100, \"max_leaf_nodes\": 63, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(learning_rate=0.02, max_iter=100, max_leaf_nodes=63, l2_regularization=1.0, min_samples_leaf=20, max_depth=6, random_state=0)),\n    ])\n",
+      "diff": "--- e010/solution.py\n+++ e019/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Random HistGradientBoosting configuration #19\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 1.0, \"learning_rate\": 0.02, \"max_depth\": 6, \"max_iter\": 100, \"max_leaf_nodes\": 63, \"min_samples_leaf\": 20}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,19 +62,7 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n-        estimators=[\n-            (\"m0\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n-            ])),\n-            (\"m1\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-            ])),\n-            (\"m2\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n-            ])),\n-        ], voting=\"soft\",\n-    )\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(learning_rate=0.02, max_iter=100, max_leaf_nodes=63, l2_regularization=1.0, min_samples_leaf=20, max_depth=6, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.934 >= alpha=0.1; gain -0.0422 (-0.77 SE, SE=0.05516), p=0.934, select -0.1222 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.2437736806684309,
+        "se": 0.04820672688525171,
+        "folds": [
+          -0.14796647291419773,
+          -0.0991867374693118,
+          -0.5351848822550334,
+          -0.26677073499611215,
+          -0.18409319955685377,
+          -0.18975088896442457,
+          -0.34639809728073545,
+          -0.44614583831501264,
+          -0.12621493587273805,
+          -0.09602501905988944
+        ]
+      },
+      "select_score": -0.12216497382869332,
+      "fit_time_s": 0.03347114138305187,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.242547541973181,
+      "started_at": "2026-10-06T15:20:48.878649+00:00"
+    },
+    {
+      "id": "e020",
+      "parent_id": "e010",
+      "idea": {
+        "title": "Random HistGradientBoosting configuration #20",
+        "rationale": "idea bank exhausted",
+        "category": "hyperparameters",
+        "radical": true
+      },
+      "code": "\"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n\nIdea: Random HistGradientBoosting configuration #20\nbuild_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\nall preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n\"\"\"\n# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 1.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 200, \"max_leaf_nodes\": 7, \"min_samples_leaf\": 10}, \"scale\": \"none\"}\nimport numpy as np\n\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.ensemble import HistGradientBoostingClassifier\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n\nNUMERIC_KINDS = (\"numeric\",)\nCATEGORICAL_KINDS = (\"categorical\", \"boolean\", \"text\")\n\n\ndef _as_str(X):\n    return X.astype(str)\n\n\ndef _signed_log1p(X):\n    X = np.asarray(X, dtype=float)\n    return np.sign(X) * np.log1p(np.abs(X))\n\n\ndef _row_stats(X):\n    X = np.asarray(X, dtype=float)\n    return np.column_stack([X, X.mean(axis=1), X.std(axis=1)])\n\n\ndef _split_columns(profile):\n    numeric = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in NUMERIC_KINDS]\n    categorical = [c[\"name\"] for c in profile[\"columns\"] if c[\"kind\"] in CATEGORICAL_KINDS]\n    return numeric, categorical\n\n\ndef _preprocessor(profile, impute=\"median\", scale=\"none\", cat=\"onehot\", fe=()):\n    numeric, categorical = _split_columns(profile)\n    num_steps = [(\"impute\", SimpleImputer(strategy=impute))]\n    if \"log1p\" in fe:\n        num_steps.append((\"log1p\", FunctionTransformer(_signed_log1p)))\n    if \"row_stats\" in fe:\n        num_steps.append((\"row_stats\", FunctionTransformer(_row_stats)))\n    if scale == \"standard\":\n        num_steps.append((\"scale\", StandardScaler()))\n    elif scale == \"power\":\n        num_steps.append((\"scale\", PowerTransformer()))\n    if cat == \"ordinal\":\n        encoder = OrdinalEncoder(handle_unknown=\"use_encoded_value\", unknown_value=-1)\n    else:\n        encoder = OneHotEncoder(handle_unknown=\"ignore\", max_categories=20, sparse_output=False)\n    cat_steps = [(\"to_str\", FunctionTransformer(_as_str)), (\"encode\", encoder)]\n    transformers = []\n    if numeric:\n        transformers.append((\"num\", Pipeline(num_steps), numeric))\n    if categorical:\n        transformers.append((\"cat\", Pipeline(cat_steps), categorical))\n    return ColumnTransformer(transformers, remainder=\"drop\", sparse_threshold=0.0)\n\n\ndef build_pipeline(profile):\n    return Pipeline([\n        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=200, max_leaf_nodes=7, l2_regularization=1.0, min_samples_leaf=10, max_depth=None, random_state=0)),\n    ])\n",
+      "diff": "--- e010/solution.py\n+++ e020/solution.py\n@@ -1,14 +1,14 @@\n \"\"\"solution.py - generated by AutoTinker's offline heuristic proposer.\n \n-Idea: Soft-voting ensemble of top kept solutions (e002, e000 + ExtraTrees)\n+Idea: Random HistGradientBoosting configuration #20\n build_pipeline(profile) returns an UNFITTED sklearn estimator that takes the raw feature DataFrame;\n all preprocessing lives inside the pipeline. The harness does all fitting and scoring.\n \"\"\"\n-# autotinker-spec: {\"ens\": \"vote\", \"members\": [{\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 0.0, \"learning_rate\": 0.1, \"max_depth\": null, \"max_iter\": 100, \"max_leaf_nodes\": 31, \"min_samples_leaf\": 20}, \"scale\": \"none\"}, {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"et\", \"params\": {\"max_depth\": null, \"max_features\": \"sqrt\", \"min_samples_leaf\": 1, \"n_estimators\": 300}, \"scale\": \"none\"}], \"model\": \"ensemble\", \"params\": {}}\n+# autotinker-spec: {\"cat\": \"onehot\", \"fe\": [], \"impute\": \"median\", \"model\": \"hgb\", \"params\": {\"l2_regularization\": 1.0, \"learning_rate\": 0.05, \"max_depth\": null, \"max_iter\": 200, \"max_leaf_nodes\": 7, \"min_samples_leaf\": 10}, \"scale\": \"none\"}\n import numpy as np\n \n from sklearn.compose import ColumnTransformer\n-from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, VotingClassifier\n+from sklearn.ensemble import HistGradientBoostingClassifier\n from sklearn.impute import SimpleImputer\n from sklearn.pipeline import Pipeline\n from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, OrdinalEncoder, PowerTransformer, StandardScaler\n@@ -62,19 +62,7 @@\n \n \n def build_pipeline(profile):\n-    return VotingClassifier(\n-        estimators=[\n-            (\"m0\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(l2_regularization=0.0, learning_rate=0.05, max_depth=None, max_iter=100, max_leaf_nodes=31, min_samples_leaf=20, random_state=0)),\n-            ])),\n-            (\"m1\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", HistGradientBoostingClassifier(learning_rate=0.1, max_iter=100, max_leaf_nodes=31, l2_regularization=0.0, min_samples_leaf=20, max_depth=None, random_state=0)),\n-            ])),\n-            (\"m2\", Pipeline([\n-                (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n-                (\"model\", ExtraTreesClassifier(n_estimators=300, min_samples_leaf=1, max_features='sqrt', max_depth=None, random_state=0)),\n-            ])),\n-        ], voting=\"soft\",\n-    )\n+    return Pipeline([\n+        (\"prep\", _preprocessor(profile, impute='median', scale='none', cat='onehot', fe=())),\n+        (\"model\", HistGradientBoostingClassifier(learning_rate=0.05, max_iter=200, max_leaf_nodes=7, l2_regularization=1.0, min_samples_leaf=10, max_depth=None, random_state=0)),\n+    ])\n",
+      "status": "discard",
+      "reason": "not significant: p=0.939 >= alpha=0.1; gain -0.1193 (-2.16 SE, SE=0.05516), p=0.939, select -0.07314 vs best -0.0846 (floor -0.1398)",
+      "cv": {
+        "mean": -0.32083010592217687,
+        "se": 0.08682884282450283,
+        "folds": [
+          -0.09802045741921536,
+          -0.11605156839659977,
+          -0.7285305139345641,
+          -0.40304675395035344,
+          -0.18853406829267855,
+          -0.2125010129982736,
+          -0.5628471736693519,
+          -0.7619720276793209,
+          -0.11376199006529578,
+          -0.023035492816115024
+        ]
+      },
+      "select_score": -0.07313519246784671,
+      "fit_time_s": 0.0674686040962115,
+      "loc": 52,
+      "repair_attempts": 0,
+      "error_kind": null,
+      "error_tail": null,
+      "llm_calls": [],
+      "cost_usd": 0.0,
+      "duration_s": 1.7120741669787094,
+      "started_at": "2026-10-06T15:20:50.128208+00:00"
+    }
+  ],
+  "best_exp_id": "e010",
+  "stop": {
+    "reason": "ceiling",
+    "summary": "stopped at experiment e020: no gains were kept in the last 10 experiments; CV standard error is 0.05516; the fitted curve (a - b*exp(-c*t)) predicts at most 0.02257 more; 10 radical attempts were rejected since the last keep (need 4).",
+    "report": {
+      "noise_floor": {
+        "value": null,
+        "threshold": 0.055159682832294527,
+        "fired": true,
+        "detail": "no gains were kept in the last 10 experiments; CV standard error is 0.05516"
+      },
+      "saturation": {
+        "value": 0.022571748914258588,
+        "threshold": 0.055159682832294527,
+        "fired": true,
+        "detail": "the fitted curve (a - b*exp(-c*t)) predicts at most 0.02257 more",
+        "params": [
+          -0.1790020482312245,
+          0.2986163720124843,
+          0.15479299087640713
+        ]
+      },
+      "exploration": {
+        "value": 10,
+        "threshold": 4,
+        "fired": true,
+        "detail": "10 radical attempts were rejected since the last keep (need 4)"
+      }
+    }
+  },
+  "final": {
+    "best_exp_id": "e010",
+    "dev_cv_mean": -0.2015737971454831,
+    "select_score": -0.08459602842010472,
+    "test_score": -0.10674133177689922,
+    "optimism_gap": 0.022145303356794502
+  },
+  "total_cost_usd": 0.0,
+  "total_input_tokens": 0,
+  "total_output_tokens": 0,
+  "wall_time_s": 48.849947874899954
+}

@@ -1,0 +1,48 @@
+{
+  "replays": [
+    {
+      "name": "housing",
+      "title": "Housing \u2014 offline heuristic proposer (no LLM)",
+      "dataset": "housing (545 rows, 12 features)",
+      "metric": "rmse",
+      "proposer": "heuristic",
+      "n_experiments": 19,
+      "stop_reason": "ceiling",
+      "fixture": false,
+      "blurb": "Real engine run: 19 experiments, 2 kept, stopped by 'ceiling'."
+    },
+    {
+      "name": "breast_cancer",
+      "title": "Breast Cancer \u2014 offline heuristic proposer (no LLM)",
+      "dataset": "breast_cancer (569 rows, 30 features, 2 classes)",
+      "metric": "roc_auc",
+      "proposer": "heuristic",
+      "n_experiments": 37,
+      "stop_reason": "ceiling",
+      "fixture": false,
+      "blurb": "Real engine run: 37 experiments, 4 kept, stopped by 'ceiling'."
+    },
+    {
+      "name": "iris_with_missing",
+      "title": "Iris With Missing \u2014 offline heuristic proposer (no LLM)",
+      "dataset": "iris_with_missing (150 rows, 4 features, 3 classes)",
+      "metric": "log_loss",
+      "proposer": "heuristic",
+      "n_experiments": 21,
+      "stop_reason": "ceiling",
+      "fixture": false,
+      "blurb": "Real engine run: 21 experiments, 3 kept, stopped by 'ceiling'."
+    },
+    {
+      "name": "wine",
+      "title": "Wine \u2014 offline heuristic proposer (no LLM)",
+      "dataset": "wine (178 rows, 13 features, 3 classes)",
+      "metric": "log_loss",
+      "proposer": "heuristic",
+      "n_experiments": 15,
+      "stop_reason": "ceiling",
+      "fixture": false,
+      "blurb": "Real engine run: 15 experiments, 2 kept, stopped by 'ceiling'."
+    }
+  ]
+}

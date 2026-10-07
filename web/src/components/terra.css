@@ -1,0 +1,105 @@
+/*
+ * Terra Incognita tokens for the run pages and the replay gallery (docs/creative/02-direction.md, "Visual system").
+ *
+ * Imported by components, so the stylesheet persists across client navigation: every rule is gated on a
+ * [data-terra] marker being on the page, which only run pages and the gallery render.
+ *
+ * Always dark, in both site themes, like the landing: the page *is* the void the land sits in, so the world is never
+ * a lit box on paper (one world, not a canvas in a frame). Bone type, amber only for kept/best, ember only on crashes.
+ * The site's light theme still applies to the pages without a world (/new).
+ */
+
+:root:has([data-terra]) {
+  color-scheme: dark;
+  --lp-ink: oklch(91% 0.02 85);
+  --lp-ink-2: oklch(78% 0.016 85);
+  --lp-ink-3: oklch(60% 0.012 250);
+  --lp-hair: oklch(88% 0.02 85 / 0.12);
+  --lp-signal: #ffb547;
+  --lp-void: #05070a;
+  --paper: #05070a;
+  --paper-2: #0d1117;
+  --paper-3: #1b222b;
+  --ink: #ece7dc;
+  --ink-2: #c4beb0;
+  --ink-3: #8a8679;
+  --rule: #171d25;
+  --rule-strong: #2a323d;
+  --best: #ffb547;
+  --best-soft: rgb(255 181 71 / 0.1);
+  --keep: #ffb547;
+  --discard: #6b7079;
+  --crash: #ff5a3c;
+  --select: #7fd6d0;
+  --test: #eaf6ff;
+  --focus: #ffb547;
+  --code-bg: #0a0d12;
+  --add-bg: rgb(255 181 71 / 0.1);
+  --del-bg: rgb(255 90 60 / 0.1);
+}
+
+html:has([data-terra]),
+body:has([data-terra]) {
+  background: #05070a;
+}
+body:has([data-terra]) > header {
+  position: relative;
+  z-index: 30;
+  border-color: transparent;
+  background: #05070a;
+}
+body:has([data-terra]) > footer {
+  border-color: var(--lp-hair);
+}
+
+/* The canvas frame is the void in both themes; a hairline of bone keeps its edge on void paper. */
+.terra-frame {
+  background: #05070a;
+  box-shadow:
+    0 0 0 1px rgb(217 211 196 / 0.09),
+    0 40px 90px -50px rgb(5 7 10 / 0.7);
+}
+
+/* The gate's balance: the beam tips toward the new probe only on a keep. */
+.terra-balance-beam {
+  transform-box: view-box;
+  transform-origin: 8px 5px;
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.terra-balance[data-tip="keep"] .terra-balance-beam {
+  transform: rotate(-14deg);
+}
+.terra-balance[data-enter="true"][data-tip="keep"] .terra-balance-beam {
+  animation: terra-tip 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+}
+@keyframes terra-tip {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-14deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terra-balance[data-enter="true"][data-tip="keep"] .terra-balance-beam {
+    animation: none;
+  }
+}
+
+/* Gallery posters fade up out of the void once captured. */
+@keyframes terra-poster-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.poster-in {
+  animation: terra-poster-in 0.9s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .poster-in {
+    animation: none;
+  }
+}
