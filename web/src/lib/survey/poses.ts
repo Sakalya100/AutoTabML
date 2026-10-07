@@ -91,7 +91,7 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
       break;
     }
     case "approach": {
-      // Hero: the whole (ghost) survey large in frame, seen from a low three-quarter, drifting slightly with scroll.
+      // Hero: the whole survey large in frame, seen from a low three-quarter, drifting slightly with scroll.
       out = {
         pos: [cx + lerp(-2.2, 0.6, e), R * 0.62 + lerp(4.2, 3.4, e), cz + R * 1.55 + lerp(5.2, 4.2, e)],
         target: [cx, lerp(0.9, 1.0, e), cz + R * 0.05],

@@ -38,8 +38,6 @@ export interface WorldProps {
   focus: Vector3;
   /** Continuous scroll input (landing); overrides pose/progress for the camera and drives the bead. */
   scrub: RefObject<SurveyScrub | null> | null;
-  /** Draw the complete run (`frame`) as faint contours over the unexplored dark. */
-  ghost: boolean;
 }
 
 /** Critically damped spring per component (ω rad/s): long, settled moves with no overshoot. */
@@ -83,17 +81,15 @@ export const SurveyWorld = memo(function SurveyWorld(props: WorldProps) {
     firstField.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the identity of the probe set
   }, [field, key, animate]);
-  // The ghost: the complete run's terrain, built once into its own texture (never morphed).
-  const ghostKey = props.ghost ? terrainKey(frame) : "";
-  useMemo(() => {
-    field.setGhost(props.ghost ? frame : null, ghostKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `ghostKey` is the identity of the complete probe set
-  }, [field, ghostKey]);
-  u.uGhost.value = field.ghost;
-  u.uGhostOn.value = field.ghost ? 1 : 0;
   u.uFieldA.value = field.texA;
   u.uFieldB.value = field.texB;
   u.uContourSpec.value.set(frame.contour.base, frame.contour.step, 1);
+  // Every decal (rings, path, bead ring) lives within the mapped probes: outside this box the shader skips them.
+  {
+    const b = frame.bounds;
+    const lb = layout.bounds;
+    u.uDecalBox.value.set(Math.min(b.minX, lb.minX) - 1.2, Math.min(b.minZ, lb.minZ) - 1.2, Math.max(b.maxX, lb.maxX) + 1.2, Math.max(b.maxZ, lb.maxZ) + 1.2);
+  }
 
   const m = frameMetrics(frame);
   const portrait = useThree((st) => st.size.width < st.size.height);
@@ -107,7 +103,7 @@ export const SurveyWorld = memo(function SurveyWorld(props: WorldProps) {
       <StudioEnv />
       <Terrain />
       <Probes probes={layout.probes} selectedId={props.selectedId} />
-      <ClimbPath climb={layout.climb} fieldKey={key} />
+      <ClimbPath climb={layout.climb} />
       <Bead target={layout.bead} path={frame.climb} />
       <Mist bestY={layout.bestY} thickness={layout.mist} />
       <CloudDeck
@@ -116,7 +112,7 @@ export const SurveyWorld = memo(function SurveyWorld(props: WorldProps) {
         size={Math.max(10, m.span * 1.25)}
         strength={CLOUD_STRENGTH[props.pose] ?? 0.25}
       />
-      <Truth summit={finalSummit} bestY={layout.bestY} selectY={layout.selectY} testY={layout.testY} labels={props.truthLabels} hidden={props.pose === "chart"} />
+      <Truth summit={finalSummit} bestY={layout.bestY} selectY={layout.selectY} testY={layout.testY} labels={props.truthLabels} climb={frame.climb} hidden={props.pose === "chart"} />
       <Headline
         text={props.headline}
         at={[m.cx, 0.04, frame.bounds.maxZ + (portrait ? 6.2 : 3.9)]}

@@ -36,6 +36,23 @@ export interface SurveyScrub {
   /** Frame the subject off-centre (fractions of the viewport): +x moves it right, +y moves it up. */
   shiftX: number;
   shiftY: number;
+  /**
+   * Section moments (0..1 presence, eased by the page). The landing shows the complete run from the first frame, so
+   * the mist, the cloud deck and the truth gauge cannot key off the run's phase there: they follow these instead.
+   * Absent (run pages) = phase-driven.
+   */
+  gates?: SurveyGates;
+}
+
+export interface SurveyGates {
+  /** The noise-floor mist (around the mist section). */
+  mist: number;
+  /** Cloud deck presence (the ceiling section; a thin cap after it, gone on the chart). */
+  cloud: number;
+  /** Cloud deck descent: 0 = high above, 1 = settled on the fitted ceiling. */
+  cloudDrop: number;
+  /** The locked-test gauge and beam (the truth section). */
+  truth: number;
 }
 
 /** Authored camera states (landing scroll beats, run/gallery framings). */
@@ -68,8 +85,6 @@ export interface SurveyCanvasProps {
   ariaLabel?: string;
   /** Continuous scroll-driven camera + bead input (landing). Overrides `pose`/`poseProgress` for the camera. */
   scrub?: RefObject<SurveyScrub | null>;
-  /** Draw the complete run's terrain as faint contour lines over the unexplored dark (landing only). */
-  ghost?: boolean;
   /** Called once when shaders are compiled and the first frame is on screen (loader gates). */
   onReady?: () => void;
 }

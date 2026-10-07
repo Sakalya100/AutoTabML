@@ -1,15 +1,13 @@
 "use client";
 
-import { Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { memo, useEffect, useMemo, useRef } from "react";
 import { Color, IcosahedronGeometry, Mesh, MeshPhysicalMaterial, Quaternion, Vector3 } from "three";
 import { climbPointXZ } from "@/lib/survey/poses";
 import { WOBBLE_BEGIN, WOBBLE_HEAD } from "./shaders";
-import { damp, sameProps, useSurvey } from "./shared";
+import { damp, MAX_PATH, sameProps, useSurvey } from "./shared";
 
 const R = 0.34;
-const PATH_COLOR = new Color(2.2, 1.25, 0.38);
 
 /**
  * The agent: a bead of mercury resting on the best-known point. It rolls (really rolls: rotation = distance / r)
@@ -57,17 +55,17 @@ export const Bead = memo(function Bead({ target, path }: { target: [number, numb
     const d = Math.min(dt, 1 / 20);
     const s = st.current;
     wob.uTime.value = state.clock.getElapsedTime();
-    if (target && !s.init) {
-      s.x = target[0];
-      s.z = target[2];
-      s.init = true;
-    }
     const beadT = scrub?.current?.beadT ?? null;
     const driven = beadT != null && !!path && path.length > 0;
     if (driven && !s.init) {
       const [x0, z0] = climbPointXZ(path, beadT);
       s.x = x0;
       s.z = z0;
+      s.init = true;
+    }
+    if (target && !s.init) {
+      s.x = target[0];
+      s.z = target[2];
       s.init = true;
     }
     if (target || driven) {
@@ -89,41 +87,55 @@ export const Bead = memo(function Bead({ target, path }: { target: [number, numb
         m.quaternion.premultiply(tmp.q);
       }
       s.speed = damp(s.speed, dist / Math.max(d, 1e-4), 6, d);
-    }
+    } else s.speed = damp(s.speed, 0, 6, d);
     s.s = damp(s.s, target || driven ? 1 : 0, animate ? 3 : 1e3, d);
     const ground = field.sample(s.x, s.z);
-    s.y = ground + R * 0.82;
+    // Sits slightly into the ground (a heavy drop of mercury flattens where it touches), lifting a hair while it rolls.
+    s.y = ground + R * (0.8 + Math.min(0.04, s.speed * 0.01));
     m.position.set(s.x, s.y, s.z);
     m.scale.setScalar(Math.max(1e-3, s.s));
     m.visible = s.s > 0.01;
-    wob.uWobble.value = animate ? 0.01 + Math.min(0.03, s.speed * 0.012) : 0;
+    // Surface tension: a slow idle shimmer that quickens (and deepens a little) while it rolls.
+    wob.uWobble.value = animate ? 0.008 + Math.min(0.022, s.speed * 0.01) : 0;
     u.uBead.value.set(s.x, s.y, s.z, m.visible ? R * s.s : -1);
   });
 
   return <mesh ref={mesh} geometry={geometry} material={material} />;
 }, sameProps);
 
-/** The climb path: a dashed amber survey line over the ground through every keep, in order. */
-export const ClimbPath = memo(function ClimbPath({ climb, fieldKey }: { climb: [number, number, number][]; fieldKey: string }) {
-  const { field } = useSurvey();
-  const points = useMemo(() => {
-    void fieldKey; // recompute when the ground changes
-    // Stay mounted with a stub when there is no path yet: unmounting disposes the dashed-line program and it would
-    // recompile (a visible hitch) the moment the first keep lands.
-    if (climb.length < 2) return [[0, -50, 0], [0, -50.01, 0]] as [number, number, number][];
-    const out: [number, number, number][] = [];
-    for (let i = 0; i < climb.length - 1; i++) {
-      const a = climb[i];
-      const b = climb[i + 1];
-      const n = Math.max(6, Math.ceil(Math.hypot(b[0] - a[0], b[2] - a[2]) / 0.12));
-      for (let k = i === 0 ? 0 : 1; k <= n; k++) {
-        const t = k / n;
-        const x = a[0] + (b[0] - a[0]) * t;
-        const z = a[2] + (b[2] - a[2]) * t;
-        out.push([x, field.sampleTarget(x, z) + 0.05, z]);
-      }
-    }
+/**
+ * The climb path: a dashed amber survey line through every keep, in order. It is painted onto the ground by the
+ * terrain shader (uPath), so it hugs every slope — never sinking into a ridge or floating over a hollow — with dashes
+ * evenly spaced in world units. Beyond the bead (landing) the path ahead is dimmer: the route it is about to take.
+ */
+export const ClimbPath = memo(function ClimbPath({ climb }: { climb: [number, number, number][] }) {
+  const { u, scrub } = useSurvey();
+  const cum = useMemo(() => {
+    const n = Math.min(climb.length, MAX_PATH);
+    const out = new Float32Array(Math.max(1, n));
+    for (let i = 1; i < n; i++) out[i] = out[i - 1] + Math.hypot(climb[i][0] - climb[i - 1][0], climb[i][2] - climb[i - 1][2]);
     return out;
-  }, [climb, field, fieldKey]);
-  return <Line visible={climb.length >= 2} points={points} color={PATH_COLOR} lineWidth={1.4} dashed dashSize={0.16} gapSize={0.11} transparent opacity={0.9} toneMapped={false} />;
+  }, [climb]);
+  useEffect(() => {
+    const n = Math.min(climb.length, MAX_PATH);
+    for (let i = 0; i < n; i++) u.uPath.value[i].set(climb[i][0], climb[i][2], cum[i]);
+    u.uPathN.value = n;
+    return () => {
+      u.uPathN.value = 0;
+    };
+  }, [climb, cum, u]);
+  const op = useRef(0);
+  useFrame((_, dt) => {
+    op.current = damp(op.current, climb.length >= 2 ? 1 : 0, 3, Math.min(dt, 0.05));
+    const t = scrub?.current?.beadT;
+    let head = 1e6;
+    if (t != null && climb.length >= 2) {
+      const n = Math.min(climb.length, MAX_PATH);
+      const c = Math.min(n - 1, Math.max(0, t));
+      const i = Math.min(n - 2, Math.floor(c));
+      head = cum[i] + (cum[i + 1] - cum[i]) * (c - i);
+    }
+    u.uPathSpec.value.set(head, op.current);
+  });
+  return null;
 }, sameProps);

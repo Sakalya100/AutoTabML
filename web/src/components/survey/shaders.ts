@@ -59,12 +59,9 @@ vec2 fieldAt(vec2 xz) {
 
 export const terrainVert = /* glsl */ `
 ${FIELD}
-uniform sampler2D uGhost;  // complete run's terrain (landing): height, reveal
-uniform float uGhostOn;
 varying vec3 vWorld;
 varying vec3 vNormalW;
 varying float vMask;
-varying vec2 vGhost;       // ghost height, ghost reveal
 void main() {
   vec2 xz = uWin.xy + position.xz * uWin.z;
   vec2 f = fieldAt(xz);
@@ -73,22 +70,30 @@ void main() {
   float hz = fieldAt(xz + vec2(0.0, e)).x - fieldAt(xz - vec2(0.0, e)).x;
   vNormalW = normalize(vec3(-hx, 2.0 * e, -hz));
   vMask = f.y;
-  vec2 g = texture2D(uGhost, fieldUV(xz)).rg * uGhostOn;
-  vGhost = g;
-  // Unrevealed ground settles a little lower, so the survey edge reads as a lip of uncovered land. Where nothing is
-  // revealed yet and a ghost exists, the (invisible) surface takes the ghost's shape so its contour lines stand in 3D.
+  // Unrevealed ground settles a little lower, so the survey edge reads as a lip of uncovered land.
   float r = smoothstep(0.0, 0.5, f.y);
-  // The hand-over happens entirely inside the band the fragment shader discards (mask < ~0.07), so the step between
-  // the ghost and the live ground is never drawn as a wall.
-  float base = mix(f.x, g.x, uGhostOn * step(0.02, g.y) * (1.0 - smoothstep(0.0, 0.05, f.y)));
-  float h = base - (1.0 - r) * 0.35;
+  float h = f.x - (1.0 - r) * 0.35;
   vWorld = vec3(xz.x, h, xz.y);
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }
 `;
 
+/** Max decal counts: keep in sync with MAX_RINGS / MAX_PATH in shared.ts. */
+const DECALS = /* glsl */ `
+#define MAX_RINGS 24
+#define MAX_PATH 32
+uniform vec4 uRings[MAX_RINGS]; // x, z, radius, intensity
+uniform int uRingN;
+uniform vec3 uPath[MAX_PATH];   // x, z, cumulative length
+uniform int uPathN;
+uniform vec2 uPathSpec;         // bead arc length, opacity
+uniform vec4 uDecalBox;         // minX, minZ, maxX, maxZ
+uniform vec4 uFoot;             // truth gauge foot: x, z, radius, intensity
+`;
+
 export const terrainFrag = /* glsl */ `
 ${NOISE}
+${DECALS}
 uniform float uTime;
 uniform vec3 uLightDir;
 uniform vec3 uMoon;
@@ -104,33 +109,24 @@ uniform vec4 uLand;        // x, z, t0, strength
 uniform vec4 uBead;        // x, y, z, radius
 uniform float uFog;
 uniform float uReveal;     // global intro reveal 0..1
-uniform float uGhostOn;
 varying vec3 vWorld;
 varying vec3 vNormalW;
 varying float vMask;
-varying vec2 vGhost;
 
 float ring(float d, float r, float w) { float x = (d - r) / w; return exp(-x * x); }
+// An anti-aliased band of half-width w around d = 0 (pw = world size of one pixel here).
+float band(float d, float w, float pw) { return 1.0 - smoothstep(w - pw * 0.75, w + pw * 0.75, d); }
 
 void main() {
-  // Ghost (landing): the complete run's contours, faint, only where the ground is not revealed yet. Derivatives are
-  // taken before any discard (uniform control flow).
-  float m = smoothstep(0.02, 0.7, vMask) * uReveal;
-  float ghc = (vGhost.x - uContourSpec.x) / max(uContourSpec.y, 1e-4);
-  float gfw = max(fwidth(ghc), 1e-4);
-  float gfr = fract(ghc);
-  float gdl = min(gfr, 1.0 - gfr);
-  float gmaj = 1.0 - step(0.5, abs(mod(floor(ghc + 0.5), 5.0)));
-  float gline = (1.0 - smoothstep(0.0, gfw * mix(1.0, 1.6, gmaj), gdl)) * (1.0 - smoothstep(0.35, 0.8, gfw));
-  // Only on gently sloped surface: where the invisible ghost surface hands over to the live ground the mesh briefly
-  // turns into a near-vertical wall, and contour lines stacked on it read as vertical streaks.
-  vec3 gn = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
-  float gflat = smoothstep(0.55, 0.8, abs(gn.y));
-  float ghostA = uGhostOn * smoothstep(0.02, 0.45, vGhost.y) * (1.0 - m) * mix(0.05, 0.13, gmaj) * gline * gflat * uReveal;
-  // Nothing revealed and no ghost line here: let the void (or land behind) show through.
-  if (m < 0.02 && ghostA < 0.004) discard;
-  vec3 n = normalize(vNormalW);
+  // Derivatives first, in uniform control flow (before any discard or loop).
   vec3 P = vWorld;
+  float pw = max(length(fwidth(P.xz)), 1e-4);
+  float hc = (P.y - uContourSpec.x) / max(uContourSpec.y, 1e-4);
+  float fw = max(fwidth(hc), 1e-4);
+  float fm = max(fwidth(vMask), 1e-4);
+  float m = smoothstep(0.02, 0.7, vMask) * uReveal;
+  if (m < 0.02) discard;
+  vec3 n = normalize(vNormalW);
 
   // Rough basalt: triplanar grain at two scales (abs() before powers: never pow a negative).
   vec3 an = abs(n);
@@ -139,6 +135,8 @@ void main() {
   float g1 = vnoise(P.yz * 7.0) * w.x + vnoise(P.xz * 7.0) * w.y + vnoise(P.xy * 7.0) * w.z;
   float g2 = vnoise(P.yz * 31.0) * w.x + vnoise(P.xz * 31.0) * w.y + vnoise(P.xy * 31.0) * w.z;
   float g3 = vnoise(P.yz * 97.0) * w.x + vnoise(P.xz * 97.0) * w.y + vnoise(P.xy * 97.0) * w.z;
+  // the finest grain fades out once it is sub-pixel (no sparkle while the camera moves)
+  g3 = mix(g3, 0.5, smoothstep(0.012, 0.04, pw));
   float strata = vnoise(vec2(P.y * 14.0, (P.x + P.z) * 0.8));
   float grain = g1 * 0.32 + g2 * 0.3 + g3 * 0.23 + strata * 0.15;
   vec3 albedo = mix(uBasaltLo, uBasaltHi, clamp(grain * 1.3 - 0.18, 0.0, 1.0));
@@ -153,20 +151,31 @@ void main() {
   float nh = max(dot(n, H), 0.0);
   float spec = nh * nh;
   spec = spec * spec; spec = spec * spec; spec = spec * spec; // nh^16
-  vec2 sh = P.xz - (uBead.xz - L.xz / max(L.y, 0.2) * uBead.w * 0.6);
-  float shadow = 1.0 - 0.6 * exp(-dot(sh, sh) / max(uBead.w * uBead.w * 2.2, 1e-3)) * step(0.0, uBead.w);
+  float beadOn = step(0.0, uBead.w);
+  float br = max(uBead.w, 1e-3);
+  vec2 sh = P.xz - (uBead.xz - L.xz / max(L.y, 0.2) * br * 0.6);
+  float castSh = exp(-dot(sh, sh) / (br * br * 2.2)) * beadOn;
+  // contact occlusion right under the ball: darkens the sky fill too, so it sits IN the ground, not on it
+  vec2 cb = P.xz - uBead.xz;
+  float contact = exp(-dot(cb, cb) / (br * br * 0.9)) * beadOn;
+  float shadow = 1.0 - 0.62 * castSh;
   vec3 sky = mix(vec3(0.010, 0.012, 0.016), vec3(0.045, 0.06, 0.08), n.y * 0.5 + 0.5);
-  vec3 col = albedo * (uMoon * (0.25 * wrap + 0.85 * ndl) * shadow + sky) + uMoon * spec * 0.05 * ndl;
+  // a touch of rim from the moon side, so ridges read against the void
+  float rim = pow(1.0 - max(dot(n, V), 0.0), 3.0) * smoothstep(-0.2, 0.6, dot(n, L));
+  vec3 col = albedo * (uMoon * (0.25 * wrap + 0.85 * ndl) * shadow + sky * (1.0 - 0.7 * contact)) + uMoon * spec * 0.05 * ndl + uMoon * albedo * rim * 0.35;
+  col *= 1.0 - 0.45 * contact;
 
-  // Analytic isolines on real score values: major every 5th.
-  float hc = (P.y - uContourSpec.x) / max(uContourSpec.y, 1e-4);
-  float fw = max(fwidth(hc), 1e-4);
+  // Analytic isolines on real score values: major every 5th. Minor lines bow out first as they get dense on screen
+  // (and with distance), so nothing crawls or shimmers while the camera moves.
+  float dist = length(cameraPosition - P);
   float fr = fract(hc);
   float dl = min(fr, 1.0 - fr);
   float idx = floor(hc + 0.5);
   float major = 1.0 - step(0.5, abs(mod(idx, 5.0)));
-  float line = 1.0 - smoothstep(0.0, fw * mix(0.85, 1.5, major), dl);
+  float line = 1.0 - smoothstep(fw * 0.25, fw * mix(0.95, 1.5, major), dl);
   line *= 1.0 - smoothstep(0.3, 0.7, fw); // grazing angles: fade instead of moiré
+  float minorFade = (1.0 - smoothstep(0.1, 0.28, fw)) * (1.0 - smoothstep(22.0, 46.0, dist));
+  line *= mix(minorFade, 1.0, major);
   float lineA = mix(0.055, 0.15, major) * uContourSpec.z;
 
   // Sonar: a ring front plus a lit wake behind it that fades over ~3 s.
@@ -187,12 +196,73 @@ void main() {
   col += uContour * line * lineA * (1.0 + boost);
   col += uSignal * (front * 0.55 + landR * 0.25 + gather * 0.18) * (0.35 + line);
 
-  // Survey edge: revealed ground fades into the void with a faint bone lip at the frontier.
-  float fm = max(fwidth(vMask), 1e-4);
-  float lip = (1.0 - smoothstep(0.0, fm * 1.1, abs(vMask - 0.16))) * 0.09;
-  col = mix(uVoid, col, m) + uContour * lip * uReveal + uContour * ghostA;
+  // ---- ground decals: painted on the displaced surface itself, so they hug every slope.
+  vec3 decal = vec3(0.0);
+  float under = 0.0; // darkening under decals (a hairline of shade gives the glow a ground to sit on)
+  if (P.x > uDecalBox.x && P.z > uDecalBox.y && P.x < uDecalBox.z && P.z < uDecalBox.w) {
+    // Kept-probe rings: a crisp benchmark ring, a soft halo and a faint warm pool of lantern light inside.
+    for (int i = 0; i < MAX_RINGS; i++) {
+      if (i >= uRingN) break;
+      vec4 c = uRings[i];
+      if (c.w <= 0.001) continue;
+      float d = length(P.xz - c.xy);
+      float e = abs(d - c.z);
+      float core = band(e, 0.011 + pw * 0.35, pw);
+      float halo = exp(-e * e / 0.0032);
+      float pool = exp(-d * d / (c.z * c.z * 1.6));
+      decal += uSignal * c.w * (core * 2.2 + halo * 0.28 + pool * 0.07);
+      under = max(under, halo * 0.35 * min(c.w, 1.0));
+    }
+    // The climb path: even dashes in world units along the polyline, brighter where the bead has already been.
+    if (uPathN > 1 && uPathSpec.y > 0.001) {
+      float bd = 1e6;
+      float bs = 0.0;
+      float vd = 1e6;
+      for (int i = 0; i < MAX_PATH - 1; i++) {
+        if (i + 1 >= uPathN) break;
+        vec2 a = uPath[i].xy;
+        vec2 ab = uPath[i + 1].xy - a;
+        float l2 = max(dot(ab, ab), 1e-6);
+        vec2 ap = P.xz - a;
+        float t = clamp(dot(ap, ab) / l2, 0.0, 1.0);
+        float d = length(ap - ab * t);
+        if (d < bd) { bd = d; bs = uPath[i].z + t * sqrt(l2); }
+        vd = min(vd, length(ap));
+      }
+      vd = min(vd, length(P.xz - uPath[uPathN - 1].xy));
+      float period = 0.3;
+      float ph = bs / period;
+      float fpx = max(pw / period, 1e-4);
+      float fp = fract(ph);
+      float dash = smoothstep(0.0, fpx, fp) * (1.0 - smoothstep(0.56 - fpx, 0.56, fp));
+      dash = mix(dash, 0.56, smoothstep(0.25, 0.6, fpx)); // far away: a steady line instead of aliasing dashes
+      float core = band(bd, 0.012 + pw * 0.3, pw) * dash;
+      float glow = exp(-bd * bd / 0.004) * 0.12;
+      // stop short of each ring and of the bead (a path that runs INTO a marker reads as a stick)
+      float gap = smoothstep(0.24, 0.32, vd) * (1.0 - beadOn * (1.0 - smoothstep(br * 1.25, br * 1.6, length(cb))));
+      float ahead = 1.0 - smoothstep(uPathSpec.x - 0.1, uPathSpec.x + 0.25, bs);
+      decal += uSignal * (core * 1.5 + glow) * gap * mix(0.16, 1.0, ahead) * uPathSpec.y;
+    }
+  }
+  // The bead's own ground ring: thin, cool and steady, hugging the slope around the contact.
+  if (beadOn > 0.5) {
+    float e = abs(length(cb) - br * 1.32);
+    decal += uContour * (band(e, 0.008 + pw * 0.3, pw) * 0.9 + exp(-e * e / 0.002) * 0.08);
+  }
+  // The truth gauge stands here: a cold survey mark where the rod meets the ground.
+  if (uFoot.w > 0.001) {
+    float d = length(P.xz - uFoot.xy);
+    float e = abs(d - uFoot.z);
+    vec3 ice = vec3(0.92, 0.97, 1.0);
+    decal += ice * uFoot.w * (band(e, 0.008 + pw * 0.3, pw) * 1.6 + exp(-e * e / 0.002) * 0.12 + exp(-d * d / 0.004) * 0.5);
+    under = max(under, exp(-d * d / 0.05) * 0.4 * uFoot.w);
+  }
+  col = col * (1.0 - under) + decal;
 
-  float dist = length(cameraPosition - P);
+  // Survey edge: revealed ground fades into the void with a faint bone lip at the frontier.
+  float lip = (1.0 - smoothstep(0.0, fm * 1.1, abs(vMask - 0.16))) * 0.09;
+  col = mix(uVoid, col, m) + uContour * lip * uReveal;
+
   float fogF = 1.0 - exp(-dist * dist * uFog * uFog);
   col = mix(col, uVoid, clamp(fogF, 0.0, 1.0));
   gl_FragColor = vec4(col, 1.0);
@@ -264,7 +334,7 @@ void main() {
   vec2 p = vWorld.xz * 0.16 + uSeed;
   vec2 q = vec2(fbm3(p + uTime * 0.008), fbm3(p + 5.2 - uTime * 0.006));
   float n = fbm(p + 1.8 * q);
-  float cover = smoothstep(0.47, 0.72, n);
+  float cover = smoothstep(0.5, 0.8, n);
   // fake top light from the density gradient, so the deck has relief under the moon
   float n2 = fbm3(p + 1.8 * q + normalize(uLightDir.xz) * 0.08) * 0.877 + 0.06;
   float lit = clamp(0.55 + (n2 - n) * 9.0, 0.2, 1.2);

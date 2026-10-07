@@ -12,9 +12,8 @@ import type { SurveyLayout } from "@/lib/survey/contract";
  *
  * The shaders still read `uFieldA`/`uFieldB` mixed by `uMix`; both point at this one texture and `mix` stays 1.
  *
- * The landing also draws a GHOST: the complete run's terrain, built once into its own texture and never morphed. The
- * terrain shader shows it only as faint contour lines where nothing is revealed yet (terra incognita); it never feeds
- * the CPU samples, the camera or the shown ground, so it cannot reintroduce the void-land failure above.
+ * The landing never morphs at all: it hands the world the complete run once, so the ground is built at load and the
+ * texture is never touched again while scrolling (only the bead, camera and section moments move).
  */
 export class FieldState {
   win: FieldWindow;
@@ -30,8 +29,6 @@ export class FieldState {
   readonly mix = 1;
   key = "";
   private duration = 1.4;
-  private ghostKey = "";
-  private ghostTex: DataTexture | null = null;
 
   constructor(res: number, bounds: SurveyLayout["bounds"]) {
     this.res = res;
@@ -92,27 +89,8 @@ export class FieldState {
     return sampleField(this.to, this.win, x, z, 0);
   }
 
-  /** The ghost texture (complete run), built once per key; null when there is none. */
-  get ghost(): DataTexture | null {
-    return this.ghostTex;
-  }
-
-  /** Build the ghost from the complete run's layout (once per key). Uses the same window as the live ground. */
-  setGhost(layout: SurveyLayout | null, key: string) {
-    if (key === this.ghostKey) return;
-    this.ghostKey = key;
-    this.ghostTex?.dispose();
-    this.ghostTex = null;
-    if (!layout) return;
-    const f = buildHeightfield(layout, this.win);
-    const data = new Uint16Array(f.length);
-    for (let i = 0; i < f.length; i++) data[i] = DataUtils.toHalfFloat(f[i]);
-    this.ghostTex = makeTex(data, this.res);
-  }
-
   dispose() {
     this.tex.dispose();
-    this.ghostTex?.dispose();
   }
 
   private upload() {

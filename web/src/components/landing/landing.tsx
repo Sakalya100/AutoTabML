@@ -5,8 +5,9 @@
  * One world, one copy rail, scroll = travel through one real run:
  *   hero → first guess → the climb (three beats) → the mist → the ceiling → the honest test → the map.
  * Rules: exactly one message on screen at every scroll position (./captions messageAt), plain words, every number from
- * the replay files. The 3D stage is a pure function of (lightly smoothed) scroll: the camera blends across section
- * boundaries and the bead rolls in proportion to scroll — nothing switches and springs.
+ * the replay files. The land is the COMPLETE run from the first frame (built once at load, never morphed while
+ * scrolling). Scroll drives only the bead (rolling along the climb in proportion to scroll), the camera (blended across
+ * section boundaries) and three section moments — mist, cloud deck, truth gauge — gated by their sections.
  */
 
 import dynamic from "next/dynamic";
@@ -19,7 +20,7 @@ import { DOCS_URL, GITHUB_URL } from "@/lib/links";
 import { formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import { buildView, type RunView } from "@/lib/run-state";
 import { useWebGLAvailable } from "@/lib/gl";
-import type { SurveyPose, SurveyScrub } from "@/lib/survey/contract";
+import type { SurveyGates, SurveyPose, SurveyScrub } from "@/lib/survey/contract";
 import { MESSAGES, messageAt, type MessageId } from "./captions";
 import { beadTFor, cursorFor, type LandingFacts } from "./facts";
 import { EASE, MagneticLink, Ticker } from "./primitives";
@@ -51,7 +52,7 @@ interface StageState {
   /** The pose that dominates the frame (for pose-keyed effects: depth of field, clouds, truth markers). */
   pose: SurveyPose;
   cursor: number;
-  /** Index into facts.growth (for the live numbers in the climb). */
+  /** Replay moment for this scroll position (the rail's live numbers; the 3D stage always shows the complete run). */
   step: number;
   msg: MessageId;
 }
@@ -77,24 +78,20 @@ function createStageStore(init: StageState) {
 type StageStore = ReturnType<typeof createStageStore>;
 
 const Stage = memo(function Stage({
-  events,
   full,
   store,
   narrow,
   scrub,
   onReady,
 }: {
-  events: AnyEvent[];
   full: RunView;
   store: StageStore;
   narrow: boolean;
   scrub: RefObject<SurveyScrub | null>;
   onReady: () => void;
 }) {
-  const cursor = useSyncExternalStore(store.sub, () => store.get().cursor, () => store.get().cursor);
   const pose = useSyncExternalStore(store.sub, () => store.get().pose, () => store.get().pose);
   const webgl = useWebGLAvailable();
-  const view = useMemo(() => (cursor >= events.length ? full : buildView(events.slice(0, cursor))), [events, full, cursor]);
   if (webgl === false)
     return (
       <div className="lp-fallback-chart" data-theme="dark">
@@ -103,11 +100,10 @@ const Stage = memo(function Stage({
     );
   return (
     <SurveyCanvas
-      view={view}
+      view={full}
       domainView={full}
       pose={pose}
       scrub={scrub}
-      ghost
       quality={narrow ? "lite" : "full"}
       interactive={false}
       className="lp-canvas"
@@ -116,6 +112,38 @@ const Stage = memo(function Stage({
     />
   );
 });
+
+/* ---- section moments ---- */
+
+const ramp = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / Math.max(1e-6, b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * The section moments for a reading line (page px): each one rises from the moment its own section (and its copy)
+ * arrives — never before — and eases in over a short stretch of scroll. The land
+ * is the complete run from the first frame, so nothing else holds them back) and eases out where the story moves on.
+ * Pure in scroll, so scrolling back up plays them in reverse. Z = the camera blend half-width (px).
+ */
+function gatesAt(geo: { pose: SurveyPose; start: number; end: number }[], line: number, Z: number, out: SurveyGates) {
+  const at = (p: SurveyPose) => geo.find((g) => g.pose === p);
+  const mist = at("mist");
+  const ceil = at("ceiling");
+  const truth = at("truth");
+  const chart = at("chart");
+  out.mist = mist ? ramp(mist.start, mist.start + Z * 1.2, line) * (1 - ramp(mist.end - Z * 0.3, mist.end + Z, line)) : 0;
+  if (ceil) {
+    const rise = ramp(ceil.start, ceil.start + Z * 0.8, line);
+    // ceiling: full; the truth section: a thin cap over the summit; the top-down chart: clear
+    const after = truth ? 1 - 0.72 * ramp(truth.start - Z, truth.start + Z, line) : 1;
+    const gone = chart ? 1 - ramp(chart.start - Z, chart.start + Z * 0.5, line) : 1;
+    out.cloud = rise * after * gone;
+    // settles early in the section, so the camera's climb through the deck is one quick pass (not a long whiteout)
+    out.cloudDrop = ramp(ceil.start, ceil.start + Z * 1.1, line);
+  } else out.cloud = out.cloudDrop = 0;
+  out.truth = truth ? ramp(truth.start, truth.start + Z * 0.8, line) * (1 - (chart ? ramp(chart.start - Z * 0.6, chart.start + Z * 0.4, line) : 0)) : 0;
+}
 
 /* ---- page ---- */
 
@@ -136,7 +164,18 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
   const webgl = useWebGLAvailable();
   const full = useMemo(() => buildView(events), [events]);
   const [store] = useState(() => createStageStore({ pose: "approach", msg: "hero", ...cursorFor("approach", 0, facts, false) }));
-  const scrub = useRef<SurveyScrub | null>({ a: "approach", pa: 0, b: "approach", pb: 0, w: 0, intro: 0, beadT: beadTFor("approach", 0, facts, false), shiftX: 0, shiftY: 0 });
+  const scrub = useRef<SurveyScrub | null>({
+    a: "approach",
+    pa: 0,
+    b: "approach",
+    pb: 0,
+    w: 0,
+    intro: 0,
+    beadT: beadTFor("approach", 0, facts, false),
+    shiftX: 0,
+    shiftY: 0,
+    gates: { mist: 0, cloud: 0, cloudDrop: 0, truth: 0 },
+  });
   const [ready, setReady] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const readyAt = useRef<number | null>(null);
@@ -216,6 +255,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
       sc.beadT = beadTFor(pose, p, facts, reduced);
       sc.shiftX = narrow ? 0 : 0.19;
       sc.shiftY = narrow ? 0.2 : 0;
+      gatesAt(geo, line, Z, sc.gates!);
       store.set({ pose: w >= 0.5 ? sc.b : sc.a, msg: messageAt(pose, p), ...cursorFor(pose, p, facts, reduced) });
       return intro;
     };
@@ -256,7 +296,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
       <div ref={root} data-landing className="lp-root" data-theme="dark" data-ready={ready ? "" : undefined} data-webgl={webgl === false ? "off" : "on"}>
         <Loader ready={ready} reduced={reduced} />
         <div className="lp-stage-wrap">
-          <Stage events={events} full={full} store={store} narrow={narrow} scrub={scrub} onReady={onReady} />
+          <Stage full={full} store={store} narrow={narrow} scrub={scrub} onReady={onReady} />
           <div className="lp-scrim" aria-hidden />
         </div>
 

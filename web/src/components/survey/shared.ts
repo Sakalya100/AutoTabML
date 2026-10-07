@@ -1,5 +1,9 @@
 import { createContext, useContext } from "react";
 import { Color, Vector2, Vector3, Vector4 } from "three";
+
+/** Ground decals drawn by the terrain shader (see terrainFrag): kept-probe rings and the climb path's vertices. */
+export const MAX_RINGS = 24;
+export const MAX_PATH = 32;
 import type { RefObject } from "react";
 import { SURVEY, type SurveyScrub } from "@/lib/survey/contract";
 import type { FieldState } from "./field-state";
@@ -41,8 +45,19 @@ export function createUniforms() {
     uBead: { value: new Vector4(0, 0, 0, -1) },
     uFog: { value: 0.012 },
     uReveal: { value: 1 },
-    uGhost: { value: null as unknown },
-    uGhostOn: { value: 0 },
+    // Decals painted onto the ground in the terrain shader, so they hug every slope (never cut, buried or floating).
+    /** Kept-probe rings: x, z, radius, intensity (0 = off). */
+    uRings: { value: Array.from({ length: MAX_RINGS }, () => new Vector4(0, 0, 0, 0)) },
+    uRingN: { value: 0 },
+    /** Climb path vertices: x, z, cumulative length along the path (world units). */
+    uPath: { value: Array.from({ length: MAX_PATH }, () => new Vector3()) },
+    uPathN: { value: 0 },
+    /** Path: arc length of the bead along it (beyond it the path is dimmer), overall opacity. */
+    uPathSpec: { value: new Vector2(1e6, 0) },
+    /** x/z box (minX, minZ, maxX, maxZ) outside which no decal can be: the loops are skipped there. */
+    uDecalBox: { value: new Vector4(0, 0, 0, 0) },
+    /** The truth gauge's foot on the ground: x, z, radius, intensity. */
+    uFoot: { value: new Vector4(0, 0, 0.16, 0) },
   };
 }
 export type SharedUniforms = ReturnType<typeof createUniforms>;
