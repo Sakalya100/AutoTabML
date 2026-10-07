@@ -11,7 +11,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { MotionConfig, motion, useMotionValue, useScroll, useTransform, type MotionValue } from "motion/react";
+import { MotionConfig, motion, useMotionValue, useScroll, useTransform } from "motion/react";
 import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { EvolutionChart } from "@/components/evolution-chart";
 import type { AnyEvent } from "@/lib/events";
@@ -20,6 +20,7 @@ import { formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import { buildView, type RunView } from "@/lib/run-state";
 import { useWebGLAvailable } from "@/lib/gl";
 import type { SurveyPose } from "@/lib/survey/contract";
+import { activeCaption, chartReveal, type CaptionId } from "./captions";
 import { cursorFor, type LandingFacts } from "./facts";
 import { MagneticLink, Ticker } from "./primitives";
 
@@ -75,7 +76,9 @@ const Stage = memo(function Stage({ events, full, store, narrow, onReady }: { ev
   const s = useSyncExternalStore(store.sub, store.get, store.get);
   const webgl = useWebGLAvailable();
   const view = useMemo(() => (s.cursor >= events.length ? full : buildView(events.slice(0, s.cursor))), [events, full, s.cursor]);
-  const headline = s.pose === "approach" || s.pose === "orbit" ? HEADLINE : s.pose === "chart" ? OUTRO : null;
+  // The in-world headline leaves on scroll position, together with the DOM hero copy (a third of the way through the
+  // hero), long before the first chapter caption is allowed to appear — so the two can never share the screen.
+  const headline = s.pose === "orbit" || (s.pose === "approach" && s.progress < 0.3) ? HEADLINE : s.pose === "chart" ? OUTRO : null;
   if (webgl === false)
     return (
       <div className="lp-fallback-chart" data-theme="dark">
@@ -194,17 +197,20 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
               </MagneticLink>
             </div>
           </motion.div>
-          <div className="lp-hero-foot lp-in" style={{ "--d": "520ms" } as CSSProperties}>
-            <p className="lp-honest">
-              <span className="lp-honest-dot" aria-hidden />
-              Replay of a real run · {proposerLine}
-            </p>
-            {webgl !== false && (
-              <p className="lp-hint" aria-hidden>
-                <span className="lp-hint-ring" /> Press and hold to sound the land
+          {/* fades with the hero copy; the wrapper carries the fade so the CSS entrance animation can't override it */}
+          <motion.div style={{ opacity: heroFade }}>
+            <div className="lp-hero-foot lp-in" style={{ "--d": "520ms" } as CSSProperties}>
+              <p className="lp-honest">
+                <span className="lp-honest-dot" aria-hidden />
+                Replay of a real run · {proposerLine}
               </p>
-            )}
-          </div>
+              {webgl !== false && (
+                <p className="lp-hint" aria-hidden>
+                  <span className="lp-hint-ring" /> Press and hold to sound the land
+                </p>
+              )}
+            </div>
+          </motion.div>
         </section>
 
         {/* 2 — FIRST PROBE */}
@@ -248,6 +254,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
 
         {/* 7 — THE CHART */}
         <section className="lp-sec lp-chart" data-pose="chart" style={{ minHeight: "150svh" }}>
+          <ChartReveal store={store}>
           <div className="lp-chart-inner">
             <h2 className="sr-only">{OUTRO}</h2>
             <p className="lp-eyebrow">
@@ -272,6 +279,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
               the size of the change. Every number here comes from the {facts.name.replace(/_/g, " ")} replay.
             </p>
           </div>
+          </ChartReveal>
         </section>
       </div>
     </MotionConfig>
@@ -308,45 +316,45 @@ function Loader({ ready, reduced }: { ready: boolean; reduced: boolean }) {
 
 /* ---- one chapter: a sticky caption that fades in and out with its section ---- */
 
-/* ---- captions: exactly one on screen, driven by the same store as the 3D stage ---- */
+/* ---- captions: exactly one on screen, chosen by ONE function (./captions) from the same store as the 3D stage ---- */
 
-const smooth = (e0: number, e1: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
-};
-/** A chapter's caption: fades in after its section becomes active, holds, and is gone before the section ends. */
-const chapterWindow = (p: number) => smooth(0.1, 0.24, p) * (1 - smooth(0.76, 0.9, p));
-/** The pinned climb: its beats handle their own hand-offs; the gate only fades the whole block in and out. */
-const climbWindow = (p: number) => smooth(0, 0.05, p) * (1 - smooth(0.93, 0.99, p));
-
-/**
- * 0..1 visibility for one section's caption. Only the section the stage store says is active can be above 0, so
- * two captions can never share the screen; captions are fixed overlays, so they crossfade in place instead of
- * scrolling away half-visible.
- */
-function useCaptionGate(store: StageStore, pose: SurveyPose, win: (p: number) => number) {
-  const gate = useMotionValue(0);
-  const progress = useMotionValue(0);
+/** Opacity (and a small rise) for one caption, written straight from the store — no React re-render per scroll. */
+function useCaption(store: StageStore, id: CaptionId) {
+  const opacity = useMotionValue(0);
+  const y = useTransform(opacity, [0, 1], [14, 0]);
   useEffect(() => {
     const sync = () => {
       const st = store.get();
-      const active = st.pose === pose;
-      if (active) progress.set(st.progress);
-      gate.set(active ? win(st.progress) : 0);
+      const a = activeCaption(st.pose, st.progress);
+      opacity.set(a.id === id ? a.alpha : 0);
     };
     sync();
     return store.sub(sync);
-  }, [store, pose, win, gate, progress]);
-  return { gate, progress };
+  }, [store, id, opacity]);
+  return { opacity, y };
 }
 
-function Chapter({ store, pose, n, eyebrow, title, height, children }: { store: StageStore; pose: SurveyPose; n: string; eyebrow: string; title: string; height: number; children: ReactNode }) {
-  const { gate } = useCaptionGate(store, pose, chapterWindow);
-  const y = useTransform(gate, [0, 1], [16, 0]);
+/** Holds the closing map's content back until the locked-test caption is gone (see chartReveal). */
+function ChartReveal({ store, children }: { store: StageStore; children: ReactNode }) {
+  const opacity = useMotionValue(0);
+  const y = useTransform(opacity, [0, 1], [14, 0]);
+  useEffect(() => {
+    const sync = () => {
+      const st = store.get();
+      opacity.set(chartReveal(st.pose, st.progress));
+    };
+    sync();
+    return store.sub(sync);
+  }, [store, opacity]);
+  return <motion.div style={{ opacity, y }}>{children}</motion.div>;
+}
+
+function Chapter({ store, pose, n, eyebrow, title, height, children }: { store: StageStore; pose: CaptionId & SurveyPose; n: string; eyebrow: string; title: string; height: number; children: ReactNode }) {
+  const { opacity, y } = useCaption(store, pose);
   return (
     <section className="lp-sec lp-chapter" data-pose={pose} style={{ height: `${height}svh` }}>
       <div className="lp-sticky">
-        <motion.div className="lp-caption" style={{ opacity: gate, y }}>
+        <motion.div className="lp-caption" style={{ opacity, y }}>
           <p className="lp-eyebrow">
             <span>{n}</span> {eyebrow}
           </p>
@@ -369,10 +377,7 @@ function Stat({ v, k }: { v: ReactNode; k: string }) {
 
 /* ---- the pinned climb ---- */
 
-const BEAT_AT = [0, 0.34, 0.67, 1];
-
 function Climb({ facts, store, reduced }: { facts: LandingFacts; store: StageStore; reduced: boolean }) {
-  const { gate, progress } = useCaptionGate(store, "climb", climbWindow);
   const step = useSyncExternalStore(store.sub, () => store.get().step, () => 0);
   const g = facts.growth;
   const at = g[Math.min(step, g.length - 1)];
@@ -430,7 +435,7 @@ function Climb({ facts, store, reduced }: { facts: LandingFacts; store: StageSto
     <section className="lp-sec lp-pin" data-pose="climb" data-pin="" aria-label="The climb">
       <div className="lp-sticky">
         {beats.map((b, i) => (
-          <BeatLayer key={i} i={i} n={beats.length} progress={progress} gate={gate}>
+          <BeatLayer key={i} store={store} id={`climb-${i}` as CaptionId}>
             {i === 0 && (
               <p className="lp-eyebrow">
                 <span>02</span> The climb · scroll
@@ -446,18 +451,8 @@ function Climb({ facts, store, reduced }: { facts: LandingFacts; store: StageSto
   );
 }
 
-function BeatLayer({ i, n, progress, gate, children }: { i: number; n: number; progress: MotionValue<number>; gate: MotionValue<number>; children: ReactNode }) {
-  const a = BEAT_AT[i];
-  const b = BEAT_AT[i + 1];
-  const f = 0.045;
-  const first = i === 0;
-  const last = i === n - 1;
-  // Strictly sequential: the outgoing caption is gone before the next arrives — never two at once. The gate fades the
-  // whole climb in/out and is 0 whenever another section is active.
-  const input = [first ? 0 : a, first ? 0.001 : a + f, last ? 0.999 : b - f, last ? 1 : b];
-  const beat = useTransform(progress, input, [first ? 1 : 0, 1, 1, last ? 1 : 0]);
-  const opacity = useTransform([beat, gate], ([x, g]: number[]) => x * g);
-  const y = useTransform(progress, input, [first ? 0 : 16, 0, 0, last ? 0 : -16]);
+function BeatLayer({ store, id, children }: { store: StageStore; id: CaptionId; children: ReactNode }) {
+  const { opacity, y } = useCaption(store, id);
   return (
     <motion.div className="lp-caption lp-beat" style={{ opacity, y }}>
       {children}

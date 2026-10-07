@@ -3,93 +3,98 @@ import { buildHeightfield, fieldWindow, sampleField, type FieldWindow } from "@/
 import type { SurveyLayout } from "@/lib/survey/contract";
 
 /**
- * The GPU-side heightfield: two fixed RG half-float textures (A = what was there, B = the new probe set), blended by
- * `mix` while the ground morphs. Textures are allocated once per resolution and only ever rewritten in place.
+ * The GPU-side heightfield: ONE RG half-float texture holding exactly what is on screen.
+ *
+ * When a probe lands, the ground morphs from what is shown now (`from`) to the new probe set (`to`) over ~1.4 s. The
+ * blend is done on the CPU each frame of the morph (~1 ms at 256²) and uploaded into the same texture. An earlier
+ * version blended two textures in the shader; during continuous scrolling (a new probe every few frames, so the morph
+ * never settled) the "previous" texture rendered as void and the whole land went black until scrolling stopped.
+ *
+ * The shaders still read `uFieldA`/`uFieldB` mixed by `uMix`; both point at this one texture and `mix` stays 1.
  */
 export class FieldState {
   win: FieldWindow;
   readonly res: number;
-  private a: Float32Array;
-  private b: Float32Array;
-  private scratch: Float32Array;
-  readonly texA: DataTexture;
-  readonly texB: DataTexture;
-  private dataA: Uint16Array;
-  private dataB: Uint16Array;
-  /** 0 → showing A, 1 → showing B. */
+  private from: Float32Array;
+  private to: Float32Array;
+  private cur: Float32Array;
+  private data: Uint16Array;
+  private readonly tex: DataTexture;
+  /** Morph progress 0 → 1. */
   t = 1;
-  /** Eased blend handed to the shaders. */
-  mix = 1;
+  /** Shader blend between uFieldA and uFieldB: always 1 (they are the same texture). */
+  readonly mix = 1;
   key = "";
+  private duration = 1.4;
 
   constructor(res: number, bounds: SurveyLayout["bounds"]) {
     this.res = res;
     this.win = fieldWindow(bounds, res);
     const n = res * res * 2;
-    this.a = new Float32Array(n);
-    this.b = new Float32Array(n);
-    this.scratch = new Float32Array(n);
-    this.dataA = new Uint16Array(n);
-    this.dataB = new Uint16Array(n);
-    this.texA = makeTex(this.dataA, res);
-    this.texB = makeTex(this.dataB, res);
+    this.from = new Float32Array(n);
+    this.to = new Float32Array(n);
+    this.cur = new Float32Array(n);
+    this.data = new Uint16Array(n);
+    this.tex = makeTex(this.data, res);
+  }
+
+  get texA(): DataTexture {
+    return this.tex;
+  }
+  get texB(): DataTexture {
+    return this.tex;
   }
 
   /** Rebuild for a new probe set. `animate` = morph from what is on screen now; otherwise snap. */
   update(layout: SurveyLayout, bounds: SurveyLayout["bounds"], key: string, animate: boolean) {
     if (key === this.key) return;
+    const first = this.key === "";
     this.key = key;
     const win = fieldWindow(bounds, this.res);
     const moved = win.minX !== this.win.minX || win.minZ !== this.win.minZ || win.size !== this.win.size;
     this.win = win;
-    // A := what is on screen now, so a rebuild mid-morph never jumps. When the last morph has settled that is
-    // exactly B, and its half-float upload can be copied instead of re-encoded.
-    if (animate && !moved) {
-      if (this.mix >= 1) {
-        this.a.set(this.b);
-        this.dataA.set(this.dataB);
-      } else {
-        const m = this.mix;
-        for (let i = 0; i < this.a.length; i++) this.scratch[i] = this.a[i] + (this.b[i] - this.a[i]) * m;
-        this.a.set(this.scratch);
-        toHalf(this.a, this.dataA);
-      }
+    buildHeightfield(layout, win, this.to);
+    if (animate && !moved && !first) {
+      // Start from exactly what is displayed now, so a new probe mid-morph never jumps.
+      this.from.set(this.cur);
+      this.t = 0;
+    } else {
+      this.cur.set(this.to);
+      this.t = 1;
+      this.upload();
     }
-    buildHeightfield(layout, win, this.b);
-    toHalf(this.b, this.dataB);
-    if (!animate || moved) {
-      this.a.set(this.b);
-      this.dataA.set(this.dataB);
-    }
-    this.texA.needsUpdate = true;
-    this.texB.needsUpdate = true;
-    this.t = animate && !moved ? 0 : 1;
-    this.mix = this.t;
   }
 
-  tick(dt: number, duration = 1.4) {
+  /** Advance the morph and upload the blended ground. No work once settled. */
+  tick(dt: number) {
     if (this.t >= 1) return;
-    this.t = Math.min(1, this.t + dt / duration);
+    this.t = Math.min(1, this.t + dt / this.duration);
     const t = this.t;
-    this.mix = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+    const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+    const { from, to, cur } = this;
+    for (let i = 0; i < cur.length; i++) cur[i] = from[i] + (to[i] - from[i]) * e;
+    this.upload();
   }
 
   /** CPU height (or mask) under (x, z), matching what the GPU displays this frame. */
   sample(x: number, z: number, channel: 0 | 1 = 0): number {
-    const b = sampleField(this.b, this.win, x, z, channel);
-    if (this.mix >= 1) return b;
-    const a = sampleField(this.a, this.win, x, z, channel);
-    return a + (b - a) * this.mix;
+    return sampleField(this.cur, this.win, x, z, channel);
   }
 
   /** Target height (after the morph) — for things that should land where the ground will be. */
   sampleTarget(x: number, z: number): number {
-    return sampleField(this.b, this.win, x, z, 0);
+    return sampleField(this.to, this.win, x, z, 0);
   }
 
   dispose() {
-    this.texA.dispose();
-    this.texB.dispose();
+    this.tex.dispose();
+  }
+
+  private upload() {
+    const f = DataUtils.toHalfFloat;
+    const { cur, data } = this;
+    for (let i = 0; i < cur.length; i++) data[i] = f(cur[i]);
+    this.tex.needsUpdate = true;
   }
 }
 
@@ -102,9 +107,4 @@ function makeTex(data: Uint16Array, res: number): DataTexture {
   t.generateMipmaps = false;
   t.needsUpdate = true;
   return t;
-}
-
-function toHalf(src: Float32Array, dst: Uint16Array) {
-  const f = DataUtils.toHalfFloat;
-  for (let i = 0; i < src.length; i++) dst[i] = f(src[i]);
 }
