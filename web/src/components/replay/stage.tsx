@@ -103,7 +103,7 @@ export function RunStage({ view, name, action, secondary, focusId, onSelect, onD
       g.mist = 0.45 + 0.15 * w;
       g.cloud = 0.4 * (1 - w) + 0.12 * w;
       g.cloudDrop = 1;
-      g.truth = 1 - Math.min(1, w * 1.6);
+      g.truth = 0;
       // keep the experiment under the playhead in frame too, not only the ball (eased in with the playhead)
       const idx = Math.round(s.t);
       sc.aimId = exps[idx]?.id ?? null;
@@ -248,7 +248,23 @@ const OUT = { opacity: DIM, y: -6, transition: { duration: 0.12, ease: [0.4, 0, 
 const IN = { opacity: 1, y: 0, transition: { duration: 0.24, ease: EASE } };
 const FROM = { opacity: DIM, y: 8 };
 
-function Summary({ view, name, action, secondary, kicker, note }: { view: RunView; name: string; action?: ReactNode; secondary?: ReactNode; kicker?: string; note?: ReactNode }) {
+export function Summary({
+  view,
+  name,
+  action,
+  secondary,
+  kicker,
+  note,
+  hint,
+}: {
+  view: RunView;
+  name: string;
+  action?: ReactNode;
+  secondary?: ReactNode;
+  kicker?: string;
+  note?: ReactNode;
+  hint?: ReactNode;
+}) {
   const asked = askedOf(view);
   const o = outcomeOf(view);
   const f = view.final;
@@ -303,6 +319,7 @@ function Summary({ view, name, action, secondary, kicker, note }: { view: RunVie
         </div>
       )}
       {(proposer || note) && <p className="rp-note">{note ?? proposer}</p>}
+      {hint}
     </>
   );
 }

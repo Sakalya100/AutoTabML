@@ -248,3 +248,36 @@ export function displayScore(metric: Metric | string | null | undefined, oriente
   if (Math.abs(raw) >= 1e4) return Math.round(raw).toLocaleString("en-US");
   return formatScore(metric, oriented);
 }
+
+/* ---- why it stopped, in words ---- */
+
+export interface PlainSignal {
+  key: string;
+  fired: boolean;
+  text: string;
+}
+
+/**
+ * The stop rule's signals as short plain sentences, numbers from the stop report. Signals the engine did not report
+ * (fired = null) are left out; unknown signals fall back to the engine's own detail line.
+ */
+export function plainStopSignals(view: RunView): PlainSignal[] {
+  const d = metricInfo(view.metric).digits;
+  const out: PlainSignal[] = [];
+  for (const s of view.stop?.signals ?? []) {
+    if (s.fired == null) continue;
+    const v = typeof s.value === "number" && Number.isFinite(s.value) ? s.value : null;
+    const th = typeof s.threshold === "number" && Number.isFinite(s.threshold) ? s.threshold : null;
+    let text: string;
+    if (s.key === "noise_floor") {
+      const m = /last (\d+) experiments/.exec(s.detail);
+      text = m ? `None of the last ${m[1]} ideas beat the best by more than chance.` : "Recent ideas stopped beating the best by more than chance.";
+    } else if (s.key === "saturation" && v != null) {
+      text = `Its own trend says at most ${fmtNum(Math.abs(v), d)} more was left to gain${th != null ? `, less than the wobble of ± ${fmtNum(th, d)}` : ""}.`;
+    } else if (s.key === "exploration" && v != null) {
+      text = `Since its last win, ${v} bold, very different ideas were tried, and none held up.`;
+    } else text = s.detail || s.key.replace(/_/g, " ");
+    out.push({ key: s.key, fired: s.fired, text });
+  }
+  return out;
+}

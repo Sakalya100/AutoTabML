@@ -9,6 +9,7 @@ import { buildView, type RunView as View } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
 import { proposerNote } from "@/lib/story";
 import { EASE, MagneticLink } from "./landing/primitives";
+import { Journey } from "./replay/journey";
 import { RunStage, SimulateLink } from "./replay/stage";
 import { TechnicalDetails } from "./replay/technical";
 import { SurveyPanel } from "./survey-panel";
@@ -37,6 +38,8 @@ interface Props {
   initialSimulate?: boolean;
   /** Live mode: a terminal status other than finished ("cancelled", "failed"). */
   endedAs?: string | null;
+  /** Replay: the other recorded runs (the closing message links to them). */
+  others?: { name: string }[];
 }
 
 /**
@@ -57,7 +60,7 @@ const FIRST_STEP_DELAY = 1500; // let the reader take in the "run started" messa
 const SPEEDS = [1, 2, 4] as const;
 type Speed = (typeof SPEEDS)[number];
 
-export function RunView({ mode, events, record, title, kicker, note, active, liveBar, emptyHint, plannedExperiments, initialSimulate, endedAs }: Props) {
+export function RunView({ mode, events, record, title, kicker, note, active, liveBar, emptyHint, plannedExperiments, initialSimulate, endedAs, others }: Props) {
   const live = mode === "live";
   const [simulating, setSimulating] = useState(!!initialSimulate && events.length > 0);
   const [cursor, setCursor] = useState(1);
@@ -126,6 +129,18 @@ export function RunView({ mode, events, record, title, kicker, note, active, liv
   const planned = plannedExperiments ?? (typeof cfgMax === "number" ? cfgMax : null);
   const totalExps = full?.experiments.length ?? null;
 
+  const details = (
+    <TechnicalDetails
+      view={view}
+      domainView={full}
+      plannedExperiments={view.experiments.length}
+      selectedId={selectedId}
+      onSelect={setPinned}
+      live={live}
+      reveal={reveal}
+    />
+  );
+
   return (
     <div data-terra className="rp-root">
       <div ref={top} />
@@ -193,38 +208,50 @@ export function RunView({ mode, events, record, title, kicker, note, active, liv
         ) : (
           <motion.div key="finished" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: EASE }}>
             {liveBar && <div className="rp-livebar">{liveBar}</div>}
-            {view.experiments.length > 0 ? (
-              <RunStage
+            {!live && view.experiments.length > 0 ? (
+              // A recorded run: the scroll journey, with the full record at its end.
+              <Journey
                 view={view}
                 name={title}
-                kicker={endState ? `${kicker ?? "Run"} · ${endState}` : kicker}
+                kicker={kicker}
                 note={note}
-                focusId={pinned}
-                onSelect={setPinned}
-                onDetails={() => setReveal((r) => r + 1)}
-                action={events.length > 0 ? <SimulateLink onClick={startSimulation}>{live ? "Replay it" : "Watch it run"}</SimulateLink> : null}
-                secondary={
-                  <MagneticLink href="/new" variant="ghost">
-                    {live ? "Start another run" : "Try your own data"}
-                  </MagneticLink>
-                }
-              />
+                others={others}
+                onDetails={(id) => {
+                  setPinned(id);
+                  setReveal((r) => r + 1);
+                }}
+                action={events.length > 0 ? <SimulateLink onClick={startSimulation}>Watch it run</SimulateLink> : null}
+              >
+                {details}
+              </Journey>
             ) : (
-              <div className="rp-wrap rp-empty">
-                <p className="rp-kicker">{kicker}</p>
-                <h1 className="rp-h1">{title}</h1>
-                <p className="lp-sub">{endState ? `This run was ${endState} before it tried any ideas.` : "No ideas were recorded for this run."}</p>
-              </div>
+              <>
+                {view.experiments.length > 0 ? (
+                  <RunStage
+                    view={view}
+                    name={title}
+                    kicker={endState ? `${kicker ?? "Run"} · ${endState}` : kicker}
+                    note={note}
+                    focusId={pinned}
+                    onSelect={setPinned}
+                    onDetails={() => setReveal((r) => r + 1)}
+                    action={events.length > 0 ? <SimulateLink onClick={startSimulation}>{live ? "Replay it" : "Watch it run"}</SimulateLink> : null}
+                    secondary={
+                      <MagneticLink href="/new" variant="ghost">
+                        {live ? "Start another run" : "Try your own data"}
+                      </MagneticLink>
+                    }
+                  />
+                ) : (
+                  <div className="rp-wrap rp-empty">
+                    <p className="rp-kicker">{kicker}</p>
+                    <h1 className="rp-h1">{title}</h1>
+                    <p className="lp-sub">{endState ? `This run was ${endState} before it tried any ideas.` : "No ideas were recorded for this run."}</p>
+                  </div>
+                )}
+                {details}
+              </>
             )}
-            <TechnicalDetails
-              view={view}
-              domainView={full}
-              plannedExperiments={view.experiments.length}
-              selectedId={selectedId}
-              onSelect={setPinned}
-              live={live}
-              reveal={reveal}
-            />
           </motion.div>
         )}
       </AnimatePresence>

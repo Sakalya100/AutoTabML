@@ -6,7 +6,7 @@ import type { SurveyPose } from "@/lib/survey/contract";
  */
 import type { AnyEvent } from "@/lib/events";
 import { describeGap } from "@/lib/metrics";
-import { buildView, stopSignals } from "@/lib/run-state";
+import { buildView, stopSignals, type RunView } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
 import { layoutSurvey } from "@/lib/survey/layout";
 
@@ -116,7 +116,11 @@ export function landingFacts(name: string, dataset: string, events: readonly Any
 
 /** x/z length of each roll between consecutive keeps, on the same map the landing draws (buildView(events)). */
 export function climbLengths(events: readonly AnyEvent[]): number[] {
-  const full = buildView(events);
+  return climbLengthsOf(buildView(events));
+}
+
+/** The same for a view already built (replay pages pass the view they draw). */
+export function climbLengthsOf(full: RunView): number[] {
   const c = layoutSurvey(full, full).climb;
   const out: number[] = [];
   for (let i = 0; i + 1 < c.length; i++) out.push(Math.hypot(c[i + 1][0] - c[i][0], c[i + 1][2] - c[i][2]));
@@ -130,7 +134,7 @@ export const ROLL_TO = 0.97;
 const ROLL_EASE = 0.07;
 
 /** 0..1 → 0..1, linear with short quadratic ease-in / ease-out ramps (speed ≤ 1/(1 − ROLL_EASE) × the mean). */
-function paced(u: number): number {
+export function paced(u: number): number {
   const a = ROLL_EASE;
   const x = Math.min(1, Math.max(0, u));
   const v = 1 / (1 - a); // top speed

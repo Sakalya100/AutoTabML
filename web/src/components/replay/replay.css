@@ -844,3 +844,434 @@
   outline-offset: 10px;
   border-radius: 3px;
 }
+
+/* ---- the replay journey (/replays/[name]): one fixed world, one fixed copy rail, scroll = travel ---- */
+body:has([data-journey]) > header {
+  background: linear-gradient(to bottom, rgb(5 7 10 / 0.7), rgb(5 7 10 / 0));
+}
+body:has([data-journey]) > footer {
+  position: relative;
+  z-index: 3;
+  background: #05070a;
+}
+.jn-root {
+  position: relative;
+  color: var(--lp-ink);
+}
+.jn-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #05070a;
+}
+.jn-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgb(5 7 10 / 0.84) 0%, rgb(5 7 10 / 0.62) 24%, rgb(5 7 10 / 0.2) 40%, transparent 50%),
+    linear-gradient(to bottom, rgb(5 7 10 / 0.55) 0%, transparent 14%),
+    linear-gradient(to top, rgb(5 7 10 / 0.5) 0%, transparent 16%);
+}
+.jn-fallback {
+  position: absolute;
+  left: 63%;
+  top: 22%;
+  width: min(56vw, 620px);
+  transform: translateX(-50%);
+  opacity: 0.8;
+}
+.jn-sec {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+.jn-rail {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: grid;
+  align-content: center;
+  padding: 72px var(--rp-gutter) 72px;
+}
+.jn-rail[data-climb] {
+  padding-bottom: 150px;
+}
+.jn-rail a,
+.jn-rail button {
+  pointer-events: auto;
+}
+.jn-rail-inner {
+  width: min(34rem, 40vw);
+}
+@media (min-width: 768px) {
+  .jn-rail[data-msg="summary"] .jn-rail-inner {
+    width: min(32rem, 37vw);
+  }
+}
+.jn-msg {
+  will-change: opacity, transform;
+}
+.jn-ticks {
+  margin-bottom: 1.4rem;
+}
+.jn-hint {
+  margin-top: 1.6rem;
+}
+.jn-of {
+  color: oklch(60% 0.012 250 / 0.75);
+}
+.jn-idea {
+  margin-top: 0.7rem;
+}
+.jn-gap {
+  margin-top: 0.9rem;
+  max-width: 40ch;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--lp-ink-2);
+  text-wrap: pretty;
+}
+.jn-signals {
+  margin-top: 1.5rem;
+  display: grid;
+  max-width: 30rem;
+}
+.jn-signals li {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr);
+  align-items: baseline;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--lp-hair);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--lp-ink-2);
+  text-wrap: pretty;
+}
+.jn-signal-mark {
+  position: relative;
+  top: -0.1em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--lp-ink-3);
+}
+.jn-signals li[data-fired] .jn-signal-mark {
+  border-color: var(--lp-signal);
+  background: var(--lp-signal);
+  box-shadow: 0 0 10px rgb(255 181 71 / 0.55);
+}
+.jn-links button {
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.jn-links a:hover,
+.jn-links button:hover {
+  color: var(--lp-ink);
+}
+
+/* the full record: the rail shrinks to one quiet pill in the corner */
+.jn-rail[data-msg="record"] {
+  align-content: end;
+  justify-items: end;
+  padding: 0 var(--rp-gutter) 22px;
+}
+.jn-rail[data-msg="record"] .jn-rail-inner {
+  width: auto;
+}
+.jn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid var(--lp-hair);
+  border-radius: 999px;
+  padding: 0.4rem 0.45rem 0.4rem 1.05rem;
+  background: rgb(5 7 10 / 0.78);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lp-ink-3);
+}
+.jn-pill button {
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid oklch(88% 0.02 85 / 0.22);
+  color: var(--lp-ink-2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 0.25s,
+    color 0.25s;
+}
+.jn-pill button:hover {
+  border-color: oklch(88% 0.02 85 / 0.6);
+  color: var(--lp-ink);
+}
+.jn-record {
+  position: relative;
+  z-index: 3;
+  background: linear-gradient(to bottom, rgb(5 7 10 / 0) 0, rgb(5 7 10 / 0.5) 22rem);
+}
+
+/* the strip: every idea in order, the position indicator of the climb */
+.jn-strip {
+  position: absolute;
+  left: var(--rp-gutter);
+  bottom: 34px;
+  width: min(34rem, 40vw);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition:
+    opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.jn-strip[data-on] {
+  opacity: 1;
+  transform: none;
+}
+.jn-strip[data-on] .jn-strip-track {
+  pointer-events: auto;
+}
+.jn-strip-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--lp-ink-3);
+  white-space: nowrap;
+}
+.jn-strip-head > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jn-strip-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.jn-strip-legend i {
+  display: inline-block;
+  width: 3px;
+  height: 10px;
+  border-radius: 1px;
+  background: oklch(88% 0.02 85 / 0.4);
+}
+.jn-strip-legend i[data-k="keep"] {
+  background: var(--lp-signal);
+}
+.jn-strip-legend i + * {
+  margin-right: 0.35rem;
+}
+.jn-strip-track {
+  position: relative;
+  height: 40px;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--lp-hair);
+}
+.jn-strip-track:focus-visible {
+  outline: 1px solid oklch(88% 0.02 85 / 0.35);
+  outline-offset: 8px;
+  border-radius: 3px;
+}
+.jn-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  --c: oklch(88% 0.02 85 / 0.2);
+  --w: 2px;
+}
+.jn-bar::before {
+  content: "";
+  width: var(--w);
+  height: calc(var(--h) * 100%);
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--c);
+  transition: background-color 0.3s;
+}
+.jn-bar[data-past] {
+  --c: oklch(88% 0.02 85 / 0.42);
+}
+.jn-bar[data-k="keep"] {
+  --c: rgb(255 181 71 / 0.5);
+  --w: 3px;
+}
+.jn-bar[data-k="keep"][data-past] {
+  --c: rgb(255 181 71 / 0.9);
+}
+.jn-bar[data-k="crash"]::before {
+  height: 5px;
+  --c: rgb(255 90 60 / 0.8);
+}
+.jn-bar[data-hover] {
+  --c: oklch(88% 0.02 85 / 0.75);
+}
+.jn-bar[data-on] {
+  --c: oklch(95% 0.02 85);
+  --w: 3px;
+}
+.jn-bar[data-k="keep"][data-on] {
+  --c: var(--lp-signal);
+}
+.jn-bar[data-on]::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  width: 5px;
+  height: 5px;
+  margin-left: 0;
+  border-radius: 50%;
+  background: var(--c);
+  transform: translateY(50%);
+}
+
+@media (max-width: 767px) {
+  .jn-scrim {
+    background:
+      linear-gradient(to top, rgb(5 7 10 / 0.94) 0%, rgb(5 7 10 / 0.7) 36%, transparent 58%),
+      linear-gradient(to bottom, rgb(5 7 10 / 0.5) 0%, transparent 12%);
+  }
+  .jn-fallback {
+    top: 10%;
+    left: 50%;
+    width: 92vw;
+  }
+  body:has([data-journey]) > footer {
+    display: none;
+  }
+  .jn-rail,
+  .jn-rail[data-climb] {
+    align-content: end;
+    padding: 0 20px 22px;
+  }
+  .jn-rail-inner {
+    width: 100%;
+  }
+  .jn-rail[data-msg="record"] {
+    padding: 0 16px 14px;
+    justify-items: start;
+  }
+  .jn-pill > span {
+    display: none;
+  }
+  .jn-pill {
+    padding: 0.3rem;
+  }
+  .jn-ticks {
+    margin-bottom: 0.9rem;
+  }
+  .jn-hint {
+    margin-top: 1rem;
+  }
+  .jn-strip {
+    position: static;
+    width: 100%;
+    margin-top: 16px;
+    display: none;
+    transform: none;
+  }
+  .jn-strip[data-on] {
+    display: block;
+  }
+  .jn-strip-track {
+    height: 30px;
+  }
+  .jn-strip-head > span:last-child {
+    display: none;
+  }
+  .jn-signals {
+    margin-top: 0.9rem;
+  }
+  .jn-signals li {
+    padding: 0.45rem 0;
+    font-size: 13.5px;
+  }
+  .jn-gap {
+    font-size: 13.5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jn-strip {
+    transition: none;
+  }
+}
+/* the record's pill floats above the record itself */
+.jn-rail[data-msg="record"] {
+  z-index: 4;
+}
+
+/* in-place crossfade of an idea's own lines; the panel around them stays still */
+.jn-swap {
+  display: grid;
+}
+.jn-swap[data-inline] {
+  display: inline-grid;
+}
+.jn-swap-item {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.jn-tail-h {
+  margin-top: 0.9rem;
+}
+.jn-ticker {
+  margin-top: 1.5rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--lp-hair);
+  max-width: 27rem;
+}
+.jn-ticker-k {
+  display: flex;
+  gap: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--lp-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.jn-ticker-line {
+  margin-top: 0.55rem;
+  min-height: 3em;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--lp-ink-2);
+  text-wrap: pretty;
+}
+.jn-ticker-id {
+  color: var(--lp-ink-3);
+  margin-right: 0.3em;
+}
+.jn-ticker-v {
+  color: var(--lp-ink);
+  white-space: nowrap;
+}
+.jn-ticker-v[data-tone="broke"] {
+  color: #ff5a3c;
+}
+@media (max-width: 767px) {
+  .jn-ticker {
+    margin-top: 0.9rem;
+    padding-top: 0.6rem;
+  }
+  .jn-ticker-line {
+    font-size: 14px;
+  }
+  .jn-tail-h + .lp-sub {
+    margin-top: 0.5rem;
+  }
+}

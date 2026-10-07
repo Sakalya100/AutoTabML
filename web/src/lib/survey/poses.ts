@@ -160,8 +160,11 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
     case "truth": {
       const ys = [summit[1], f.frame.selectY ?? f.now.selectY ?? summit[1], f.frame.testY ?? f.now.testY ?? summit[1]];
       const mid = (Math.min(...ys) + Math.max(...ys)) / 2;
+      // A tall gauge (a test score far from the others, e.g. housing's RMSE) backs the shot off so the rod and its
+      // labels stay in frame. 1 for spreads up to ~3.5 units, so the landing's framing is unchanged.
+      const fit = Math.max(1, (Math.max(...ys) - Math.min(...ys) + 0.65) / 4.1);
       out = {
-        pos: [summit[0] + lerp(8.5, 6.5, e), mid + lerp(2.4, 1.6, e), summit[2] + lerp(9.5, 8.0, e)],
+        pos: [summit[0] + lerp(8.5, 6.5, e) * fit, mid + lerp(2.4, 1.6, e) * fit, summit[2] + lerp(9.5, 8.0, e) * fit],
         target: [summit[0] + 0.5, mid, summit[2] + 0.6],
         fov: 32,
       };

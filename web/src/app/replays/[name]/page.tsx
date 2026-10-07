@@ -20,6 +20,7 @@ export default async function ReplayPage({ params, searchParams }: PageProps<"/r
   const data = await loadReplay(name);
   if (!data) notFound();
   const { info, record, events } = data;
+  const others = (await listReplays()).filter((r) => r.name !== name && !r.fixture).map((r) => ({ name: r.name }));
   return (
     <RunView
       mode="replay"
@@ -29,6 +30,7 @@ export default async function ReplayPage({ params, searchParams }: PageProps<"/r
       title={humanName(info.name)}
       kicker="A recorded run"
       note={info.fixture ? "A hand-written example, not a recorded engine run." : undefined}
+      others={others}
     />
   );
 }
