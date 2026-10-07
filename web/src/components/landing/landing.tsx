@@ -41,6 +41,8 @@ const reducedQ = mq("(prefers-reduced-motion: reduce)");
 
 /** Half-width of the camera blend around each section boundary, as a fraction of the viewport height. */
 const BLEND_VH = 0.32;
+/** The climb → mist boundary's blend, as a multiple of BLEND_VH (a slow descent from the summit orbit). */
+const BLEND_MIST = 1.9;
 /** Scroll smoothing rate (1/s): light, so the stage glides between wheel ticks without lagging behind. */
 const SMOOTH = 14;
 /** Intro dolly from the orbit shot after the loader (ms). */
@@ -231,17 +233,21 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
       for (let k = 0; k < geo.length; k++) if (line >= geo[k].start) i = k;
       const p = pAt(i, line);
       const pose = geo[i].pose;
-      // Camera blend across the boundary zone: continuous on both sides of every boundary.
+      // Camera blend across the boundary zone: continuous on both sides of every boundary. The descent from the
+      // climb's summit orbit into the mist is the longest move on the page, so it gets a longer, gentler blend.
       const Z = vh * BLEND_VH;
+      const zAfter = (k: number) => (geo[k].pose === "climb" && geo[k + 1]?.pose === "mist" ? Z * BLEND_MIST : Z);
       let a = i;
       let b = i;
       let w = 0;
-      if (i + 1 < geo.length && line > geo[i].end - Z) {
+      if (i + 1 < geo.length && line > geo[i].end - zAfter(i)) {
+        const zb = zAfter(i);
         b = i + 1;
-        w = clamp01((line - (geo[i].end - Z)) / (2 * Z));
-      } else if (i > 0 && line < geo[i].start + Z) {
+        w = clamp01((line - (geo[i].end - zb)) / (2 * zb));
+      } else if (i > 0 && line < geo[i].start + zAfter(i - 1)) {
+        const zb = zAfter(i - 1);
         a = i - 1;
-        w = clamp01((line - (geo[i].start - Z)) / (2 * Z));
+        w = clamp01((line - (geo[i].start - zb)) / (2 * zb));
       }
       if (reduced) w = w < 0.5 ? 0 : 1;
       const intro = reduced ? 1 : readyAt.current == null ? 0 : clamp01((now - readyAt.current) / INTRO_MS);

@@ -8,6 +8,7 @@ import type { AnyEvent } from "@/lib/events";
 import { describeGap } from "@/lib/metrics";
 import { buildView, stopSignals } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
+import { layoutSurvey } from "@/lib/survey/layout";
 
 /** The run's state at one step of the scroll-scrubbed growth sequence. */
 export interface GrowthStep {
@@ -40,6 +41,8 @@ export interface LandingFacts {
   growth: GrowthStep[];
   /** Cursor of the whole run (the locked test opened). */
   end: number;
+  /** Map length (x/z, world units) of each roll of the bead between consecutive keeps — paces the climb. */
+  climbLengths: number[];
   /** The survey's own numbers (oriented scores; null when the replay lacks them). */
   survey: {
     /** CV mean of the first probe (the baseline). */
@@ -106,101 +109,116 @@ export function landingFacts(name: string, dataset: string, events: readonly Any
     final: f ? { devCv: f.devCvMean, select: f.selectScore, test: f.testScore, gap: f.optimismGap, gapText: describeGap(metric, f.optimismGap) } : null,
     growth: growthSteps(events),
     end: events.length,
+    climbLengths: climbLengths(events),
     survey: surveyNumbers(v),
   };
 }
 
-/** Scroll weight of one growth step in the climb: a kept experiment gets far more room, so the bead's roll to it is
- * spread over a long stretch of scroll instead of happening within one wheel tick. */
-const KEEP_WEIGHT = 8;
+/** x/z length of each roll between consecutive keeps, on the same map the landing draws (buildView(events)). */
+export function climbLengths(events: readonly AnyEvent[]): number[] {
+  const full = buildView(events);
+  const c = layoutSurvey(full, full).climb;
+  const out: number[] = [];
+  for (let i = 0; i + 1 < c.length; i++) out.push(Math.hypot(c[i + 1][0] - c[i][0], c[i + 1][2] - c[i][2]));
+  return out;
+}
 
-/**
- * The climb's continuous replay coordinate for the climb section's progress p: a fractional growth-step index from the
- * first probe to the last decision before the stop. Steps are spaced by weight (a keep = KEEP_WEIGHT, anything else
- * = 1). Monotonic and continuous in p.
- */
-export function climbCoord(p: number, facts: LandingFacts): number {
+/** Climb-section progress where the bead starts / finishes rolling (a short rest at each end of the section). */
+export const ROLL_FROM = 0.03;
+export const ROLL_TO = 0.97;
+/** Fraction of the roll spent easing in (and out): everywhere else the bead rolls at one constant map speed. */
+const ROLL_EASE = 0.07;
+
+/** 0..1 → 0..1, linear with short quadratic ease-in / ease-out ramps (speed ≤ 1/(1 − ROLL_EASE) × the mean). */
+function paced(u: number): number {
+  const a = ROLL_EASE;
+  const x = Math.min(1, Math.max(0, u));
+  const v = 1 / (1 - a); // top speed
+  if (x < a) return (v * x * x) / (2 * a);
+  if (x > 1 - a) return 1 - (v * (1 - x) * (1 - x)) / (2 * a);
+  return (v * a) / 2 + v * (x - a);
+}
+
+/** Growth-step index at which keep j (0 = the baseline) was decided. */
+function keepSteps(facts: LandingFacts): number[] {
   const g = facts.growth;
-  const last = g.length - 1;
-  const preStop = Math.max(1, last - 1);
-  const first = Math.min(1, last);
-  const t = Math.min(1, Math.max(0, (p - 0.02) / 0.9));
-  if (preStop <= first) return first;
-  let total = 0;
-  for (let i = first; i < preStop; i++) total += g[i + 1].kept > g[i].kept ? KEEP_WEIGHT : 1;
-  let u = t * total;
-  for (let i = first; i < preStop; i++) {
-    const w = g[i + 1].kept > g[i].kept ? KEEP_WEIGHT : 1;
-    if (u <= w) return i + u / w;
-    u -= w;
-  }
-  return preStop;
+  const out: number[] = [];
+  for (let i = 1; i < g.length; i++) if (g[i].kept > g[i - 1].kept) out.push(i);
+  return out;
 }
 
 /**
- * Section → which moment of the replay it shows. Strictly monotonic down the page (hero = the start, chart = the end)
- * so scrolling only ever moves the run forward or backward along its own timeline: the bead never vanishes and
- * reappears, it just keeps rolling. Order of poses on the page: orbit/approach → first-probe → climb → mist →
- * ceiling → truth → chart. In the climb an experiment lands as soon as its stretch of scroll begins (ceil), and if it
- * was kept the bead then rolls to it across that stretch (see beadTFor).
+ * Where the bead is along the climb path (index into the kept probes, fractional while it rolls) for a scroll
+ * position. The whole climb — every roll from the baseline to the final best — is spread over the climb section (its
+ * three messages) at one constant speed along the map, easing only at the very start and end: it never rushes and is
+ * never parked while the climb's copy is on screen. Before the climb it rests on the baseline, after it on the summit.
+ */
+export function beadTFor(pose: SurveyPose, p: number, facts: LandingFacts, reduced: boolean): number {
+  const L = facts.climbLengths;
+  const n = L.length; // number of rolls
+  switch (pose) {
+    case "orbit":
+    case "approach":
+    case "first-probe":
+      return 0;
+    case "climb": {
+      if (reduced || n === 0) return n;
+      const total = L.reduce((x, y) => x + y, 0);
+      if (!(total > 0)) return n * paced((p - ROLL_FROM) / (ROLL_TO - ROLL_FROM));
+      let s = total * paced((p - ROLL_FROM) / (ROLL_TO - ROLL_FROM));
+      for (let i = 0; i < n; i++) {
+        if (s <= L[i]) return i + (L[i] > 0 ? s / L[i] : 1);
+        s -= L[i];
+      }
+      return n;
+    }
+    default:
+      return n;
+  }
+}
+
+/**
+ * Section → which moment of the replay the rail's numbers show (the 3D stage always shows the complete run). Strictly
+ * monotonic down the page. In the climb the experiment count follows the bead: the experiments between two keeps are
+ * counted through while the bead rolls between them, and keep j is counted exactly as the bead arrives at it. The
+ * experiments after the last keep are counted through during the mist (the bead rests on the summit). Then the stop
+ * (ceiling) and the locked test (truth, chart).
  */
 export function cursorFor(pose: SurveyPose, p: number, facts: LandingFacts, reduced: boolean): { cursor: number; step: number } {
   const g = facts.growth;
   const last = g.length - 1; // the stop
   const preStop = Math.max(1, last - 1);
   const first = Math.min(1, last); // the baseline probe (e000) has landed and the bead sits on it
-  switch (pose) {
-    case "orbit":
-    case "approach":
-    case "first-probe":
-      return { cursor: g[first].cursor, step: first };
-    case "climb": {
-      if (reduced) return { cursor: g[preStop].cursor, step: preStop };
-      const i = Math.min(preStop, Math.max(first, Math.ceil(climbCoord(p, facts) - 1e-6)));
-      return { cursor: g[i].cursor, step: i };
-    }
-    case "mist":
-      return { cursor: g[preStop].cursor, step: preStop };
-    case "ceiling":
-      return { cursor: g[last].cursor, step: last };
-    case "truth":
-    case "chart":
-    default:
-      return { cursor: facts.end, step: last };
-  }
-}
-
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
-
-/**
- * Where the bead is along the climb path (index into the kept probes, fractional while it rolls) for a scroll
- * position. A pure function of scroll: within the stretch where a kept experiment lands, the bead rolls from the
- * previous keep to the new one in proportion to scroll (forwards and backwards); elsewhere it rests on the best so far.
- * Relies on the bead resting on the latest keep (the gate only keeps real gains, so the latest keep is the best).
- */
-export function beadTFor(pose: SurveyPose, p: number, facts: LandingFacts, reduced: boolean): number {
-  const g = facts.growth;
-  const last = g.length - 1;
-  const preStop = Math.max(1, last - 1);
-  const first = Math.min(1, last);
-  const at = (i: number) => Math.max(0, g[Math.min(last, Math.max(0, i))].kept - 1);
+  const ks = keepSteps(facts);
+  const lastKeep = ks.length ? Math.min(preStop, ks[ks.length - 1]) : first;
+  const at = (i: number) => {
+    const step = Math.min(last, Math.max(0, i));
+    return { cursor: g[step].cursor, step };
+  };
+  const clamp01 = (x: number) => Math.min(1, Math.max(0, Number.isFinite(x) ? x : 0));
   switch (pose) {
     case "orbit":
     case "approach":
     case "first-probe":
       return at(first);
     case "climb": {
-      if (reduced) return at(preStop);
-      const c = climbCoord(p, facts);
-      const i = Math.floor(c);
-      const k = at(i);
-      if (i + 1 > preStop || at(i + 1) <= k) return k;
-      return k + smoothstep(0.12, 0.88, c - i) * (at(i + 1) - k);
+      if (reduced) return at(lastKeep);
+      if (ks.length < 2) return at(first + Math.floor(clamp01(p) * (lastKeep - first)));
+      const t = beadTFor("climb", p, facts, false);
+      const j = Math.min(ks.length - 2, Math.floor(t));
+      const f = t - j;
+      // keep j+1 is decided only when the bead reaches it (f = 1); the steps in between are counted on the way
+      const step = f >= 1 - 1e-9 ? ks[j + 1] : ks[j] + Math.floor(f * (ks[j + 1] - ks[j]));
+      return at(Math.max(first, step));
     }
-    default:
+    case "mist":
+      if (reduced) return at(preStop);
+      return at(lastKeep + Math.floor(clamp01((p - 0.05) / 0.8) * (preStop - lastKeep) + 1e-9));
+    case "ceiling":
       return at(last);
+    case "truth":
+    case "chart":
+    default:
+      return { cursor: facts.end, step: last };
   }
 }

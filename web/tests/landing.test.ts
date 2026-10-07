@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { beadTFor, climbCoord, cursorFor, landingFacts } from "@/components/landing/facts";
+import { BEAT_AT } from "@/components/landing/captions";
+import { beadTFor, cursorFor, landingFacts } from "@/components/landing/facts";
 import { layoutSurvey } from "@/lib/survey/layout";
 import { climbPointXZ } from "@/lib/survey/poses";
 import { parseEventsJsonl } from "@/lib/events";
@@ -89,35 +90,56 @@ describe("landing scroll → replay moment", () => {
     expect(prev).toBe(facts.nKept - 1);
   });
 
-  it("the bead rolls continuously (no jumps) through the climb, and rests on the best between keeps", () => {
-    let prev = beadTFor("climb", 0, facts, false);
-    for (let p = 0.0005; p <= 1.0001; p += 0.0005) {
-      const t = beadTFor("climb", Math.min(1, p), facts, false);
-      expect(Math.abs(t - prev)).toBeLessThan(0.05);
-      prev = t;
-    }
-    const full = buildView(events);
-    const L = layoutSurvey(full, full);
-    // wherever the bead rests it sits on a best probe: before a new keep's roll it is the previous best (the keep has
-    // landed but the bead has not moved yet), after it the new one
-    for (let p = 0; p <= 1.0001; p += 0.01) {
-      const t = beadTFor("climb", Math.min(1, p), facts, false);
-      if (Math.abs(t - Math.round(t)) > 1e-9) continue;
-      const c = climbCoord(Math.min(1, p), facts);
-      const [x, z] = climbPointXZ(L.climb, t);
-      const at = (i: number) => layoutSurvey(buildView(events.slice(0, facts.growth[Math.min(i, facts.growth.length - 1)].cursor)), full).bead!;
-      const ok = [at(Math.floor(c)), at(Math.ceil(c))].some((b) => Math.abs(b[0] - x) < 1e-9 && Math.abs(b[2] - z) < 1e-9);
-      expect(ok).toBe(true);
+  const full = buildView(events);
+  const L = layoutSurvey(full, full);
+  /** World (x/z) position of the bead for a climb progress. */
+  const beadXZ = (p: number) => climbPointXZ(L.climb, beadTFor("climb", p, facts, false));
+
+  it("the bead rolls through every keep during the climb, at a calm, near-constant speed (no rush, no dead stretch)", () => {
+    expect(beadTFor("climb", 0, facts, false)).toBe(0);
+    expect(beadTFor("climb", 1, facts, false)).toBe(facts.nKept - 1);
+    const dp = 0.0025;
+    const speeds: number[] = [];
+    // distance travelled along the path (map units), from the bead's place on it
+    const arc = (p: number) => {
+      const t = beadTFor("climb", p, facts, false);
+      let d = 0;
+      for (let i = 0; i + 1 < L.climb.length; i++) {
+        const seg = Math.hypot(L.climb[i + 1][0] - L.climb[i][0], L.climb[i + 1][2] - L.climb[i][2]);
+        d += seg * Math.min(1, Math.max(0, t - i));
+      }
+      return d;
+    };
+    for (let p = 0.04; p <= 0.96 + 1e-9; p += dp) speeds.push((arc(p + dp) - arc(p)) / dp);
+    const mean = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+    expect(Math.max(...speeds)).toBeLessThanOrEqual(2 * mean);
+    // only the very start and end ease (the first / last ~7% of the roll); in between it cruises
+    const cruise = speeds.slice(Math.ceil(0.07 / dp), speeds.length - Math.ceil(0.07 / dp));
+    expect(Math.min(...cruise)).toBeGreaterThan(0.85 * mean);
+  });
+
+  it("the bead moves during each of the climb's three messages", () => {
+    for (let i = 0; i < 3; i++) {
+      const [x0, z0] = beadXZ(BEAT_AT[i] + 0.02);
+      const [x1, z1] = beadXZ(BEAT_AT[i + 1] - 0.02);
+      expect(Math.hypot(x1 - x0, z1 - z0)).toBeGreaterThan(1);
     }
   });
 
-  it("an experiment lands before the bead rolls to it (the climb coordinate leads the cursor)", () => {
-    for (let p = 0; p <= 1.0001; p += 0.003) {
-      const c = climbCoord(Math.min(1, p), facts);
-      const { step } = cursorFor("climb", Math.min(1, p), facts, false);
-      expect(step).toBeGreaterThanOrEqual(Math.floor(c));
+  it("the rail's kept count is the number of keeps the bead has reached", () => {
+    for (let p = 0; p <= 1.0001; p += 0.001) {
       const t = beadTFor("climb", Math.min(1, p), facts, false);
-      expect(Math.ceil(t - 1e-9)).toBeLessThanOrEqual(Math.max(0, facts.growth[step].kept - 1));
+      const { step } = cursorFor("climb", Math.min(1, p), facts, false);
+      expect(facts.growth[step].kept).toBe(Math.floor(t + 1e-9) + 1);
     }
+  });
+
+  it("the experiments after the last keep are counted through during the mist, then the stop", () => {
+    const lastKeep = facts.growth.findIndex((g) => g.kept === facts.nKept);
+    expect(cursorFor("climb", 1, facts, false).step).toBe(lastKeep);
+    expect(cursorFor("mist", 0, facts, false).step).toBe(lastKeep);
+    expect(cursorFor("mist", 1, facts, false).step).toBe(facts.growth.length - 2);
+    expect(facts.growth[cursorFor("mist", 1, facts, false).step].n).toBe(facts.nExperiments);
+    expect(cursorFor("ceiling", 0, facts, false).step).toBe(facts.growth.length - 1);
   });
 });

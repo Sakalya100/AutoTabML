@@ -13,6 +13,10 @@ export interface CameraPose {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const ease = (t: number) => t * t * (3 - 2 * t);
+const smooth01 = (t: number) => ease(Math.min(1, Math.max(0, t)));
+
+/** Climb progress where the follow shot hands over to the summit orbit (the landing's third climb message). */
+export const CLIMB_ORBIT_AT = 0.67;
 
 export interface PoseFrame {
   /** Domain-stable framing (complete run for replays). */
@@ -108,13 +112,31 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
       break;
     }
     case "climb": {
-      const yaw = lerp(-0.55, 0.45, e);
+      // Two moves, so no two consecutive beats are the same kind of shot (landing: messages 3–4, then 5):
+      //   1. follow: tracks the bead from a three-quarter, its bearing sweeping as the climb goes on;
+      //   2. from CLIMB_ORBIT_AT on: a slow ~40° orbit around the summit with a gentle crane up, while the bead makes
+      //      its last roll — ending on the bearing the mist shot starts from, so the next move is a pure descent.
+      const yaw = lerp(-0.55, 0.1, ease(Math.min(1, p / CLIMB_ORBIT_AT)));
       const d = 10.5;
-      out = {
+      const follow: CameraPose = {
         pos: [bead[0] + Math.sin(yaw) * d, bead[1] + 4.6, bead[2] + Math.cos(yaw) * d],
         target: [lerp(bead[0], cx, 0.35), bead[1] * 0.75, lerp(bead[2], cz, 0.35)],
         fov: 36,
       };
+      const w = smooth01((p - (CLIMB_ORBIT_AT - 0.06)) / 0.14);
+      if (w <= 0) {
+        out = follow;
+        break;
+      }
+      const q = ease(Math.min(1, Math.max(0, (p - CLIMB_ORBIT_AT) / (1 - CLIMB_ORBIT_AT))));
+      const az = lerp(0.1, -0.68, q);
+      const D = lerp(10.5, 9.6, q);
+      const orbit: CameraPose = {
+        pos: [summit[0] + Math.sin(az) * D, summit[1] + lerp(4.2, 5.6, q), summit[2] + Math.cos(az) * D],
+        target: [lerp(bead[0], summit[0], 0.55), lerp(bead[1] * 0.75, summit[1] * 0.85, q), lerp(bead[2], summit[2], 0.55)],
+        fov: lerp(36, 34, q),
+      };
+      out = blendPose(follow, orbit, w);
       break;
     }
     case "mist": {
