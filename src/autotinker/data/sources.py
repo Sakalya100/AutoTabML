@@ -4,13 +4,19 @@ Specs understood by `load_source`:
   * a path to a ``.csv`` / ``.tsv`` / ``.parquet`` file
   * ``openml:<id>``                              (needs the optional ``openml`` package)
   * ``kaggle:<owner>/<dataset>[/<file.csv>]``    (needs the optional ``kagglehub`` package)
+  * ``https://...`` a public URL to a CSV / TSV / parquet file; GitHub, Google Drive / Sheets and Hugging Face
+    share links are rewritten to direct downloads (see `autotinker.data.fetch`)
+
+`source_stem` turns any of these specs into a short filesystem-safe name (used for run ids).
 """
 
 from __future__ import annotations
 
 import importlib
+import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 import pandas as pd
 
@@ -108,15 +114,56 @@ def _load_kaggle(ident: str) -> pd.DataFrame:
     return _read_file(candidates[0])
 
 
+def _load_url(url: str) -> pd.DataFrame:
+    # Imported lazily: fetch.py imports DataSourceError / NA_VALUES from this module.
+    from autotinker.data import fetch
+
+    return fetch.read_fetched(fetch.fetch_url(fetch.rewrite_share_link(url)))
+
+
+def _is_url(spec: str) -> bool:
+    return re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", spec) is not None
+
+
 def load_source(spec: str | Path) -> pd.DataFrame:
     """Resolve a data source spec into a DataFrame with whitespace-stripped column names."""
     if isinstance(spec, Path):
         return _normalise_columns(_read_file(spec))
     spec = spec.strip()
-    if spec.startswith("openml:"):
+    if _is_url(spec):
+        scheme = spec.split(":", 1)[0].lower()
+        if scheme != "https":
+            raise DataSourceError(f"only https:// links are supported (got {scheme}://)")
+        df = _load_url(spec)
+    elif spec.startswith("openml:"):
         df = _load_openml(spec[len("openml:") :])
     elif spec.startswith("kaggle:"):
         df = _load_kaggle(spec[len("kaggle:") :])
     else:
         df = _read_file(Path(spec).expanduser())
     return _normalise_columns(df)
+
+
+_GENERIC_URL_SEGMENTS = frozenset({"export", "uc", "view", "edit", "download", "open", "raw", "resolve"})
+
+
+def _safe_stem(text: str, max_len: int = 48) -> str:
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", text).strip("-._")
+    return stem[:max_len].rstrip("-._") or "data"
+
+
+def source_stem(spec: str | Path) -> str:
+    """A short filesystem-safe stem for a data source spec (for run ids)."""
+    if isinstance(spec, Path):
+        return _safe_stem(spec.stem)
+    spec = spec.strip()
+    if _is_url(spec):
+        parts = urlsplit(spec)
+        last = unquote(parts.path.rstrip("/").rsplit("/", 1)[-1])
+        name = last.rsplit(".", 1)[0] if "." in last.strip(".") else last
+        if not name or name.lower() in _GENERIC_URL_SEGMENTS:
+            name = parts.hostname or "url"
+        return _safe_stem(name)
+    if spec.startswith(("openml:", "kaggle:")):
+        return _safe_stem(spec.replace(":", "-").replace("/", "-"))
+    return _safe_stem(Path(spec).expanduser().stem)

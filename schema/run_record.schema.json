@@ -1,5 +1,200 @@
 {
   "$defs": {
+    "AgentStep": {
+      "description": "One step of one agent (or of a deterministic actor such as the executor) inside an experiment.\n\nLLM steps carry the model/provider and token accounting; executor/ablation/tune steps carry the sandbox\ntails. `plain` is the one-line, plain-language message shown in the chat.",
+      "properties": {
+        "step_id": {
+          "default": "",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "attempt": {
+          "default": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "plain": {
+          "default": "",
+          "title": "Plain",
+          "type": "string"
+        },
+        "input_summary": {
+          "default": "",
+          "title": "Input Summary",
+          "type": "string"
+        },
+        "reasoning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoning"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Diff"
+        },
+        "tool_calls": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Tool Calls",
+          "type": "array"
+        },
+        "stdout_tail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stdout Tail"
+        },
+        "stderr_tail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stderr Tail"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "tokens_in": {
+          "default": 0,
+          "title": "Tokens In",
+          "type": "integer"
+        },
+        "tokens_out": {
+          "default": 0,
+          "title": "Tokens Out",
+          "type": "integer"
+        },
+        "tokens_cached": {
+          "default": 0,
+          "title": "Tokens Cached",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "default": 0.0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "would_be_cost_usd": {
+          "default": 0.0,
+          "title": "Would Be Cost Usd",
+          "type": "number"
+        },
+        "duration_s": {
+          "default": 0.0,
+          "title": "Duration S",
+          "type": "number"
+        },
+        "started_at": {
+          "default": "",
+          "title": "Started At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "AgentStep",
+      "type": "object"
+    },
     "CVScore": {
       "properties": {
         "mean": {
@@ -309,6 +504,32 @@
           "default": "",
           "title": "Started At",
           "type": "string"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/AgentStep"
+          },
+          "title": "Steps",
+          "type": "array"
+        },
+        "trials": {
+          "items": {
+            "$ref": "#/$defs/HpoTrial"
+          },
+          "title": "Trials",
+          "type": "array"
         }
       },
       "required": [
@@ -352,6 +573,51 @@
         "optimism_gap"
       ],
       "title": "FinalScores",
+      "type": "object"
+    },
+    "HpoTrial": {
+      "properties": {
+        "number": {
+          "title": "Number",
+          "type": "integer"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "state": {
+          "default": "complete",
+          "enum": [
+            "complete",
+            "fail",
+            "pruned"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "duration_s": {
+          "default": 0.0,
+          "title": "Duration S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "number"
+      ],
+      "title": "HpoTrial",
       "type": "object"
     },
     "Idea": {
@@ -402,7 +668,17 @@
             "draft",
             "propose",
             "implement",
-            "repair"
+            "repair",
+            "intake",
+            "profiler",
+            "planner",
+            "coder",
+            "debugger",
+            "critic",
+            "judge",
+            "tuner",
+            "ensembler",
+            "reporter"
           ],
           "title": "Purpose",
           "type": "string"
@@ -632,6 +908,31 @@
       "default": 0.0,
       "title": "Wall Time S",
       "type": "number"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/AgentStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "report": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Report"
+    },
+    "usage": {
+      "additionalProperties": true,
+      "title": "Usage",
+      "type": "object"
     }
   },
   "required": [

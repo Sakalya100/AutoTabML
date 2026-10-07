@@ -145,8 +145,27 @@ class Idea(BaseModel):
     radical: bool = False  # a different model family / approach, used by the stop rule
 
 
+LLMPurpose = Literal[
+    "draft",
+    "propose",
+    "implement",
+    "repair",
+    # agentic roles (v3)
+    "intake",
+    "profiler",
+    "planner",
+    "coder",
+    "debugger",
+    "critic",
+    "judge",
+    "tuner",
+    "ensembler",
+    "reporter",
+]
+
+
 class LLMUsage(BaseModel):
-    purpose: Literal["draft", "propose", "implement", "repair"]
+    purpose: LLMPurpose
     model: str
     input_tokens: int = 0
     output_tokens: int = 0
@@ -158,3 +177,45 @@ class Decision(str, Enum):
     keep = "keep"
     discard = "discard"
     crash = "crash"
+
+
+# ---------------------------------------------------------------- agentic steps (v3, additive)
+
+
+class AgentStep(BaseModel):
+    """One step of one agent (or of a deterministic actor such as the executor) inside an experiment.
+
+    LLM steps carry the model/provider and token accounting; executor/ablation/tune steps carry the sandbox
+    tails. `plain` is the one-line, plain-language message shown in the chat."""
+
+    step_id: str = ""
+    role: str  # intake | profiler | planner | coder | executor | debugger | critic | judge | tuner | ...
+    model: str | None = None
+    provider: str | None = None
+    attempt: int = 0
+    status: Literal["ok", "error"] = "ok"
+    plain: str = ""
+    input_summary: str = ""
+    reasoning: str | None = None  # the model's parsed reasoning, when the provider returns it
+    output: dict[str, Any] | None = None  # parsed structured output
+    code: str | None = None
+    diff: str | None = None
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    stdout_tail: str | None = None
+    stderr_tail: str | None = None
+    error: str | None = None
+    tokens_in: int = 0
+    tokens_out: int = 0
+    tokens_cached: int = 0
+    cost_usd: float = 0.0  # actually billed (0 on free tiers)
+    would_be_cost_usd: float = 0.0  # list price of the same tokens
+    duration_s: float = 0.0
+    started_at: str = ""
+
+
+class HpoTrial(BaseModel):
+    number: int
+    params: dict[str, Any] = Field(default_factory=dict)
+    value: float | None = None  # oriented inner-CV score; None when the trial failed
+    state: Literal["complete", "fail", "pruned"] = "complete"
+    duration_s: float = 0.0

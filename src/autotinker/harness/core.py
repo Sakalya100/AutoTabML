@@ -5,13 +5,14 @@ from __future__ import annotations
 import math
 import re
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from autotinker.contracts import DataProfile, ExecResult, TaskSpec
+from autotinker.contracts import DataProfile, ExecResult, HpoTrial, TaskSpec
 from autotinker.data.profiler import profile_dataframe, resolve_task
 from autotinker.harness import scorer
 from autotinker.harness.sandbox import SandboxResult, run_in_sandbox
@@ -19,6 +20,18 @@ from autotinker.harness.splits import Splits, make_splits, persist_splits
 from autotinker.harness.static_check import allowed_imports, static_check
 
 _SAFE_ID = re.compile(r"[^A-Za-z0-9_.-]")
+
+
+@dataclass
+class TuneResult:
+    ok: bool
+    trials: list[HpoTrial] = field(default_factory=list)
+    best_params: dict[str, Any] = field(default_factory=dict)
+    best_value: float | None = None
+    error_kind: str | None = None
+    error_tail: str | None = None
+    stdout_tail: str | None = None
+    duration_s: float = 0.0
 
 
 class Harness:
@@ -64,19 +77,28 @@ class Harness:
         safe = _SAFE_ID.sub("_", label)[:60] or "exp"
         return self.workdir / "runs" / f"{self._n_runs:04d}-{safe}"
 
-    def _sandbox(self, code: str, mode: str, label: str) -> SandboxResult:
+    def _sandbox(
+        self,
+        code: str,
+        mode: str,
+        label: str,
+        *,
+        timeout_s: float | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> SandboxResult:
         assert self.task.metric is not None
         return run_in_sandbox(
             code,
             mode=mode,
-            data_path=self._dev_path if mode == "cv" else self._test_path,
+            data_path=self._dev_path if mode in ("cv", "tune") else self._test_path,
             job_dir=self._job_dir(label),
             profile=self._profile_dict,
             need_proba=scorer.needs_proba(self.task.metric),
             n_classes=self._splits.n_classes,
-            timeout_s=self.task.experiment_timeout_s,
+            timeout_s=timeout_s if timeout_s is not None else self.task.experiment_timeout_s,
             memory_mb=self.task.experiment_memory_mb,
             seed=self.task.seed,
+            extra=extra,
         )
 
     def _score(self, y_true: np.ndarray[Any, Any], pred: np.ndarray[Any, Any]) -> float:
@@ -142,6 +164,55 @@ class Harness:
             duration_s=time.monotonic() - t0,
             stdout_tail=res.stdout_tail,
             static_warnings=warns,
+        )
+
+    def tune(
+        self,
+        code: str,
+        space: dict[str, dict[str, Any]],
+        *,
+        n_trials: int,
+        time_budget_s: float,
+        label: str,
+        tune_folds: int = 3,
+    ) -> TuneResult:
+        """Run an Optuna search over `space` (sklearn set_params paths) inside the sandbox, on the first
+        `tune_folds` fixed dev folds. Never touches select/test. Never raises for solution failures."""
+        assert self.task.metric is not None and self.task.problem_type is not None
+        t0 = time.monotonic()
+        errors, _ = static_check(code, self.allowed_imports)
+        if errors:
+            return TuneResult(False, error_kind="static_check", error_tail="\n".join(errors))
+        res = self._sandbox(
+            code,
+            "tune",
+            label,
+            timeout_s=time_budget_s + max(60.0, self.task.experiment_timeout_s),
+            extra={
+                "space": space,
+                "n_trials": int(n_trials),
+                "time_budget_s": float(time_budget_s),
+                "tune_folds": int(tune_folds),
+                "metric": self.task.metric.value,
+                "problem_type": self.task.problem_type.value,
+            },
+        )
+        if not res.ok or res.payload is None:
+            return TuneResult(
+                False,
+                error_kind=res.error_kind or "runtime",
+                error_tail=res.error_tail,
+                stdout_tail=res.stdout_tail,
+                duration_s=time.monotonic() - t0,
+            )
+        trials = [HpoTrial.model_validate(t) for t in res.payload.get("trials", [])]
+        return TuneResult(
+            True,
+            trials=trials,
+            best_params=dict(res.payload.get("best_params") or {}),
+            best_value=res.payload.get("best_value"),
+            stdout_tail=res.stdout_tail,
+            duration_s=time.monotonic() - t0,
         )
 
     def score_test(self, code: str) -> float:

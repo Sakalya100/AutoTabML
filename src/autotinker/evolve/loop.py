@@ -468,8 +468,12 @@ class _Runner:
         self.save()
         if self.run_dir is not None:
             (self.run_dir / "best_solution.py").write_text(best.code, encoding="utf-8")
+        self._before_close()
         self.emitter.close()
         return self.record
+
+    def _before_close(self) -> None:
+        """Hook for subclasses: runs after run_finished, before the event stream closes (e.g. the report)."""
 
     def save(self) -> None:
         self.record.wall_time_s = self.elapsed

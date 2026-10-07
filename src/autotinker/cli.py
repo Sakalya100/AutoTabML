@@ -80,6 +80,12 @@ class LiveView:
             self.rows[ev.exp_id] = {"id": ev.exp_id, "idea": ev.idea.title + tag}
         elif typ == "llm_call":
             self.cost += ev.usage.cost_usd
+        elif typ == "agent_step_finished" and ev.exp_id:
+            r = self.rows.setdefault(ev.exp_id, {"id": ev.exp_id})
+            if ev.step.role not in ("executor",):
+                r["note"] = f"{ev.step.role}: {ev.step.plain}"
+        elif typ == "report_ready":
+            self.footer += f"\n[bold]report[/]: {str(ev.report.get('summary', ''))[:400]}"
         elif typ == "sandbox_finished":
             r = self.rows.setdefault(ev.exp_id, {"id": ev.exp_id})
             r["rep"] = ev.attempt
@@ -111,7 +117,12 @@ def _make(llm: str | None, cheap_llm: str | None, out: Path, gate: str, seed: in
     from autotinker.api import AutoTinker
 
     return AutoTinker(
-        llm=llm, workdir=out, cheap_llm=cheap_llm, gate=gate, seed=seed, max_repairs=max_repairs  # type: ignore[arg-type]
+        llm=llm,
+        workdir=out,
+        cheap_llm=cheap_llm,
+        gate=gate,  # type: ignore[arg-type]
+        seed=seed,
+        max_repairs=max_repairs,
     )
 
 
@@ -133,31 +144,95 @@ def _go(fn: Any, events_stdout: bool, title: str) -> Any:
         return fn(view)
 
 
+def load_env_file() -> None:
+    """Load provider keys from ./.env (never overrides the real environment; values are never printed)."""
+    try:
+        from dotenv import find_dotenv, load_dotenv
+    except ImportError:  # pragma: no cover - python-dotenv is a dependency
+        return
+    path = find_dotenv(usecwd=True)
+    if path:
+        load_dotenv(path, override=False)
+
+
 @app.command()
 def run(
-    source: Annotated[str, typer.Argument(help="CSV/parquet path, openml:<id> or kaggle:<owner>/<dataset>")],
-    target: Annotated[str, typer.Option("--target", "-t")],
-    llm: LLMOpt = None,
-    cheap_llm: Annotated[str | None, typer.Option("--cheap-llm")] = None,
-    description: Annotated[str, typer.Option("--description", "-d")] = "",
+    source: Annotated[
+        str, typer.Argument(help="https:// link, CSV/parquet path, openml:<id> or kaggle:<owner>/<dataset>")
+    ],
+    target: Annotated[
+        str | None, typer.Option("--target", "-t", help="column to predict (inferred by Intake if omitted)")
+    ] = None,
+    goal: Annotated[str, typer.Option("--goal", "-g", help='one sentence, e.g. "predict churn"')] = "",
     metric: Annotated[str | None, typer.Option("--metric")] = None,
+    max_experiments: Annotated[int, typer.Option("--max-experiments")] = 10,
+    max_time: Annotated[float, typer.Option("--max-time", help="seconds")] = 40 * 60,
+    max_tokens: Annotated[
+        int, typer.Option("--max-tokens", help="token cap across all agent calls")
+    ] = 400_000,
     out: Annotated[Path, typer.Option("--out")] = Path("runs"),
     seed: Annotated[int, typer.Option("--seed")] = 0,
-    max_repairs: Annotated[int, typer.Option("--max-repairs")] = 3,
     events_stdout: Annotated[
         bool, typer.Option("--events-stdout", help="print ONLY JSONL events on stdout")
     ] = False,
+    llm: Annotated[
+        str | None,
+        typer.Option("--llm", help="legacy single-shot mode with this proposer (e.g. 'heuristic')"),
+    ] = None,
+    cheap_llm: Annotated[str | None, typer.Option("--cheap-llm", help="legacy single-shot mode only")] = None,
+    description: Annotated[str, typer.Option("--description", "-d", help="legacy alias of --goal")] = "",
+    max_repairs: Annotated[int, typer.Option("--max-repairs", help="legacy single-shot mode only")] = 3,
 ) -> None:
-    """Single shot: draft one solution.py, repair it up to 3 times, score it."""
-    at = _make(llm, cheap_llm, out, "stat", seed, max_repairs)
-    res = _go(
-        lambda cb: at.run(
-            source, target, description=description, metric=metric, on_event=cb, events_stdout=events_stdout
-        ),
-        events_stdout,
-        f"autotinker run {source}",
-    )
+    """The agentic AutoML loop: agents profile, plan, code, debug, tune and ensemble until the ceiling.
+
+    Provider keys (GROQ_API_KEY, GEMINI_API_KEY, ...) are read from the environment or ./.env.
+    With --llm, runs the legacy single-shot mode instead (draft one solution, repair, score)."""
+    goal = goal or description
+    if llm is not None:
+        if target is None:
+            raise typer.BadParameter("--target is required with --llm (legacy single-shot mode)")
+        at = _make(llm, cheap_llm, out, "stat", seed, max_repairs)
+        res = _go(
+            lambda cb: at.run(
+                source, target, description=goal, metric=metric, on_event=cb, events_stdout=events_stdout
+            ),
+            events_stdout,
+            f"autotinker run {source}",
+        )
+        err.print(f"run directory: {res.run_dir}")
+        return
+    load_env_file()
+    from autotinker.api import agentic_run
+
+    try:
+        res = _go(
+            lambda cb: agentic_run(
+                source,
+                target=target,
+                goal=goal,
+                metric=metric,
+                workdir=out,
+                max_experiments=max_experiments,
+                max_time_s=max_time,
+                max_tokens=max_tokens,
+                seed=seed,
+                on_event=cb,
+                events_stdout=events_stdout,
+            ),
+            events_stdout,
+            f"autotinker run {source}",
+        )
+    except (RuntimeError, ValueError) as exc:
+        err.print(f"[red]error:[/] {exc}")
+        raise typer.Exit(code=2) from exc
     err.print(f"run directory: {res.run_dir}")
+    rep = res.record.report or {}
+    if rep.get("summary"):
+        err.print(f"[bold]report:[/] {rep['summary']}")
+    stop = res.record.stop or {}
+    if stop.get("reason") == "proposer_failure":
+        err.print(f"[red]run aborted:[/] {stop.get('summary', '')}")
+        raise typer.Exit(code=3)
 
 
 @app.command()
