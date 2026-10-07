@@ -4,6 +4,7 @@ import { Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { memo, useEffect, useMemo, useRef } from "react";
 import { Color, IcosahedronGeometry, Mesh, MeshPhysicalMaterial, Quaternion, Vector3 } from "three";
+import { climbPointXZ } from "@/lib/survey/poses";
 import { WOBBLE_BEGIN, WOBBLE_HEAD } from "./shaders";
 import { damp, sameProps, useSurvey } from "./shared";
 
@@ -14,9 +15,12 @@ const PATH_COLOR = new Color(2.2, 1.25, 0.38);
  * The agent: a bead of mercury resting on the best-known point. It rolls (really rolls: rotation = distance / r)
  * along the ground to a new best only when the gate keeps a probe. Surface tension: a slow vertex wobble that
  * quickens while it moves.
+ *
+ * On the landing the bead's place is a pure function of scroll (`scrub.beadT`, an index along the complete run's climb
+ * `path`): it rolls in proportion to scroll, forwards and backwards, with no catch-up lag.
  */
-export const Bead = memo(function Bead({ target }: { target: [number, number, number] | null }) {
-  const { field, u, animate } = useSurvey();
+export const Bead = memo(function Bead({ target, path }: { target: [number, number, number] | null; path?: [number, number, number][] }) {
+  const { field, u, animate, scrub } = useSurvey();
   const mesh = useRef<Mesh>(null);
   const st = useRef({ x: 0, z: 0, y: 0, s: 0, init: false, speed: 0 });
   const tmp = useMemo(() => ({ axis: new Vector3(), q: new Quaternion() }), []);
@@ -58,12 +62,24 @@ export const Bead = memo(function Bead({ target }: { target: [number, number, nu
       s.z = target[2];
       s.init = true;
     }
-    if (target) {
+    const beadT = scrub?.current?.beadT ?? null;
+    const driven = beadT != null && !!path && path.length > 0;
+    if (driven && !s.init) {
+      const [x0, z0] = climbPointXZ(path, beadT);
+      s.x = x0;
+      s.z = z0;
+      s.init = true;
+    }
+    if (target || driven) {
       const px = s.x;
       const pz = s.z;
-      const lam = animate ? 2.1 : 1e3;
-      s.x = damp(s.x, target[0], lam, d);
-      s.z = damp(s.z, target[2], lam, d);
+      if (driven) {
+        [s.x, s.z] = climbPointXZ(path, beadT);
+      } else if (target) {
+        const lam = animate ? 2.1 : 1e3;
+        s.x = damp(s.x, target[0], lam, d);
+        s.z = damp(s.z, target[2], lam, d);
+      }
       const dx = s.x - px;
       const dz = s.z - pz;
       const dist = Math.hypot(dx, dz);
@@ -74,7 +90,7 @@ export const Bead = memo(function Bead({ target }: { target: [number, number, nu
       }
       s.speed = damp(s.speed, dist / Math.max(d, 1e-4), 6, d);
     }
-    s.s = damp(s.s, target ? 1 : 0, animate ? 3 : 1e3, d);
+    s.s = damp(s.s, target || driven ? 1 : 0, animate ? 3 : 1e3, d);
     const ground = field.sample(s.x, s.z);
     s.y = ground + R * 0.82;
     m.position.set(s.x, s.y, s.z);

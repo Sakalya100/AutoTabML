@@ -21,6 +21,39 @@ export interface PoseFrame {
   now: SurveyLayoutFull;
   /** Viewport width / height. */
   aspect: number;
+  /**
+   * Where the bead is drawn right now, if the caller drives it continuously (landing scroll). The climb pose follows
+   * this instead of the stepped best probe, so the camera glides with the rolling bead rather than hopping.
+   */
+  bead?: [number, number, number] | null;
+}
+
+/**
+ * A point along the climb path (the kept probes, in order) for a continuous index `t` in [0, n − 1]: t = 1.5 is
+ * halfway between the 2nd and 3rd keep. Returns x/z only — the caller puts it on the ground it is drawing.
+ */
+export function climbPointXZ(climb: readonly (readonly [number, number, number])[], t: number): [number, number] {
+  const n = climb.length;
+  if (n === 0) return [0, 0];
+  const c = Math.min(n - 1, Math.max(0, Number.isFinite(t) ? t : 0));
+  const i = Math.min(n - 2, Math.floor(c));
+  if (i < 0) return [climb[0][0], climb[0][2]];
+  const f = c - i;
+  const a = climb[i];
+  const b = climb[i + 1];
+  return [a[0] + (b[0] - a[0]) * f, a[2] + (b[2] - a[2]) * f];
+}
+
+/** Linear blend of two camera poses (w = 0 → a, 1 → b). Both are pure functions of scroll, so the blend is too. */
+export function blendPose(a: CameraPose, b: CameraPose, w: number): CameraPose {
+  const t = Math.min(1, Math.max(0, w));
+  if (t <= 0) return a;
+  if (t >= 1) return b;
+  return {
+    pos: [lerp(a.pos[0], b.pos[0], t), lerp(a.pos[1], b.pos[1], t), lerp(a.pos[2], b.pos[2], t)],
+    target: [lerp(a.target[0], b.target[0], t), lerp(a.target[1], b.target[1], t), lerp(a.target[2], b.target[2], t)],
+    fov: lerp(a.fov, b.fov, t),
+  };
 }
 
 export function frameMetrics(l: SurveyLayoutFull) {
@@ -45,8 +78,10 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
   const e = ease(p);
   const { cx, cz, R, maxY } = frameMetrics(f.frame);
   const summit = summitOf(f.frame);
-  const first = f.now.probes[0]?.pos ?? f.frame.probes[0]?.pos ?? [cx, 1, cz];
-  const bead = f.now.bead ?? first;
+  // Domain-stable anchors (the full run for replays): reading the stepped playback state here made the camera hop
+  // whenever a scrub crossed a step. Only the bead is live, and the landing hands it in continuously.
+  const first = f.frame.probes[0]?.pos ?? f.now.probes[0]?.pos ?? [cx, 1, cz];
+  const bead = f.bead ?? f.now.bead ?? first;
   let out: CameraPose;
   switch (pose) {
     case "orbit": {
@@ -56,16 +91,17 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
       break;
     }
     case "approach": {
+      // Hero: the whole (ghost) survey large in frame, seen from a low three-quarter, drifting slightly with scroll.
       out = {
-        pos: [cx + lerp(-1.2, 1.2, e), R * 1.05 + lerp(5.5, 3.5, e), cz + R * 2.45 + lerp(10, 7, e)],
-        target: [cx, lerp(0.2, 0.6, e), cz + R * 0.5],
-        fov: 32,
+        pos: [cx + lerp(-2.2, 0.6, e), R * 0.62 + lerp(4.2, 3.4, e), cz + R * 1.55 + lerp(5.2, 4.2, e)],
+        target: [cx, lerp(0.9, 1.0, e), cz + R * 0.05],
+        fov: 34,
       };
       break;
     }
     case "first-probe": {
       out = {
-        pos: [first[0] + lerp(2.6, 1.7, e), first[1] + lerp(1.15, 0.75, e), first[2] + lerp(4.8, 3.3, e)],
+        pos: [first[0] + lerp(3.4, 2.4, e), first[1] + lerp(1.6, 1.15, e), first[2] + lerp(6.2, 4.6, e)],
         target: [first[0], first[1] + 0.35, first[2]],
         fov: 30,
       };
@@ -82,7 +118,7 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
       break;
     }
     case "mist": {
-      const y = f.now.bestY ?? summit[1];
+      const y = f.frame.bestY ?? f.now.bestY ?? summit[1];
       out = {
         pos: [summit[0] + lerp(-6.5, 4.5, e), y + 0.32, summit[2] + lerp(6.8, 5.2, e)],
         target: [summit[0] + lerp(-0.8, 0.8, e), y - 0.15, summit[2]],
@@ -91,7 +127,7 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
       break;
     }
     case "ceiling": {
-      const cy = f.now.cloudY ?? summit[1] + 1.2;
+      const cy = f.frame.cloudY ?? f.now.cloudY ?? summit[1] + 1.2;
       out = {
         pos: [summit[0] + lerp(3.2, 1.2, e), lerp(cy - 1.0, cy + 9, e), summit[2] + lerp(6.5, 3.2, e)],
         target: [summit[0], summit[1] - lerp(0.2, 1.5, e), summit[2]],
@@ -100,7 +136,7 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
       break;
     }
     case "truth": {
-      const ys = [summit[1], f.now.selectY ?? summit[1], f.now.testY ?? summit[1]];
+      const ys = [summit[1], f.frame.selectY ?? f.now.selectY ?? summit[1], f.frame.testY ?? f.now.testY ?? summit[1]];
       const mid = (Math.min(...ys) + Math.max(...ys)) / 2;
       out = {
         pos: [summit[0] + lerp(8.5, 6.5, e), mid + lerp(2.4, 1.6, e), summit[2] + lerp(9.5, 8.0, e)],
@@ -123,12 +159,8 @@ export function cameraPose(pose: SurveyPose, progress: number, f: PoseFrame): Ca
   // Portrait screens: back off along the view direction and widen a little so the subject still fits.
   if (f.aspect < 1) {
     const portrait = 1 - Math.min(1, Math.max(0, (f.aspect - 0.45) / 0.55));
-    // The outro map climbs above the captions that fill the lower half of a phone.
-    if (pose === "chart") {
-      const dz = R * 0.75 * portrait;
-      out = { ...out, pos: [out.pos[0], out.pos[1], out.pos[2] + dz], target: [out.target[0], out.target[1], out.target[2] + dz] };
-    }
-    const wide = pose === "approach" || pose === "orbit" || pose === "chart" || pose === "overview";
+    // (Pages that put copy over the lower half lift the subject with a view offset, see SurveyScrub.shiftY.)
+    const wide = pose === "approach" || pose === "orbit" || pose === "overview";
     const k = lerp(1, wide ? 1.95 : 1.5, portrait);
     out = {
       pos: [out.target[0] + (out.pos[0] - out.target[0]) * k, out.target[1] + (out.pos[1] - out.target[1]) * k, out.target[2] + (out.pos[2] - out.target[2]) * k],

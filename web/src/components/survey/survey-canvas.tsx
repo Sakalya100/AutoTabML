@@ -104,6 +104,8 @@ export default function SurveyCanvas({
   className,
   ariaLabel,
   onReady,
+  scrub,
+  ghost = false,
 }: SurveyCanvasProps) {
   const webgl = useWebGLAvailable();
   const reduced = usePrefersReducedMotion();
@@ -247,6 +249,8 @@ export default function SurveyCanvas({
               orbit={orbit}
               onReady={readyFn}
               focus={focus}
+              scrub={scrub ?? null}
+              ghost={ghost}
             />
           </Suspense>
           <Post tier={tier} pose={pose} focus={focus} />

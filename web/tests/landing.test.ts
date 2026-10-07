@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { cursorFor, landingFacts } from "@/components/landing/facts";
+import { beadTFor, climbCoord, cursorFor, landingFacts } from "@/components/landing/facts";
+import { layoutSurvey } from "@/lib/survey/layout";
+import { climbPointXZ } from "@/lib/survey/poses";
 import { parseEventsJsonl } from "@/lib/events";
 import { buildView } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
@@ -72,5 +74,50 @@ describe("landing scroll → replay moment", () => {
   it("the bead is on the land from the very first screen", () => {
     const { cursor } = cursorFor("approach", 0, facts, false);
     expect(buildView(events.slice(0, cursor)).experiments.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("the bead's place along the climb is monotonic down the page and ends on the final best", () => {
+    const order = ["orbit", "approach", "first-probe", "climb", "mist", "ceiling", "truth", "chart"] as const;
+    let prev = -1;
+    for (const pose of order)
+      for (let p = 0; p <= 1.0001; p += 0.002) {
+        const t = beadTFor(pose, Math.min(1, p), facts, false);
+        expect(t).toBeGreaterThanOrEqual(prev - 1e-12);
+        prev = t;
+      }
+    expect(beadTFor("approach", 0, facts, false)).toBe(0);
+    expect(prev).toBe(facts.nKept - 1);
+  });
+
+  it("the bead rolls continuously (no jumps) through the climb, and rests on the best between keeps", () => {
+    let prev = beadTFor("climb", 0, facts, false);
+    for (let p = 0.0005; p <= 1.0001; p += 0.0005) {
+      const t = beadTFor("climb", Math.min(1, p), facts, false);
+      expect(Math.abs(t - prev)).toBeLessThan(0.05);
+      prev = t;
+    }
+    const full = buildView(events);
+    const L = layoutSurvey(full, full);
+    // wherever the bead rests it sits on a best probe: before a new keep's roll it is the previous best (the keep has
+    // landed but the bead has not moved yet), after it the new one
+    for (let p = 0; p <= 1.0001; p += 0.01) {
+      const t = beadTFor("climb", Math.min(1, p), facts, false);
+      if (Math.abs(t - Math.round(t)) > 1e-9) continue;
+      const c = climbCoord(Math.min(1, p), facts);
+      const [x, z] = climbPointXZ(L.climb, t);
+      const at = (i: number) => layoutSurvey(buildView(events.slice(0, facts.growth[Math.min(i, facts.growth.length - 1)].cursor)), full).bead!;
+      const ok = [at(Math.floor(c)), at(Math.ceil(c))].some((b) => Math.abs(b[0] - x) < 1e-9 && Math.abs(b[2] - z) < 1e-9);
+      expect(ok).toBe(true);
+    }
+  });
+
+  it("an experiment lands before the bead rolls to it (the climb coordinate leads the cursor)", () => {
+    for (let p = 0; p <= 1.0001; p += 0.003) {
+      const c = climbCoord(Math.min(1, p), facts);
+      const { step } = cursorFor("climb", Math.min(1, p), facts, false);
+      expect(step).toBeGreaterThanOrEqual(Math.floor(c));
+      const t = beadTFor("climb", Math.min(1, p), facts, false);
+      expect(Math.ceil(t - 1e-9)).toBeLessThanOrEqual(Math.max(0, facts.growth[step].kept - 1));
+    }
   });
 });

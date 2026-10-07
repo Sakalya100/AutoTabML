@@ -125,6 +125,8 @@ export const Probes = memo(function Probes({ probes, selectedId }: { probes: Sur
       const fall = t < 0 ? 1e3 : (1 - k * k) * DROP_H;
       // The probe the mercury rests on is marked by the bead itself (and its ring): no stake through the bead.
       const hidden = t < 0 || p.isBest;
+      // Ease in while it falls (grows from nothing over the first part of the drop): a new stake never pops.
+      const grow = t < 0 ? 0 : 1 - (1 - Math.min(1, t / (DROP * 0.7))) ** 3;
       const h = STAKE_H[p.status] ?? 0.6;
       const sel = p.id === selectedId;
       const hover = p.status === "running" ? 1.1 + Math.sin(now * 2) * 0.08 : 0;
@@ -135,7 +137,7 @@ export const Probes = memo(function Probes({ probes, selectedId }: { probes: Sur
         const a = hash01(`crash:${p.id}`) * Math.PI * 2;
         dummy.rotation.set(Math.cos(a) * 1.05, 0, Math.sin(a) * 1.05);
       } else dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(hidden ? 0 : 1, hidden ? 0 : h, hidden ? 0 : 1);
+      dummy.scale.set(hidden ? 0 : grow, hidden ? 0 : h * grow, hidden ? 0 : grow);
       dummy.updateMatrix();
       S.setMatrixAt(i, dummy.matrix);
 
@@ -144,7 +146,7 @@ export const Probes = memo(function Probes({ probes, selectedId }: { probes: Sur
       if (p.status === "crash") dummy.position.set(x, ground + fall + 0.07, z);
       else dummy.position.set(x, ground + fall + hover + h - 0.04, z);
       dummy.rotation.set(0, now * (p.isBest ? 0.6 : 0.25) + i, 0);
-      dummy.scale.setScalar(hidden ? 0 : s);
+      dummy.scale.setScalar(hidden ? 0 : s * grow);
       dummy.updateMatrix();
       H.setMatrixAt(i, dummy.matrix);
 

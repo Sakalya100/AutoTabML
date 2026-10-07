@@ -110,11 +110,39 @@ export function landingFacts(name: string, dataset: string, events: readonly Any
   };
 }
 
+/** Scroll weight of one growth step in the climb: a kept experiment gets far more room, so the bead's roll to it is
+ * spread over a long stretch of scroll instead of happening within one wheel tick. */
+const KEEP_WEIGHT = 8;
+
+/**
+ * The climb's continuous replay coordinate for the climb section's progress p: a fractional growth-step index from the
+ * first probe to the last decision before the stop. Steps are spaced by weight (a keep = KEEP_WEIGHT, anything else
+ * = 1). Monotonic and continuous in p.
+ */
+export function climbCoord(p: number, facts: LandingFacts): number {
+  const g = facts.growth;
+  const last = g.length - 1;
+  const preStop = Math.max(1, last - 1);
+  const first = Math.min(1, last);
+  const t = Math.min(1, Math.max(0, (p - 0.02) / 0.9));
+  if (preStop <= first) return first;
+  let total = 0;
+  for (let i = first; i < preStop; i++) total += g[i + 1].kept > g[i].kept ? KEEP_WEIGHT : 1;
+  let u = t * total;
+  for (let i = first; i < preStop; i++) {
+    const w = g[i + 1].kept > g[i].kept ? KEEP_WEIGHT : 1;
+    if (u <= w) return i + u / w;
+    u -= w;
+  }
+  return preStop;
+}
+
 /**
  * Section → which moment of the replay it shows. Strictly monotonic down the page (hero = the start, chart = the end)
  * so scrolling only ever moves the run forward or backward along its own timeline: the bead never vanishes and
  * reappears, it just keeps rolling. Order of poses on the page: orbit/approach → first-probe → climb → mist →
- * ceiling → truth → chart.
+ * ceiling → truth → chart. In the climb an experiment lands as soon as its stretch of scroll begins (ceil), and if it
+ * was kept the bead then rolls to it across that stretch (see beadTFor).
  */
 export function cursorFor(pose: SurveyPose, p: number, facts: LandingFacts, reduced: boolean): { cursor: number; step: number } {
   const g = facts.growth;
@@ -128,8 +156,7 @@ export function cursorFor(pose: SurveyPose, p: number, facts: LandingFacts, redu
       return { cursor: g[first].cursor, step: first };
     case "climb": {
       if (reduced) return { cursor: g[preStop].cursor, step: preStop };
-      const t = Math.min(1, Math.max(0, (p - 0.02) / 0.9));
-      const i = Math.min(preStop, Math.max(first, first + Math.round(t * (preStop - first))));
+      const i = Math.min(preStop, Math.max(first, Math.ceil(climbCoord(p, facts) - 1e-6)));
       return { cursor: g[i].cursor, step: i };
     }
     case "mist":
@@ -140,5 +167,40 @@ export function cursorFor(pose: SurveyPose, p: number, facts: LandingFacts, redu
     case "chart":
     default:
       return { cursor: facts.end, step: last };
+  }
+}
+
+const smoothstep = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Where the bead is along the climb path (index into the kept probes, fractional while it rolls) for a scroll
+ * position. A pure function of scroll: within the stretch where a kept experiment lands, the bead rolls from the
+ * previous keep to the new one in proportion to scroll (forwards and backwards); elsewhere it rests on the best so far.
+ * Relies on the bead resting on the latest keep (the gate only keeps real gains, so the latest keep is the best).
+ */
+export function beadTFor(pose: SurveyPose, p: number, facts: LandingFacts, reduced: boolean): number {
+  const g = facts.growth;
+  const last = g.length - 1;
+  const preStop = Math.max(1, last - 1);
+  const first = Math.min(1, last);
+  const at = (i: number) => Math.max(0, g[Math.min(last, Math.max(0, i))].kept - 1);
+  switch (pose) {
+    case "orbit":
+    case "approach":
+    case "first-probe":
+      return at(first);
+    case "climb": {
+      if (reduced) return at(preStop);
+      const c = climbCoord(p, facts);
+      const i = Math.floor(c);
+      const k = at(i);
+      if (i + 1 > preStop || at(i + 1) <= k) return k;
+      return k + smoothstep(0.12, 0.88, c - i) * (at(i + 1) - k);
+    }
+    default:
+      return at(last);
   }
 }

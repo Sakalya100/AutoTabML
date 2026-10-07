@@ -15,7 +15,28 @@
  * `domainView = buildView(allEvents, record)` so heights never rescale during playback.
  */
 
+import type { RefObject } from "react";
 import type { RunView } from "@/lib/run-state";
+
+/**
+ * Continuous, scroll-driven stage input (landing). Written by the page at frame rate into a ref; the frame loop reads
+ * it, React never re-renders for it. Everything here is a pure function of the (lightly smoothed) scroll position.
+ */
+export interface SurveyScrub {
+  /** Camera: pose `a` at progress `pa` blended toward pose `b` at progress `pb` by `w` (0 = all a). */
+  a: SurveyPose;
+  pa: number;
+  b: SurveyPose;
+  pb: number;
+  w: number;
+  /** 0 → 1 intro dolly from the orbit shot (time-driven once, after the loader). */
+  intro: number;
+  /** Continuous index along the full run's climb path (kept probes); null = rest on the current best. */
+  beadT: number | null;
+  /** Frame the subject off-centre (fractions of the viewport): +x moves it right, +y moves it up. */
+  shiftX: number;
+  shiftY: number;
+}
 
 /** Authored camera states (landing scroll beats, run/gallery framings). */
 export type SurveyPose =
@@ -45,6 +66,10 @@ export interface SurveyCanvasProps {
   headline?: string | null;
   className?: string;
   ariaLabel?: string;
+  /** Continuous scroll-driven camera + bead input (landing). Overrides `pose`/`poseProgress` for the camera. */
+  scrub?: RefObject<SurveyScrub | null>;
+  /** Draw the complete run's terrain as faint contour lines over the unexplored dark (landing only). */
+  ghost?: boolean;
   /** Called once when shaders are compiled and the first frame is on screen (loader gates). */
   onReady?: () => void;
 }

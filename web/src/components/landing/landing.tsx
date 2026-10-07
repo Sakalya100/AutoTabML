@@ -2,33 +2,30 @@
 
 /*
  * Landing — Terra Incognita (docs/creative/02-direction.md, direction B).
- * One world, named camera poses, scroll = travel:
- *   loader (orbit) → approach (headline on the plain) → first probe → the climb (pinned, scrubs the real replay)
- *   → the mist → the ceiling → the truth → the chart.
- * Rules: one idea per screen, one short caption at a time, every number from the replay files, nothing over the
- * canvas but text (no panels, no backdrop blur). The 3D headline has the same words in the DOM for screen readers.
+ * One world, one copy rail, scroll = travel through one real run:
+ *   hero → first guess → the climb (three beats) → the mist → the ceiling → the honest test → the map.
+ * Rules: exactly one message on screen at every scroll position (./captions messageAt), plain words, every number from
+ * the replay files. The 3D stage is a pure function of (lightly smoothed) scroll: the camera blends across section
+ * boundaries and the bead rolls in proportion to scroll — nothing switches and springs.
  */
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { MotionConfig, motion, useMotionValue, useScroll, useTransform } from "motion/react";
-import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { EvolutionChart } from "@/components/evolution-chart";
 import type { AnyEvent } from "@/lib/events";
 import { DOCS_URL, GITHUB_URL } from "@/lib/links";
 import { formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import { buildView, type RunView } from "@/lib/run-state";
 import { useWebGLAvailable } from "@/lib/gl";
-import type { SurveyPose } from "@/lib/survey/contract";
-import { activeCaption, chartReveal, type CaptionId } from "./captions";
-import { cursorFor, type LandingFacts } from "./facts";
-import { MagneticLink, Ticker } from "./primitives";
+import type { SurveyPose, SurveyScrub } from "@/lib/survey/contract";
+import { MESSAGES, messageAt, type MessageId } from "./captions";
+import { beadTFor, cursorFor, type LandingFacts } from "./facts";
+import { EASE, MagneticLink, Ticker } from "./primitives";
 
 // three.js stays out of the server render and the first paint; the void + loader show until it streams in.
 const SurveyCanvas = dynamic(() => import("@/components/survey/survey-canvas"), { ssr: false, loading: () => null });
-
-const HEADLINE = "Models that tinker themselves.";
-const OUTRO = "Your data. Your map.";
 
 const mq = (q: string) => ({
   sub: (cb: () => void) => {
@@ -41,14 +38,22 @@ const mq = (q: string) => ({
 const narrowQ = mq("(max-width: 767px)");
 const reducedQ = mq("(prefers-reduced-motion: reduce)");
 
-/* ---- a tiny external store: scroll writes it, only the stage reads it ---- */
+/** Half-width of the camera blend around each section boundary, as a fraction of the viewport height. */
+const BLEND_VH = 0.32;
+/** Scroll smoothing rate (1/s): light, so the stage glides between wheel ticks without lagging behind. */
+const SMOOTH = 14;
+/** Intro dolly from the orbit shot after the loader (ms). */
+const INTRO_MS = 2200;
+
+/* ---- a tiny external store: scroll writes it; React only hears discrete changes ---- */
 
 interface StageState {
+  /** The pose that dominates the frame (for pose-keyed effects: depth of field, clouds, truth markers). */
   pose: SurveyPose;
-  progress: number;
   cursor: number;
   /** Index into facts.growth (for the live numbers in the climb). */
   step: number;
+  msg: MessageId;
 }
 
 function createStageStore(init: StageState) {
@@ -56,9 +61,8 @@ function createStageStore(init: StageState) {
   const ls = new Set<() => void>();
   return {
     get: () => s,
-    set(p: Partial<StageState>) {
-      const n = { ...s, ...p };
-      if (n.pose === s.pose && n.cursor === s.cursor && n.step === s.step && Math.abs(n.progress - s.progress) < 1e-4) return;
+    set(n: StageState) {
+      if (n.pose === s.pose && n.cursor === s.cursor && n.step === s.step && n.msg === s.msg) return;
       s = n;
       ls.forEach((l) => l());
     },
@@ -72,13 +76,25 @@ function createStageStore(init: StageState) {
 }
 type StageStore = ReturnType<typeof createStageStore>;
 
-const Stage = memo(function Stage({ events, full, store, narrow, onReady }: { events: AnyEvent[]; full: RunView; store: StageStore; narrow: boolean; onReady: () => void }) {
-  const s = useSyncExternalStore(store.sub, store.get, store.get);
+const Stage = memo(function Stage({
+  events,
+  full,
+  store,
+  narrow,
+  scrub,
+  onReady,
+}: {
+  events: AnyEvent[];
+  full: RunView;
+  store: StageStore;
+  narrow: boolean;
+  scrub: RefObject<SurveyScrub | null>;
+  onReady: () => void;
+}) {
+  const cursor = useSyncExternalStore(store.sub, () => store.get().cursor, () => store.get().cursor);
+  const pose = useSyncExternalStore(store.sub, () => store.get().pose, () => store.get().pose);
   const webgl = useWebGLAvailable();
-  const view = useMemo(() => (s.cursor >= events.length ? full : buildView(events.slice(0, s.cursor))), [events, full, s.cursor]);
-  // The in-world headline leaves on scroll position, together with the DOM hero copy (a third of the way through the
-  // hero), long before the first chapter caption is allowed to appear — so the two can never share the screen.
-  const headline = s.pose === "orbit" || (s.pose === "approach" && s.progress < 0.3) ? HEADLINE : s.pose === "chart" ? OUTRO : null;
+  const view = useMemo(() => (cursor >= events.length ? full : buildView(events.slice(0, cursor))), [events, full, cursor]);
   if (webgl === false)
     return (
       <div className="lp-fallback-chart" data-theme="dark">
@@ -89,13 +105,13 @@ const Stage = memo(function Stage({ events, full, store, narrow, onReady }: { ev
     <SurveyCanvas
       view={view}
       domainView={full}
-      pose={s.pose}
-      poseProgress={s.progress}
+      pose={pose}
+      scrub={scrub}
+      ghost
       quality={narrow ? "lite" : "full"}
       interactive={false}
-      headline={headline}
       className="lp-canvas"
-      ariaLabel={`Survey of the ${full.experiments.length}-experiment replay: each probe's height is its cross-validated score.`}
+      ariaLabel={`Map of a real ${full.experiments.length}-experiment run: each marker's height is its score.`}
       onReady={onReady}
     />
   );
@@ -103,15 +119,28 @@ const Stage = memo(function Stage({ events, full, store, narrow, onReady }: { ev
 
 /* ---- page ---- */
 
+/** Section order and heights (svh). Each is a plain scroll spacer; the stage store reads data-pose. */
+const SECTIONS: { pose: SurveyPose; vh: number }[] = [
+  { pose: "approach", vh: 100 },
+  { pose: "first-probe", vh: 120 },
+  { pose: "climb", vh: 520 },
+  { pose: "mist", vh: 130 },
+  { pose: "ceiling", vh: 130 },
+  { pose: "truth", vh: 130 },
+  { pose: "chart", vh: 150 },
+];
+
 export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingFacts }) {
   const reduced = useSyncExternalStore(reducedQ.sub, reducedQ.get, () => false);
   const narrow = useSyncExternalStore(narrowQ.sub, narrowQ.get, () => false);
   const webgl = useWebGLAvailable();
   const full = useMemo(() => buildView(events), [events]);
-  const [store] = useState(() => createStageStore({ pose: "orbit", progress: 0, ...cursorFor("approach", 0, facts, false) }));
+  const [store] = useState(() => createStageStore({ pose: "approach", msg: "hero", ...cursorFor("approach", 0, facts, false) }));
+  const scrub = useRef<SurveyScrub | null>({ a: "approach", pa: 0, b: "approach", pb: 0, w: 0, intro: 0, beadT: beadTFor("approach", 0, facts, false), shiftX: 0, shiftY: 0 });
   const [ready, setReady] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const readyRef = useRef(false);
+  const readyAt = useRef<number | null>(null);
+  const kick = useRef<() => void>(() => {});
 
   // Loader gate: never block for long — if WebGL is missing or slow, open anyway.
   useEffect(() => {
@@ -123,164 +152,119 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
     return () => clearTimeout(t);
   }, [webgl]);
   const [onReady] = useState(() => () => setReady(true));
-
-  // Scroll → (pose, progress, cursor). One passive listener, one rAF; the page itself never re-renders.
   useEffect(() => {
-    readyRef.current = ready;
-    const sections = Array.from(root.current?.querySelectorAll<HTMLElement>("[data-pose]") ?? []);
-    let raf = 0;
-    const apply = () => {
-      raf = 0;
-      const vh = window.innerHeight;
-      let pose: SurveyPose = "approach";
-      let p = 0;
-      for (const el of sections) {
+    if (ready && readyAt.current == null) {
+      readyAt.current = performance.now();
+      kick.current();
+    }
+  }, [ready]);
+
+  // Scroll → stage. One smoothed scroll value; everything (camera blend, bead, replay cursor, message) is a pure
+  // function of it. The rAF loop runs only while the smoothing or the intro is still moving.
+  useEffect(() => {
+    const els = Array.from(root.current?.querySelectorAll<HTMLElement>("[data-pose]") ?? []);
+    let geo: { pose: SurveyPose; start: number; end: number }[] = [];
+    let vh = window.innerHeight;
+    const measure = () => {
+      vh = window.innerHeight;
+      const y0 = window.scrollY;
+      const maxLine = Math.max(vh * 0.5 + 1, document.documentElement.scrollHeight - vh + vh * 0.5);
+      geo = els.map((el) => {
         const r = el.getBoundingClientRect();
-        if (r.top <= vh * 0.5 && r.bottom > vh * 0.5) {
-          pose = el.dataset.pose as SurveyPose;
-          p = el.dataset.pin != null ? (vh * 0.5 - r.top) / Math.max(1, r.height - vh * 0.5) : (vh * 0.5 - r.top) / Math.max(1, r.height);
-          break;
-        }
-        if (r.top > vh * 0.5) break;
-        pose = el.dataset.pose as SurveyPose;
-        p = 1;
+        return { pose: el.dataset.pose as SurveyPose, start: r.top + y0, end: r.bottom + y0 };
+      });
+      if (geo.length) {
+        geo[0].start = vh * 0.5; // the reading line at scroll 0
+        const last = geo[geo.length - 1];
+        last.end = Math.max(last.start + 1, Math.min(last.end, maxLine)); // the furthest the reading line can go
       }
-      p = Math.min(1, Math.max(0, p));
-      if (!readyRef.current && pose === "approach") pose = "orbit";
-      const c = cursorFor(pose, p, facts, reduced);
-      store.set({ pose, progress: reduced ? 0.5 : p, ...c });
     };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(apply);
+    const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+    const pAt = (k: number, line: number) => clamp01((line - geo[k].start) / Math.max(1, geo[k].end - geo[k].start));
+
+    let smooth = window.scrollY;
+    let raf = 0;
+    let lastT = 0;
+    const apply = (y: number, now: number) => {
+      if (!geo.length) return;
+      const line = y + vh * 0.5;
+      let i = 0;
+      for (let k = 0; k < geo.length; k++) if (line >= geo[k].start) i = k;
+      const p = pAt(i, line);
+      const pose = geo[i].pose;
+      // Camera blend across the boundary zone: continuous on both sides of every boundary.
+      const Z = vh * BLEND_VH;
+      let a = i;
+      let b = i;
+      let w = 0;
+      if (i + 1 < geo.length && line > geo[i].end - Z) {
+        b = i + 1;
+        w = clamp01((line - (geo[i].end - Z)) / (2 * Z));
+      } else if (i > 0 && line < geo[i].start + Z) {
+        a = i - 1;
+        w = clamp01((line - (geo[i].start - Z)) / (2 * Z));
+      }
+      if (reduced) w = w < 0.5 ? 0 : 1;
+      const intro = reduced ? 1 : readyAt.current == null ? 0 : clamp01((now - readyAt.current) / INTRO_MS);
+      const sc = scrub.current!;
+      sc.a = geo[a].pose;
+      sc.b = geo[b].pose;
+      sc.pa = reduced ? 0.5 : pAt(a, line);
+      sc.pb = reduced ? 0.5 : pAt(b, line);
+      sc.w = w;
+      sc.intro = intro;
+      sc.beadT = beadTFor(pose, p, facts, reduced);
+      sc.shiftX = narrow ? 0 : 0.19;
+      sc.shiftY = narrow ? 0.2 : 0;
+      store.set({ pose: w >= 0.5 ? sc.b : sc.a, msg: messageAt(pose, p), ...cursorFor(pose, p, facts, reduced) });
+      return intro;
     };
-    apply();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    const frame = (now: number) => {
+      raf = 0;
+      const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 1 / 60);
+      lastT = now;
+      const target = window.scrollY;
+      smooth = reduced ? target : smooth + (target - smooth) * (1 - Math.exp(-SMOOTH * dt));
+      if (Math.abs(target - smooth) < 0.25) smooth = target;
+      const intro = apply(smooth, now) ?? 1;
+      if (smooth !== target || (readyAt.current != null && intro < 1)) raf = requestAnimationFrame(frame);
+      else lastT = 0;
+    };
+    const start = () => {
+      if (!raf) raf = requestAnimationFrame(frame);
+    };
+    kick.current = start;
+    const onResize = () => {
+      measure();
+      start();
+    };
+    measure();
+    apply(smooth, performance.now());
+    start();
+    window.addEventListener("scroll", start, { passive: true });
+    window.addEventListener("resize", onResize);
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("scroll", start);
+      window.removeEventListener("resize", onResize);
       cancelAnimationFrame(raf);
+      kick.current = () => {};
     };
-  }, [facts, reduced, store, ready]);
-
-  // As the hero scrolls away its copy lifts and fades, so it never sits on the headline lying on the plain.
-  const hero = useRef<HTMLElement>(null);
-  const { scrollYProgress: heroP } = useScroll({ target: hero, offset: ["start start", "end start"] });
-  const heroFade = useTransform(heroP, [0, 0.3], [1, 0]);
-  const heroLift = useTransform(heroP, [0, 0.3], [0, -40]);
-
-  const replayHref = `/replays/${facts.name}`;
-  const proposerLine = facts.proposer === "heuristic" ? "offline heuristic proposer (no LLM)" : `proposer: ${facts.proposer}`;
-  const label = metricInfo(facts.metric).label;
-  const sv = facts.survey;
+  }, [facts, reduced, narrow, store]);
 
   return (
     <MotionConfig reducedMotion="user">
       <div ref={root} data-landing className="lp-root" data-theme="dark" data-ready={ready ? "" : undefined} data-webgl={webgl === false ? "off" : "on"}>
         <Loader ready={ready} reduced={reduced} />
-        <div className="lp-stage-wrap" aria-hidden={false}>
-          <Stage events={events} full={full} store={store} narrow={narrow} onReady={onReady} />
+        <div className="lp-stage-wrap">
+          <Stage events={events} full={full} store={store} narrow={narrow} scrub={scrub} onReady={onReady} />
           <div className="lp-scrim" aria-hidden />
         </div>
 
-        {/* 1 — APPROACH: the headline lies on the plain (SDF in the scene; the same words here for everyone else). */}
-        <section ref={hero} className="lp-sec lp-hero" data-pose="approach">
-          <h1 className={webgl === false ? "lp-h1" : "sr-only"}>{HEADLINE}</h1>
-          <motion.div className="lp-hero-copy" style={{ opacity: heroFade, y: heroLift }}>
-            <p className="lp-sub lp-in" style={{ "--d": "200ms" } as CSSProperties}>
-              AutoTinker evolves a readable ML pipeline, keeps only what beats the noise, and knows when to stop.
-            </p>
-            <div className="lp-ctas lp-in" style={{ "--d": "320ms" } as CSSProperties}>
-              <MagneticLink href={replayHref}>Watch a run</MagneticLink>
-              <MagneticLink href="/new" variant="ghost">
-                Start a survey
-              </MagneticLink>
-            </div>
-          </motion.div>
-          {/* fades with the hero copy; the wrapper carries the fade so the CSS entrance animation can't override it */}
-          <motion.div style={{ opacity: heroFade }}>
-            <div className="lp-hero-foot lp-in" style={{ "--d": "520ms" } as CSSProperties}>
-              <p className="lp-honest">
-                <span className="lp-honest-dot" aria-hidden />
-                Replay of a real run · {proposerLine}
-              </p>
-              {webgl !== false && (
-                <p className="lp-hint" aria-hidden>
-                  <span className="lp-hint-ring" /> Press and hold to sound the land
-                </p>
-              )}
-            </div>
-          </motion.div>
-        </section>
+        <Rail store={store} facts={facts} webgl={webgl !== false} />
 
-        {/* 2 — FIRST PROBE */}
-        <Chapter store={store} pose="first-probe" n="01" eyebrow="First probe" title="Every experiment is a probe." height={150}>
-          <p className="lp-sub">Where it lands, ground appears. Its height is the real score.</p>
-          {sv.baseline != null && <Stat v={formatScore(facts.metric, sv.baseline)} k={`baseline · cross-validated ${label}`} />}
-        </Chapter>
-
-        {/* 3 — THE CLIMB: pinned; scroll scrubs the real replay. */}
-        <Climb facts={facts} store={store} reduced={reduced} />
-
-        {/* 4 — THE MIST */}
-        <Chapter store={store} pose="mist" n="03" eyebrow="The mist" title="Gains smaller than the mist are noise." height={160}>
-          <p className="lp-sub">The mist is as thick as the best score&apos;s standard error. A probe inside it is a tie, so it is not kept.</p>
-          {sv.bestSe != null && <Stat v={`± ${formatSe(sv.bestSe)}`} k="standard error of the best" />}
-        </Chapter>
-
-        {/* 5 — THE CEILING */}
-        <Chapter store={store} pose="ceiling" n="04" eyebrow="The ceiling" title="It stops when the rest is in the clouds." height={170}>
-          <p className="lp-sub">The stop rule fits the climb and settles a cloud deck at the asymptote, just above the summit.</p>
-          {sv.ceiling != null ? (
-            <Stat
-              v={formatScore(facts.metric, sv.ceiling)}
-              k={facts.stop && facts.stop.signals > 0 ? `fitted ceiling · ${facts.stop.fired} of ${facts.stop.signals} stop signals agreed` : "fitted ceiling"}
-            />
-          ) : (
-            facts.stop && <Stat v={`${facts.stop.fired} / ${facts.stop.signals}`} k="stop signals agreed" />
-          )}
-        </Chapter>
-
-        {/* 6 — THE TRUTH */}
-        <Chapter store={store} pose="truth" n="05" eyebrow="The locked test" title="One locked test, opened once." height={170}>
-          <p className="lp-sub">A split it never saw, scored a single time at the very end.</p>
-          {facts.final && (
-            <Stat
-              v={formatScore(facts.metric, facts.final.test)}
-              k={`${label} on the locked test · select ${formatScore(facts.metric, facts.final.select)} · ${facts.final.gapText}`}
-            />
-          )}
-        </Chapter>
-
-        {/* 7 — THE CHART */}
-        <section className="lp-sec lp-chart" data-pose="chart" style={{ minHeight: "150svh" }}>
-          <ChartReveal store={store}>
-          <div className="lp-chart-inner">
-            <h2 className="sr-only">{OUTRO}</h2>
-            <p className="lp-eyebrow">
-              <span>06</span> The map
-            </p>
-            <p className="lp-sub lp-measure">
-              {facts.nExperiments} probes, {facts.nKept} kept, stopped on its own. Every run leaves a map like this one.
-            </p>
-            <div className="lp-ctas">
-              <MagneticLink href="/new">Start a survey</MagneticLink>
-              <MagneticLink href={replayHref} variant="ghost">
-                Watch a run
-              </MagneticLink>
-            </div>
-            <nav className="lp-links" aria-label="More">
-              <Link href="/replays">All replays</Link>
-              <a href={GITHUB_URL}>GitHub</a>
-              <a href={DOCS_URL}>Design notes</a>
-            </nav>
-            <p className="lp-colophon">
-              Height is measured: each probe sits at its cross-validated {label}. The map is a projection: bearing is the idea&apos;s family, step is
-              the size of the change. Every number here comes from the {facts.name.replace(/_/g, " ")} replay.
-            </p>
-          </div>
-          </ChartReveal>
-        </section>
+        {SECTIONS.map((s) => (
+          <section key={s.pose} className="lp-sec" data-pose={s.pose} style={{ height: s.pose === "approach" ? "calc(100svh - 57px)" : `${s.vh}svh` }} aria-hidden />
+        ))}
       </div>
     </MotionConfig>
   );
@@ -308,61 +292,46 @@ function Loader({ ready, reduced }: { ready: boolean; reduced: boolean }) {
   }, [ready]);
   return (
     <div className="lp-loader" data-done={ready ? "" : undefined} data-reduced={reduced ? "" : undefined} aria-hidden={ready} role="status">
-      <p className="lp-loader-word">Surveying…</p>
+      <p className="lp-loader-word">Mapping…</p>
       <p className="lp-loader-n">{String(n).padStart(3, "0")}</p>
     </div>
   );
 }
 
-/* ---- one chapter: a sticky caption that fades in and out with its section ---- */
+/* ---- the copy rail: one message, always ---- */
 
-/* ---- captions: exactly one on screen, chosen by ONE function (./captions) from the same store as the 3D stage ---- */
+// A single-slot swap that is never empty: the outgoing message dims (it never fades to nothing), is replaced in the
+// same frame by the incoming one at that same dim level, which then brightens. One block on screen, always.
+const DIM = 0.32;
+const OUT = { opacity: DIM, y: -6, transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as const } };
+const IN = { opacity: 1, y: 0, transition: { duration: 0.26, ease: EASE } };
+const FROM = { opacity: DIM, y: 8 };
 
-/** Opacity (and a small rise) for one caption, written straight from the store — no React re-render per scroll. */
-function useCaption(store: StageStore, id: CaptionId) {
-  const opacity = useMotionValue(0);
-  const y = useTransform(opacity, [0, 1], [14, 0]);
-  useEffect(() => {
-    const sync = () => {
-      const st = store.get();
-      const a = activeCaption(st.pose, st.progress);
-      opacity.set(a.id === id ? a.alpha : 0);
-    };
-    sync();
-    return store.sub(sync);
-  }, [store, id, opacity]);
-  return { opacity, y };
-}
-
-/** Holds the closing map's content back until the locked-test caption is gone (see chartReveal). */
-function ChartReveal({ store, children }: { store: StageStore; children: ReactNode }) {
-  const opacity = useMotionValue(0);
-  const y = useTransform(opacity, [0, 1], [14, 0]);
-  useEffect(() => {
-    const sync = () => {
-      const st = store.get();
-      opacity.set(chartReveal(st.pose, st.progress));
-    };
-    sync();
-    return store.sub(sync);
-  }, [store, opacity]);
-  return <motion.div style={{ opacity, y }}>{children}</motion.div>;
-}
-
-function Chapter({ store, pose, n, eyebrow, title, height, children }: { store: StageStore; pose: CaptionId & SurveyPose; n: string; eyebrow: string; title: string; height: number; children: ReactNode }) {
-  const { opacity, y } = useCaption(store, pose);
+/**
+ * A single fixed slot. The message id comes from the store (a string, so React re-renders only when it changes —
+ * never per scroll frame) and swaps out-then-in, so two messages can never share the screen.
+ */
+function Rail({ store, facts, webgl }: { store: StageStore; facts: LandingFacts; webgl: boolean }) {
+  const id = useSyncExternalStore(store.sub, () => store.get().msg, () => store.get().msg);
+  const idx = MESSAGES.indexOf(id);
+  // The hero's staggered entrance plays once, behind the loader; coming back to it later is an ordinary swap.
+  const [intro, setIntro] = useState(true);
+  if (id !== "hero" && intro) setIntro(false);
   return (
-    <section className="lp-sec lp-chapter" data-pose={pose} style={{ height: `${height}svh` }}>
-      <div className="lp-sticky">
-        <motion.div className="lp-caption" style={{ opacity, y }}>
-          <p className="lp-eyebrow">
-            <span>{n}</span> {eyebrow}
-          </p>
-          <h2 className="lp-h2">{title}</h2>
-          {children}
-        </motion.div>
+    <div className="lp-rail" data-msg={id} data-intro={intro ? "" : undefined}>
+      <div className="lp-rail-inner">
+        <ol className="lp-ticks" aria-hidden>
+          {MESSAGES.map((m, i) => (
+            <li key={m} data-on={i <= idx ? "" : undefined} data-here={i === idx ? "" : undefined} />
+          ))}
+        </ol>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={id} className="lp-msg" initial={FROM} animate={IN} exit={OUT}>
+            <Message id={id} store={store} facts={facts} webgl={webgl} />
+          </motion.div>
+        </AnimatePresence>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -375,87 +344,145 @@ function Stat({ v, k }: { v: ReactNode; k: string }) {
   );
 }
 
-/* ---- the pinned climb ---- */
-
-function Climb({ facts, store, reduced }: { facts: LandingFacts; store: StageStore; reduced: boolean }) {
-  const step = useSyncExternalStore(store.sub, () => store.get().step, () => 0);
-  const g = facts.growth;
-  const at = g[Math.min(step, g.length - 1)];
-  const label = metricInfo(facts.metric).label;
-  const beats: { title: string; sub: string; stat: ReactNode; k: string }[] = [
-    {
-      title: "Each idea sends a probe.",
-      sub: "Bearing is the idea's family; the step is the size of the change.",
-      stat: (
-        <>
-          <Ticker value={at.n} format={(x) => String(Math.round(x)).padStart(2, "0")} />
-          <span className="lp-stat-dim"> / {facts.nExperiments}</span>
-        </>
-      ),
-      k: "experiments, one hypothesis each",
-    },
-    {
-      title: "The bead moves only on a real gain.",
-      sub: "A corrected paired test decides. Everything else stays a stake on lower ground.",
-      stat: (
-        <>
-          <span className="lp-signal">
-            <Ticker value={at.kept} format={(x) => String(Math.round(x))} />
-          </span>
-          <span className="lp-stat-dim"> kept</span>
-        </>
-      ),
-      k: `of ${at.n} tried`,
-    },
-    {
-      title: "Up is better.",
-      sub: "The mercury rests on the best score so far.",
-      stat: <Ticker value={at.best} format={(x) => formatScore(facts.metric, x)} />,
-      k: `best cross-validated ${label} so far`,
-    },
-  ];
-  if (reduced)
+/** The climb's live numbers: their own subscriber (on the replay step), so the rail itself never re-renders for them. */
+function LiveStat({ store, facts, kind }: { store: StageStore; facts: LandingFacts; kind: "tried" | "kept" | "best" }) {
+  const step = useSyncExternalStore(store.sub, () => store.get().step, () => store.get().step);
+  const at = facts.growth[Math.min(step, facts.growth.length - 1)];
+  if (kind === "tried")
     return (
-      <section className="lp-sec lp-chapter" data-pose="climb" style={{ height: "auto" }} aria-label="The climb">
-        {beats.map((b, i) => (
-          <div key={i} className="lp-sticky lp-static">
-            <div className="lp-caption">
-              <p className="lp-eyebrow">
-                <span>02</span> The climb
-              </p>
-              <h2 className="lp-h2">{b.title}</h2>
-              <p className="lp-sub">{b.sub}</p>
-              <Stat v={b.stat} k={b.k} />
-            </div>
-          </div>
-        ))}
-      </section>
+      <Stat
+        v={
+          <>
+            <Ticker value={at.n} format={(x) => String(Math.round(x))} />
+            <span className="lp-stat-dim"> of {facts.nExperiments}</span>
+          </>
+        }
+        k="ideas tried so far"
+      />
     );
-  return (
-    <section className="lp-sec lp-pin" data-pose="climb" data-pin="" aria-label="The climb">
-      <div className="lp-sticky">
-        {beats.map((b, i) => (
-          <BeatLayer key={i} store={store} id={`climb-${i}` as CaptionId}>
-            {i === 0 && (
-              <p className="lp-eyebrow">
-                <span>02</span> The climb · scroll
-              </p>
-            )}
-            <h2 className="lp-h2">{b.title}</h2>
-            <p className="lp-sub">{b.sub}</p>
-            <Stat v={b.stat} k={b.k} />
-          </BeatLayer>
-        ))}
-      </div>
-    </section>
-  );
+  if (kind === "kept")
+    return (
+      <Stat
+        v={
+          <>
+            <span className="lp-signal">
+              <Ticker value={at.kept} format={(x) => String(Math.round(x))} />
+            </span>
+            <span className="lp-stat-dim"> kept</span>
+          </>
+        }
+        k={`out of ${at.n} tried`}
+      />
+    );
+  return <Stat v={<Ticker value={at.best} format={(x) => formatScore(facts.metric, x)} />} k="best score so far" />;
 }
 
-function BeatLayer({ store, id, children }: { store: StageStore; id: CaptionId; children: ReactNode }) {
-  const { opacity, y } = useCaption(store, id);
-  return (
-    <motion.div className="lp-caption lp-beat" style={{ opacity, y }}>
-      {children}
-    </motion.div>
-  );
+function Message({ id, store, facts, webgl }: { id: MessageId; store: StageStore; facts: LandingFacts; webgl: boolean }) {
+  const label = metricInfo(facts.metric).label;
+  const replayHref = `/replays/${facts.name}`;
+  const sv = facts.survey;
+  switch (id) {
+    case "hero":
+      return (
+        <>
+          <h1 className="lp-h1 lp-in" style={{ "--d": "60ms" } as CSSProperties}>
+            Models that tinker <em>themselves.</em>
+          </h1>
+          <p className="lp-sub lp-in" style={{ "--d": "200ms" } as CSSProperties}>
+            Give it a table and a goal. It tries idea after idea, keeps what truly works, and stops when it&apos;s done.
+          </p>
+          <div className="lp-ctas lp-in" style={{ "--d": "320ms" } as CSSProperties}>
+            <MagneticLink href={replayHref}>Watch a run</MagneticLink>
+            <MagneticLink href="/new" variant="ghost">
+              Start a survey
+            </MagneticLink>
+          </div>
+          <p className="lp-hint lp-in" style={{ "--d": "520ms" } as CSSProperties}>
+            <span className="lp-hint-line" aria-hidden />
+            <span>
+              Scroll to watch one real run
+              {webgl && <span className="lp-hint-alt"> · press and hold to light up the map</span>}
+            </span>
+          </p>
+        </>
+      );
+    case "first":
+      return (
+        <>
+          <h2 className="lp-h2">It starts with a simple guess.</h2>
+          <p className="lp-sub">Every idea lands somewhere on the map. Higher means better.</p>
+          {sv.baseline != null && <Stat v={formatScore(facts.metric, sv.baseline)} k="score of the first guess" />}
+        </>
+      );
+    case "climb-0":
+      return (
+        <>
+          <h2 className="lp-h2">Then it tries new ideas.</h2>
+          <p className="lp-sub">One at a time, each idea is really tested and dropped onto the map.</p>
+          <LiveStat store={store} facts={facts} kind="tried" />
+        </>
+      );
+    case "climb-1":
+      return (
+        <>
+          <h2 className="lp-h2">Only real wins move the ball.</h2>
+          <p className="lp-sub">If an improvement could just be luck, it&apos;s thrown away.</p>
+          <LiveStat store={store} facts={facts} kind="kept" />
+        </>
+      );
+    case "climb-2":
+      return (
+        <>
+          <h2 className="lp-h2">Up and up.</h2>
+          <p className="lp-sub">The ball always rests on the best model so far.</p>
+          <LiveStat store={store} facts={facts} kind="best" />
+        </>
+      );
+    case "mist":
+      return (
+        <>
+          <h2 className="lp-h2">Tiny gains don&apos;t count.</h2>
+          <p className="lp-sub">Anything smaller than the mist could be chance, so it&apos;s ignored.</p>
+          {sv.bestSe != null && <Stat v={`± ${formatSe(sv.bestSe)}`} k="how much scores wobble by chance" />}
+        </>
+      );
+    case "ceiling":
+      return (
+        <>
+          <h2 className="lp-h2">It knows when to stop.</h2>
+          <p className="lp-sub">When progress levels off, it stops by itself. No wasted effort.</p>
+          <Stat v={String(facts.nExperiments)} k="ideas tried, then it stopped on its own" />
+        </>
+      );
+    case "test":
+      return (
+        <>
+          <h2 className="lp-h2">Then one honest test.</h2>
+          <p className="lp-sub">On data it never saw, checked once at the very end.</p>
+          {facts.final && <Stat v={formatScore(facts.metric, facts.final.test)} k={`score on unseen data (${label})`} />}
+        </>
+      );
+    case "map":
+    default:
+      return (
+        <>
+          <h2 className="lp-h2">
+            Your data. Your <em>map.</em>
+          </h2>
+          <p className="lp-sub">Every run leaves a map like this one.</p>
+          <div className="lp-ctas">
+            <MagneticLink href="/new">Start a survey</MagneticLink>
+            <MagneticLink href={replayHref} variant="ghost">
+              Watch a run
+            </MagneticLink>
+          </div>
+          <nav className="lp-links" aria-label="More">
+            <Link href="/replays">All replays</Link>
+            <a href={GITHUB_URL}>GitHub</a>
+            <a href={DOCS_URL}>Design notes</a>
+          </nav>
+          <p className="lp-colophon">Every number on this page comes from one real run on a {facts.name.replace(/_/g, " ")} dataset.</p>
+        </>
+      );
+  }
 }

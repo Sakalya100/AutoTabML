@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import { Color, Vector2, Vector3, Vector4 } from "three";
-import { SURVEY } from "@/lib/survey/contract";
+import type { RefObject } from "react";
+import { SURVEY, type SurveyScrub } from "@/lib/survey/contract";
 import type { FieldState } from "./field-state";
 
 /** Sonar input written by DOM handlers, read by the frame loop (no React state at pointer rate). */
@@ -40,6 +41,8 @@ export function createUniforms() {
     uBead: { value: new Vector4(0, 0, 0, -1) },
     uFog: { value: 0.012 },
     uReveal: { value: 1 },
+    uGhost: { value: null as unknown },
+    uGhostOn: { value: 0 },
   };
 }
 export type SharedUniforms = ReturnType<typeof createUniforms>;
@@ -57,8 +60,9 @@ export interface SurveyShared {
   u: SharedUniforms;
   sonar: SonarInput;
   pulse: SonarPulse;
-  /** Latest landing (probe id + time) for the ground ripple. */
   animate: boolean;
+  /** Continuous scroll input (landing), or null. Read in frame loops only. */
+  scrub: RefObject<SurveyScrub | null> | null;
 }
 
 export const SurveyCtx = createContext<SurveyShared | null>(null);

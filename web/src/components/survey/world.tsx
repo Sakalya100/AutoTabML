@@ -7,9 +7,9 @@ import { Environment, Lightformer } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { memo, useEffect, useMemo, useRef, type RefObject } from "react";
 import { PerspectiveCamera, Raycaster, Vector3 } from "three";
-import { SURVEY, type SurveyPose } from "@/lib/survey/contract";
+import { SURVEY, type SurveyPose, type SurveyScrub } from "@/lib/survey/contract";
 import { terrainKey, type SurveyLayoutFull } from "@/lib/survey/layout";
-import { cameraPose, frameMetrics } from "@/lib/survey/poses";
+import { blendPose, cameraPose, climbPointXZ, frameMetrics, type CameraPose } from "@/lib/survey/poses";
 import { CloudDeck, Mist, Truth, type TruthLabels } from "./atmosphere";
 import { Bead, ClimbPath } from "./bead";
 import { FieldState } from "./field-state";
@@ -36,6 +36,10 @@ export interface WorldProps {
   orbit: { yaw: number; pitch: number };
   onReady?: () => void;
   focus: Vector3;
+  /** Continuous scroll input (landing); overrides pose/progress for the camera and drives the bead. */
+  scrub: RefObject<SurveyScrub | null> | null;
+  /** Draw the complete run (`frame`) as faint contours over the unexplored dark. */
+  ghost: boolean;
 }
 
 /** Critically damped spring per component (ω rad/s): long, settled moves with no overshoot. */
@@ -65,7 +69,11 @@ export const SurveyWorld = memo(function SurveyWorld(props: WorldProps) {
   const u = useMemo(() => createUniforms(), []);
   const field = useMemo(() => new FieldState(res, frame.bounds), [res, frame.bounds]);
   useEffect(() => () => field.dispose(), [field]);
-  const shared: SurveyShared = useMemo(() => ({ field, u, sonar, pulse: { id: 0, t0: -100, speed: 6, x: 0, z: 0 }, animate }), [field, u, sonar, animate]);
+  const { scrub } = props;
+  const shared: SurveyShared = useMemo(
+    () => ({ field, u, sonar, pulse: { id: 0, t0: -100, speed: 6, x: 0, z: 0 }, animate, scrub }),
+    [field, u, sonar, animate, scrub],
+  );
 
   // Rebuild the heightfield only when the probe set changes (in render, so children read the new ground at once).
   const key = terrainKey(layout);
@@ -75,6 +83,14 @@ export const SurveyWorld = memo(function SurveyWorld(props: WorldProps) {
     firstField.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the identity of the probe set
   }, [field, key, animate]);
+  // The ghost: the complete run's terrain, built once into its own texture (never morphed).
+  const ghostKey = props.ghost ? terrainKey(frame) : "";
+  useMemo(() => {
+    field.setGhost(props.ghost ? frame : null, ghostKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `ghostKey` is the identity of the complete probe set
+  }, [field, ghostKey]);
+  u.uGhost.value = field.ghost;
+  u.uGhostOn.value = field.ghost ? 1 : 0;
   u.uFieldA.value = field.texA;
   u.uFieldB.value = field.texB;
   u.uContourSpec.value.set(frame.contour.base, frame.contour.step, 1);
@@ -92,7 +108,7 @@ export const SurveyWorld = memo(function SurveyWorld(props: WorldProps) {
       <Terrain />
       <Probes probes={layout.probes} selectedId={props.selectedId} />
       <ClimbPath climb={layout.climb} fieldKey={key} />
-      <Bead target={layout.bead} />
+      <Bead target={layout.bead} path={frame.climb} />
       <Mist bestY={layout.bestY} thickness={layout.mist} />
       <CloudDeck
         cloudY={layout.cloudY}
@@ -163,12 +179,17 @@ const hits = new Map<string, number>();
  * The single writer for the camera and the shared uniforms: pose springs, parallax / drag-orbit, sonar charge and
  * pulse, terrain morph. Runs before everything else each frame.
  */
-function Driver({ layout, frame, pose, progress, interactive, onSelect, animate, sonar, orbit, onReady, focus, shared }: WorldProps & { shared: SurveyShared }) {
+function Driver({ layout, frame, pose, progress, interactive, onSelect, animate, sonar, orbit, onReady, focus, shared, scrub }: WorldProps & { shared: SurveyShared }) {
   const { u, field, pulse } = shared;
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const size = useThree((s) => s.size);
+  // On-demand frame loops (reduced motion) render only when asked: a new pose must draw its framing.
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    invalidate();
+  }, [pose, layout, invalidate]);
   const tmp = useMemo(
     () => ({
       pos: new Spring3(),
@@ -254,7 +275,32 @@ function Driver({ layout, frame, pose, progress, interactive, onSelect, animate,
 
     // ---- camera
     const aspect = size.width / Math.max(1, size.height);
-    const c = cameraPose(pose, progress.current ?? 0, { frame, now: layout, aspect });
+    const sc = scrub?.current ?? null;
+    let c: CameraPose;
+    if (sc) {
+      // Landing: the camera is a pure function of (smoothed) scroll — a blend across each section boundary, never a
+      // switch-and-spring — and the climb shot follows the bead exactly where the Bead draws it.
+      let bead: [number, number, number] | null = null;
+      if (sc.beadT != null && frame.climb.length > 0) {
+        const [bx, bz] = climbPointXZ(frame.climb, sc.beadT);
+        bead = [bx, field.sample(bx, bz), bz];
+      }
+      const pf = { frame, now: layout, aspect, bead };
+      c = cameraPose(sc.a, sc.pa, pf);
+      if (sc.w > 0) c = blendPose(c, cameraPose(sc.b, sc.pb, pf), sc.w * sc.w * (3 - 2 * sc.w));
+      if (sc.intro < 1) {
+        const k = Math.min(1, Math.max(0, sc.intro));
+        c = blendPose(cameraPose("orbit", 0, pf), c, 1 - (1 - k) ** 3);
+      }
+      // Compose off-centre (the copy rail sits on the other side) with a view offset: poses stay untouched.
+      const ox = -sc.shiftX * size.width;
+      const oy = sc.shiftY * size.height;
+      const v = camera.view;
+      if (ox !== 0 || oy !== 0) {
+        if (!v || !v.enabled || v.offsetX !== ox || v.offsetY !== oy || v.fullWidth !== size.width || v.fullHeight !== size.height)
+          camera.setViewOffset(size.width, size.height, ox, oy, size.width, size.height);
+      } else if (v?.enabled) camera.clearViewOffset();
+    } else c = cameraPose(pose, progress.current ?? 0, { frame, now: layout, aspect });
     tmp.want.set(...c.pos);
     tmp.wantT.set(...c.target);
     if (tmp.first || !animate) {
@@ -263,10 +309,17 @@ function Driver({ layout, frame, pose, progress, interactive, onSelect, animate,
       tmp.fov.x = c.fov;
       tmp.first = false;
     } else {
-      tmp.pos.step(tmp.want, 2.6, dt);
-      tmp.target.step(tmp.wantT, 2.9, dt);
-      tmp.fov.v += (-2 * 2.6 * tmp.fov.v - 2.6 * 2.6 * (tmp.fov.x - c.fov)) * dt;
-      tmp.fov.x += tmp.fov.v * dt;
+      // Scroll-driven: the input is already continuous, so only a light, fast follow (no swings). Elsewhere: the
+      // long settled moves between authored poses.
+      const wPos = sc ? 11 : 2.6;
+      const wT = sc ? 12 : 2.9;
+      tmp.pos.step(tmp.want, wPos, dt);
+      tmp.target.step(tmp.wantT, wT, dt);
+      if (sc) tmp.fov.x += (c.fov - tmp.fov.x) * (1 - Math.exp(-10 * dt));
+      else {
+        tmp.fov.v += (-2 * wPos * tmp.fov.v - wPos * wPos * (tmp.fov.x - c.fov)) * dt;
+        tmp.fov.x += tmp.fov.v * dt;
+      }
     }
     // parallax (±2°) toward the pointer, plus the constrained drag-orbit on run pages
     const px = sonar.hasPointer && animate ? sonar.ndc.x : 0;

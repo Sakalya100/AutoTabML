@@ -59,9 +59,12 @@ vec2 fieldAt(vec2 xz) {
 
 export const terrainVert = /* glsl */ `
 ${FIELD}
+uniform sampler2D uGhost;  // complete run's terrain (landing): height, reveal
+uniform float uGhostOn;
 varying vec3 vWorld;
 varying vec3 vNormalW;
 varying float vMask;
+varying vec2 vGhost;       // ghost height, ghost reveal
 void main() {
   vec2 xz = uWin.xy + position.xz * uWin.z;
   vec2 f = fieldAt(xz);
@@ -70,8 +73,15 @@ void main() {
   float hz = fieldAt(xz + vec2(0.0, e)).x - fieldAt(xz - vec2(0.0, e)).x;
   vNormalW = normalize(vec3(-hx, 2.0 * e, -hz));
   vMask = f.y;
-  // Unrevealed ground settles a little lower, so the survey edge reads as a lip of uncovered land.
-  float h = f.x - (1.0 - smoothstep(0.0, 0.5, f.y)) * 0.35;
+  vec2 g = texture2D(uGhost, fieldUV(xz)).rg * uGhostOn;
+  vGhost = g;
+  // Unrevealed ground settles a little lower, so the survey edge reads as a lip of uncovered land. Where nothing is
+  // revealed yet and a ghost exists, the (invisible) surface takes the ghost's shape so its contour lines stand in 3D.
+  float r = smoothstep(0.0, 0.5, f.y);
+  // The hand-over happens entirely inside the band the fragment shader discards (mask < ~0.07), so the step between
+  // the ghost and the live ground is never drawn as a wall.
+  float base = mix(f.x, g.x, uGhostOn * step(0.02, g.y) * (1.0 - smoothstep(0.0, 0.05, f.y)));
+  float h = base - (1.0 - r) * 0.35;
   vWorld = vec3(xz.x, h, xz.y);
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }
@@ -94,14 +104,31 @@ uniform vec4 uLand;        // x, z, t0, strength
 uniform vec4 uBead;        // x, y, z, radius
 uniform float uFog;
 uniform float uReveal;     // global intro reveal 0..1
+uniform float uGhostOn;
 varying vec3 vWorld;
 varying vec3 vNormalW;
 varying float vMask;
+varying vec2 vGhost;
 
 float ring(float d, float r, float w) { float x = (d - r) / w; return exp(-x * x); }
 
 void main() {
-  if (vMask < 0.004) discard;
+  // Ghost (landing): the complete run's contours, faint, only where the ground is not revealed yet. Derivatives are
+  // taken before any discard (uniform control flow).
+  float m = smoothstep(0.02, 0.7, vMask) * uReveal;
+  float ghc = (vGhost.x - uContourSpec.x) / max(uContourSpec.y, 1e-4);
+  float gfw = max(fwidth(ghc), 1e-4);
+  float gfr = fract(ghc);
+  float gdl = min(gfr, 1.0 - gfr);
+  float gmaj = 1.0 - step(0.5, abs(mod(floor(ghc + 0.5), 5.0)));
+  float gline = (1.0 - smoothstep(0.0, gfw * mix(1.0, 1.6, gmaj), gdl)) * (1.0 - smoothstep(0.35, 0.8, gfw));
+  // Only on gently sloped surface: where the invisible ghost surface hands over to the live ground the mesh briefly
+  // turns into a near-vertical wall, and contour lines stacked on it read as vertical streaks.
+  vec3 gn = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+  float gflat = smoothstep(0.55, 0.8, abs(gn.y));
+  float ghostA = uGhostOn * smoothstep(0.02, 0.45, vGhost.y) * (1.0 - m) * mix(0.05, 0.13, gmaj) * gline * gflat * uReveal;
+  // Nothing revealed and no ghost line here: let the void (or land behind) show through.
+  if (m < 0.02 && ghostA < 0.004) discard;
   vec3 n = normalize(vNormalW);
   vec3 P = vWorld;
 
@@ -161,10 +188,9 @@ void main() {
   col += uSignal * (front * 0.55 + landR * 0.25 + gather * 0.18) * (0.35 + line);
 
   // Survey edge: revealed ground fades into the void with a faint bone lip at the frontier.
-  float m = smoothstep(0.02, 0.7, vMask) * uReveal;
   float fm = max(fwidth(vMask), 1e-4);
   float lip = (1.0 - smoothstep(0.0, fm * 1.1, abs(vMask - 0.16))) * 0.09;
-  col = mix(uVoid, col, m) + uContour * lip * uReveal;
+  col = mix(uVoid, col, m) + uContour * lip * uReveal + uContour * ghostA;
 
   float dist = length(cameraPosition - P);
   float fogF = 1.0 - exp(-dist * dist * uFog * uFog);
