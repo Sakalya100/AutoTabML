@@ -1,7 +1,8 @@
 """Live control of a running agentic loop: steering messages and a graceful stop.
 
-The web runner writes JSONL commands to the engine (stdin or a FIFO); a daemon thread reads them into a
-thread-safe queue and the loop drains that queue on its own (main) thread:
+The web runner writes JSONL commands to the engine (stdin, a FIFO, or an append-only control file that is
+polled — the only option inside a remote sandbox, where the runner can write files but has no stdin); a daemon
+thread reads them into a thread-safe queue and the loop drains that queue on its own (main) thread:
 
     {"type": "steer", "text": "prefer simple linear models"}
     {"type": "stop"}
@@ -15,6 +16,7 @@ import json
 import queue
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Literal
@@ -116,6 +118,36 @@ class ControlChannel:
                     return
 
         return ch._start(run, "autotinker-control-fifo")
+
+    @classmethod
+    def from_file(cls, path: str | Path, poll_s: float = 0.5) -> ControlChannel:
+        """Poll an append-only JSONL file for new complete lines (a missing file is simply empty).
+
+        The writer may rewrite the whole file if it keeps the earlier lines (read, append, write back);
+        if the file shrinks it is treated as replaced and read from the start."""
+        ch = cls()
+        p = Path(path)
+
+        def run() -> None:
+            offset = 0
+            while True:
+                try:
+                    data = p.read_bytes()
+                except FileNotFoundError:
+                    data = b""
+                except OSError as exc:
+                    print(f"[autotinker] control file unreadable: {exc}", file=sys.stderr)
+                    data = b""
+                if len(data) < offset:
+                    offset = 0
+                end = data.rfind(b"\n") + 1  # only complete lines; a partial write is picked up next poll
+                if end > offset:
+                    for line in data[offset:end].decode("utf-8", errors="replace").splitlines():
+                        ch.feed_line(line)
+                    offset = end
+                time.sleep(poll_s)
+
+        return ch._start(run, "autotinker-control-file")
 
     # ---------------------------------------------------------------- consumer
 

@@ -159,9 +159,41 @@ def test_stop_is_graceful_locked_test_and_report_still_run(tmp_path: Path) -> No
     assert types.index("stopped") < types.index("run_finished") < types.index("report_ready")
 
 
+def _drain_until(ch: ControlChannel, n: int, timeout: float = 3.0) -> list[ControlCommand]:
+    got: list[ControlCommand] = []
+    deadline = time.time() + timeout
+    while len(got) < n and time.time() < deadline:
+        got += ch.drain()
+        time.sleep(0.01)
+    return got
+
+
+def test_control_file_is_polled_for_appended_lines(tmp_path: Path) -> None:
+    path = tmp_path / "control.jsonl"
+    ch = ControlChannel.from_file(path, poll_s=0.02)  # the file does not exist yet: treated as empty
+    time.sleep(0.05)
+    assert ch.drain() == []
+    path.write_text('{"type":"steer","text":"prefer trees"}\n{"type":"st')  # partial last line: not read yet
+    assert _drain_until(ch, 1) == [ControlCommand("steer", "prefer trees")]
+    assert not ch.stop_requested
+    # the remote writer rewrites the whole file with the earlier lines kept (read, append, write back)
+    path.write_text('{"type":"steer","text":"prefer trees"}\n{"type":"stop"}\n')
+    assert _drain_until(ch, 1) == [ControlCommand("stop")]
+    assert ch.stop_requested
+
+
+def test_control_file_replaced_by_a_shorter_one_is_reread(tmp_path: Path) -> None:
+    path = tmp_path / "control.jsonl"
+    path.write_text('{"type":"steer","text":"a fairly long first steering message"}\n')
+    ch = ControlChannel.from_file(path, poll_s=0.02)
+    assert _drain_until(ch, 1) == [ControlCommand("steer", "a fairly long first steering message")]
+    path.write_text('{"type":"stop"}\n')
+    assert _drain_until(ch, 1) == [ControlCommand("stop")]
+
+
 def test_cli_control_flags_are_listed() -> None:
     # CI forces colour (GITHUB_ACTIONS / FORCE_COLOR), and Rich's ANSI codes split option names; strip them.
     res = CliRunner().invoke(app, ["run", "--help"], env={"COLUMNS": "200", "NO_COLOR": "1", "TERM": "dumb"})
     assert res.exit_code == 0
     out = re.sub(r"\x1b\[[0-9;]*m", "", res.output)
-    assert "--control-stdin" in out and "--control-fifo" in out
+    assert "--control-stdin" in out and "--control-fifo" in out and "--control-file" in out
