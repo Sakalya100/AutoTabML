@@ -22,7 +22,7 @@ export default async function Home() {
           <Link href="/replays" className="rounded-full bg-ink px-6 py-3 text-paper">
             Replays
           </Link>
-          <Link href="/new" className="rounded-full border border-rule-strong px-6 py-3">
+          <Link href="/s/new" className="rounded-full border border-rule-strong px-6 py-3">
             New run
           </Link>
         </div>

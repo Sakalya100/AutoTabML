@@ -4,7 +4,21 @@
  */
 
 export type RunEvent =
-  RunStarted | ExperimentStarted | LLMCall | SandboxFinished | ExperimentScored | DecisionMade | Stopped | RunFinished;
+  | RunStarted
+  | ExperimentStarted
+  | LLMCall
+  | SandboxFinished
+  | ExperimentScored
+  | DecisionMade
+  | Stopped
+  | RunFinished
+  | AgentStepStarted
+  | AgentReasoning
+  | AgentStepFinished
+  | SandboxLog
+  | HpoTrialEvent
+  | ReportReady
+  | SteerApplied;
 export type RunId = string;
 export type Seq = number;
 export type Ts = string;
@@ -76,12 +90,27 @@ export type IdeaCategory =
   | "simplification"
   | "repair";
 export type Radical = boolean;
+export type Phase = string | null;
 export type RunId2 = string;
 export type Seq2 = number;
 export type Ts2 = string;
 export type Type2 = "llm_call";
 export type ExpId1 = string | null;
-export type Purpose = "draft" | "propose" | "implement" | "repair";
+export type Purpose =
+  | "draft"
+  | "propose"
+  | "implement"
+  | "repair"
+  | "intake"
+  | "profiler"
+  | "planner"
+  | "coder"
+  | "debugger"
+  | "critic"
+  | "judge"
+  | "tuner"
+  | "ensembler"
+  | "reporter";
 export type Model = string;
 export type InputTokens = number;
 export type OutputTokens = number;
@@ -125,7 +154,8 @@ export type RunId6 = string;
 export type Seq6 = number;
 export type Ts6 = string;
 export type Type6 = "stopped";
-export type Reason1 = "ceiling" | "max_experiments" | "max_cost" | "max_time" | "user" | "proposer_failure";
+export type Reason1 =
+  "ceiling" | "max_experiments" | "max_cost" | "max_time" | "user" | "proposer_failure" | "max_tokens";
 export type Summary = string;
 export type RunId7 = string;
 export type Seq7 = number;
@@ -139,15 +169,91 @@ export type OptimismGap = number;
 export type NExperiments = number;
 export type TotalCostUsd = number;
 export type WallTimeS = number;
-export type Version = number;
 export type RunId8 = string;
+export type Seq8 = number;
+export type Ts8 = string;
+export type Type8 = "agent_step_started";
+export type ExpId5 = string | null;
+export type StepId = string;
+export type Role = string;
+export type Attempt1 = number;
+export type InputSummary = string;
+export type RunId9 = string;
+export type Seq9 = number;
+export type Ts9 = string;
+export type Type9 = "agent_reasoning";
+export type ExpId6 = string | null;
+export type StepId1 = string;
+export type Role1 = string;
+export type Text = string;
+export type RunId10 = string;
+export type Seq10 = number;
+export type Ts10 = string;
+export type Type10 = "agent_step_finished";
+export type ExpId7 = string | null;
+export type StepId2 = string;
+export type Role2 = string;
+export type Model1 = string | null;
+export type Provider = string | null;
+export type Attempt2 = number;
+export type Status = "ok" | "error";
+export type Plain = string;
+export type InputSummary1 = string;
+export type Reasoning = string | null;
+export type Output = {
+  [k: string]: unknown;
+} | null;
+export type Code = string | null;
+export type Diff = string | null;
+export type ToolCalls = {
+  [k: string]: unknown;
+}[];
+export type StdoutTail = string | null;
+export type StderrTail = string | null;
+export type Error = string | null;
+export type TokensIn = number;
+export type TokensOut = number;
+export type TokensCached = number;
+export type CostUsd1 = number;
+export type WouldBeCostUsd = number;
+export type DurationS1 = number;
+export type StartedAt = string;
+export type RunId11 = string;
+export type Seq11 = number;
+export type Ts11 = string;
+export type Type11 = "sandbox_log";
+export type ExpId8 = string;
+export type Attempt3 = number;
+export type Stream = "stdout" | "stderr";
+export type Lines = string[];
+export type RunId12 = string;
+export type Seq12 = number;
+export type Ts12 = string;
+export type Type12 = "hpo_trial";
+export type ExpId9 = string;
+export type Number = number;
+export type Value = number | null;
+export type State = "complete" | "fail" | "pruned";
+export type DurationS2 = number;
+export type RunId13 = string;
+export type Seq13 = number;
+export type Ts13 = string;
+export type Type13 = "report_ready";
+export type RunId14 = string;
+export type Seq14 = number;
+export type Ts14 = string;
+export type Type14 = "steer_applied";
+export type Text1 = string;
+export type AtExp = string | null;
+export type Version = number;
+export type RunId15 = string;
 export type CreatedAt = string;
 export type Mode = string;
 export type Proposer1 = string;
 export type Id = string;
 export type ParentId1 = string | null;
-export type Code = string;
-export type Diff = string;
+export type Code1 = string;
+export type Diff1 = string;
 export type Reason2 = string;
 export type SelectScore2 = number | null;
 export type FitTimeS1 = number | null;
@@ -156,9 +262,12 @@ export type RepairAttempts = number;
 export type ErrorKind1 = string | null;
 export type ErrorTail1 = string | null;
 export type LlmCalls = LLMUsage[];
-export type CostUsd1 = number;
-export type DurationS1 = number;
-export type StartedAt = string;
+export type CostUsd2 = number;
+export type DurationS3 = number;
+export type StartedAt1 = string;
+export type Phase1 = string | null;
+export type Steps = AgentStep[];
+export type Trials = HpoTrial[];
 export type Experiments = ExperimentRecord[];
 export type BestExpId2 = string | null;
 export type Stop = {
@@ -173,6 +282,10 @@ export type TotalCostUsd1 = number;
 export type TotalInputTokens = number;
 export type TotalOutputTokens = number;
 export type WallTimeS1 = number;
+export type Steps1 = AgentStep[];
+export type Report2 = {
+  [k: string]: unknown;
+} | null;
 
 export interface AutoTinkerSchemas {
   event: RunEvent;
@@ -257,6 +370,7 @@ export interface ExperimentStarted {
   exp_id: ExpId;
   parent_id: ParentId;
   idea: Idea;
+  phase?: Phase;
 }
 /**
  * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
@@ -383,11 +497,155 @@ export interface RunFinished {
 }
 /**
  * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "AgentStepStarted".
+ */
+export interface AgentStepStarted {
+  run_id: RunId8;
+  seq?: Seq8;
+  ts?: Ts8;
+  type?: Type8;
+  exp_id: ExpId5;
+  step_id: StepId;
+  role: Role;
+  attempt?: Attempt1;
+  input_summary?: InputSummary;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "AgentReasoning".
+ */
+export interface AgentReasoning {
+  run_id: RunId9;
+  seq?: Seq9;
+  ts?: Ts9;
+  type?: Type9;
+  exp_id: ExpId6;
+  step_id: StepId1;
+  role: Role1;
+  text: Text;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "AgentStepFinished".
+ */
+export interface AgentStepFinished {
+  run_id: RunId10;
+  seq?: Seq10;
+  ts?: Ts10;
+  type?: Type10;
+  exp_id: ExpId7;
+  step: AgentStep;
+}
+/**
+ * One step of one agent (or of a deterministic actor such as the executor) inside an experiment.
+ *
+ * LLM steps carry the model/provider and token accounting; executor/ablation/tune steps carry the sandbox
+ * tails. `plain` is the one-line, plain-language message shown in the chat.
+ *
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "AgentStep".
+ */
+export interface AgentStep {
+  step_id?: StepId2;
+  role: Role2;
+  model?: Model1;
+  provider?: Provider;
+  attempt?: Attempt2;
+  status?: Status;
+  plain?: Plain;
+  input_summary?: InputSummary1;
+  reasoning?: Reasoning;
+  output?: Output;
+  code?: Code;
+  diff?: Diff;
+  tool_calls?: ToolCalls;
+  stdout_tail?: StdoutTail;
+  stderr_tail?: StderrTail;
+  error?: Error;
+  tokens_in?: TokensIn;
+  tokens_out?: TokensOut;
+  tokens_cached?: TokensCached;
+  cost_usd?: CostUsd1;
+  would_be_cost_usd?: WouldBeCostUsd;
+  duration_s?: DurationS1;
+  started_at?: StartedAt;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "SandboxLog".
+ */
+export interface SandboxLog {
+  run_id: RunId11;
+  seq?: Seq11;
+  ts?: Ts11;
+  type?: Type11;
+  exp_id: ExpId8;
+  attempt?: Attempt3;
+  stream?: Stream;
+  lines: Lines;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "HpoTrialEvent".
+ */
+export interface HpoTrialEvent {
+  run_id: RunId12;
+  seq?: Seq12;
+  ts?: Ts12;
+  type?: Type12;
+  exp_id: ExpId9;
+  trial: HpoTrial;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "HpoTrial".
+ */
+export interface HpoTrial {
+  number: Number;
+  params?: Params;
+  value?: Value;
+  state?: State;
+  duration_s?: DurationS2;
+}
+export interface Params {
+  [k: string]: unknown;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "ReportReady".
+ */
+export interface ReportReady {
+  run_id: RunId13;
+  seq?: Seq13;
+  ts?: Ts13;
+  type?: Type13;
+  report: Report1;
+}
+export interface Report1 {
+  [k: string]: unknown;
+}
+/**
+ * A steering message from the person watching was accepted: it is included in every later Planner and
+ * Tuner prompt, starting with experiment `at_exp`.
+ *
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "SteerApplied".
+ */
+export interface SteerApplied {
+  run_id: RunId14;
+  seq?: Seq14;
+  ts?: Ts14;
+  type?: Type14;
+  text: Text1;
+  at_exp?: AtExp;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
  * via the `definition` "RunRecord".
  */
 export interface RunRecord {
   version?: Version;
-  run_id: RunId8;
+  run_id: RunId15;
   created_at: CreatedAt;
   mode: Mode;
   proposer: Proposer1;
@@ -402,6 +660,9 @@ export interface RunRecord {
   total_input_tokens?: TotalInputTokens;
   total_output_tokens?: TotalOutputTokens;
   wall_time_s?: WallTimeS1;
+  steps?: Steps1;
+  report?: Report2;
+  usage?: Usage;
 }
 export interface Config1 {
   [k: string]: unknown;
@@ -414,8 +675,8 @@ export interface ExperimentRecord {
   id: Id;
   parent_id: ParentId1;
   idea: Idea;
-  code: Code;
-  diff?: Diff;
+  code: Code1;
+  diff?: Diff1;
   status: Decision;
   reason?: Reason2;
   cv?: CVScore | null;
@@ -426,9 +687,12 @@ export interface ExperimentRecord {
   error_kind?: ErrorKind1;
   error_tail?: ErrorTail1;
   llm_calls?: LlmCalls;
-  cost_usd?: CostUsd1;
-  duration_s?: DurationS1;
-  started_at?: StartedAt;
+  cost_usd?: CostUsd2;
+  duration_s?: DurationS3;
+  started_at?: StartedAt1;
+  phase?: Phase1;
+  steps?: Steps;
+  trials?: Trials;
 }
 /**
  * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
@@ -440,4 +704,7 @@ export interface FinalScores {
   select_score: SelectScore3;
   test_score: TestScore1;
   optimism_gap: OptimismGap1;
+}
+export interface Usage {
+  [k: string]: unknown;
 }

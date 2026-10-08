@@ -129,6 +129,7 @@ def run_in_sandbox(
     memory_mb: int,
     seed: int = 0,
     threads: int | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> SandboxResult:
     """Run `code` (no static check here; callers do that) in a worker subprocess. Never raises for
     solution failures."""
@@ -150,6 +151,7 @@ def run_in_sandbox(
         "n_classes": n_classes,
         "memory_mb": memory_mb,
         "seed": seed,
+        **(extra or {}),
     }
     job_path = job_dir / "job.json"
     job_path.write_text(json.dumps(job))

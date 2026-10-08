@@ -410,7 +410,7 @@ function Message({ id, store, facts, webgl }: { id: MessageId; store: StageStore
           </p>
           <div className="lp-ctas lp-in" style={{ "--d": "320ms" } as CSSProperties}>
             <MagneticLink href={replayHref}>Watch a run</MagneticLink>
-            <MagneticLink href="/new" variant="ghost">
+            <MagneticLink href="/s/new" variant="ghost">
               Start a survey
             </MagneticLink>
           </div>
@@ -488,7 +488,7 @@ function Message({ id, store, facts, webgl }: { id: MessageId; store: StageStore
           </h2>
           <p className="lp-sub">Every run leaves a map like this one.</p>
           <div className="lp-ctas">
-            <MagneticLink href="/new">Start a survey</MagneticLink>
+            <MagneticLink href="/s/new">Start a survey</MagneticLink>
             <MagneticLink href={replayHref} variant="ghost">
               Watch a run
             </MagneticLink>

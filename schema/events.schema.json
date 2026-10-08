@@ -1,5 +1,359 @@
 {
   "$defs": {
+    "AgentReasoning": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "agent_reasoning",
+          "default": "agent_reasoning",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exp Id"
+        },
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "step_id",
+        "role",
+        "text"
+      ],
+      "title": "AgentReasoning",
+      "type": "object"
+    },
+    "AgentStep": {
+      "description": "One step of one agent (or of a deterministic actor such as the executor) inside an experiment.\n\nLLM steps carry the model/provider and token accounting; executor/ablation/tune steps carry the sandbox\ntails. `plain` is the one-line, plain-language message shown in the chat.",
+      "properties": {
+        "step_id": {
+          "default": "",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "attempt": {
+          "default": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "plain": {
+          "default": "",
+          "title": "Plain",
+          "type": "string"
+        },
+        "input_summary": {
+          "default": "",
+          "title": "Input Summary",
+          "type": "string"
+        },
+        "reasoning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoning"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Diff"
+        },
+        "tool_calls": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Tool Calls",
+          "type": "array"
+        },
+        "stdout_tail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stdout Tail"
+        },
+        "stderr_tail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stderr Tail"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "tokens_in": {
+          "default": 0,
+          "title": "Tokens In",
+          "type": "integer"
+        },
+        "tokens_out": {
+          "default": 0,
+          "title": "Tokens Out",
+          "type": "integer"
+        },
+        "tokens_cached": {
+          "default": 0,
+          "title": "Tokens Cached",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "default": 0.0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "would_be_cost_usd": {
+          "default": 0.0,
+          "title": "Would Be Cost Usd",
+          "type": "number"
+        },
+        "duration_s": {
+          "default": 0.0,
+          "title": "Duration S",
+          "type": "number"
+        },
+        "started_at": {
+          "default": "",
+          "title": "Started At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "AgentStep",
+      "type": "object"
+    },
+    "AgentStepFinished": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "agent_step_finished",
+          "default": "agent_step_finished",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exp Id"
+        },
+        "step": {
+          "$ref": "#/$defs/AgentStep"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "step"
+      ],
+      "title": "AgentStepFinished",
+      "type": "object"
+    },
+    "AgentStepStarted": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "agent_step_started",
+          "default": "agent_step_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exp Id"
+        },
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "attempt": {
+          "default": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "input_summary": {
+          "default": "",
+          "title": "Input Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "step_id",
+        "role"
+      ],
+      "title": "AgentStepStarted",
+      "type": "object"
+    },
     "CVScore": {
       "properties": {
         "mean": {
@@ -324,6 +678,18 @@
         },
         "idea": {
           "$ref": "#/$defs/Idea"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
         }
       },
       "required": [
@@ -333,6 +699,88 @@
         "idea"
       ],
       "title": "ExperimentStarted",
+      "type": "object"
+    },
+    "HpoTrial": {
+      "properties": {
+        "number": {
+          "title": "Number",
+          "type": "integer"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "state": {
+          "default": "complete",
+          "enum": [
+            "complete",
+            "fail",
+            "pruned"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "duration_s": {
+          "default": 0.0,
+          "title": "Duration S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "number"
+      ],
+      "title": "HpoTrial",
+      "type": "object"
+    },
+    "HpoTrialEvent": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "hpo_trial",
+          "default": "hpo_trial",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "title": "Exp Id",
+          "type": "string"
+        },
+        "trial": {
+          "$ref": "#/$defs/HpoTrial"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "trial"
+      ],
+      "title": "HpoTrialEvent",
       "type": "object"
     },
     "Idea": {
@@ -427,7 +875,17 @@
             "draft",
             "propose",
             "implement",
-            "repair"
+            "repair",
+            "intake",
+            "profiler",
+            "planner",
+            "coder",
+            "debugger",
+            "critic",
+            "judge",
+            "tuner",
+            "ensembler",
+            "reporter"
           ],
           "title": "Purpose",
           "type": "string"
@@ -485,6 +943,40 @@
       ],
       "title": "ProblemType",
       "type": "string"
+    },
+    "ReportReady": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "report_ready",
+          "default": "report_ready",
+          "title": "Type",
+          "type": "string"
+        },
+        "report": {
+          "additionalProperties": true,
+          "title": "Report",
+          "type": "object"
+        }
+      },
+      "required": [
+        "run_id",
+        "report"
+      ],
+      "title": "ReportReady",
+      "type": "object"
     },
     "RunFinished": {
       "properties": {
@@ -673,6 +1165,107 @@
       "title": "SandboxFinished",
       "type": "object"
     },
+    "SandboxLog": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "sandbox_log",
+          "default": "sandbox_log",
+          "title": "Type",
+          "type": "string"
+        },
+        "exp_id": {
+          "title": "Exp Id",
+          "type": "string"
+        },
+        "attempt": {
+          "default": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "stream": {
+          "default": "stdout",
+          "enum": [
+            "stdout",
+            "stderr"
+          ],
+          "title": "Stream",
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lines",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id",
+        "exp_id",
+        "lines"
+      ],
+      "title": "SandboxLog",
+      "type": "object"
+    },
+    "SteerApplied": {
+      "description": "A steering message from the person watching was accepted: it is included in every later Planner and\nTuner prompt, starting with experiment `at_exp`.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "steer_applied",
+          "default": "steer_applied",
+          "title": "Type",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "at_exp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At Exp"
+        }
+      },
+      "required": [
+        "run_id",
+        "text"
+      ],
+      "title": "SteerApplied",
+      "type": "object"
+    },
     "Stopped": {
       "properties": {
         "run_id": {
@@ -701,7 +1294,8 @@
             "max_cost",
             "max_time",
             "user",
-            "proposer_failure"
+            "proposer_failure",
+            "max_tokens"
           ],
           "title": "Reason",
           "type": "string"
@@ -803,13 +1397,20 @@
   },
   "discriminator": {
     "mapping": {
+      "agent_reasoning": "#/$defs/AgentReasoning",
+      "agent_step_finished": "#/$defs/AgentStepFinished",
+      "agent_step_started": "#/$defs/AgentStepStarted",
       "decision": "#/$defs/DecisionMade",
       "experiment_scored": "#/$defs/ExperimentScored",
       "experiment_started": "#/$defs/ExperimentStarted",
+      "hpo_trial": "#/$defs/HpoTrialEvent",
       "llm_call": "#/$defs/LLMCall",
+      "report_ready": "#/$defs/ReportReady",
       "run_finished": "#/$defs/RunFinished",
       "run_started": "#/$defs/RunStarted",
       "sandbox_finished": "#/$defs/SandboxFinished",
+      "sandbox_log": "#/$defs/SandboxLog",
+      "steer_applied": "#/$defs/SteerApplied",
       "stopped": "#/$defs/Stopped"
     },
     "propertyName": "type"
@@ -838,6 +1439,27 @@
     },
     {
       "$ref": "#/$defs/RunFinished"
+    },
+    {
+      "$ref": "#/$defs/AgentStepStarted"
+    },
+    {
+      "$ref": "#/$defs/AgentReasoning"
+    },
+    {
+      "$ref": "#/$defs/AgentStepFinished"
+    },
+    {
+      "$ref": "#/$defs/SandboxLog"
+    },
+    {
+      "$ref": "#/$defs/HpoTrialEvent"
+    },
+    {
+      "$ref": "#/$defs/ReportReady"
+    },
+    {
+      "$ref": "#/$defs/SteerApplied"
     }
   ]
 }

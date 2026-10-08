@@ -20,7 +20,9 @@ from typing import Any, Literal
 
 import numpy as np
 
-StopReason = Literal["ceiling", "max_experiments", "max_cost", "max_time", "user", "proposer_failure"]
+StopReason = Literal[
+    "ceiling", "max_experiments", "max_cost", "max_time", "user", "proposer_failure", "max_tokens"
+]
 
 
 @dataclass

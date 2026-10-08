@@ -1,0 +1,148 @@
+/* /new — paste a link, press Start. Night cartography like the landing: void, bone type, one amber signal. */
+
+.nr-root {
+  --nr-gutter: clamp(20px, 5vw, 76px);
+  color: var(--lp-ink);
+  overflow-x: clip;
+}
+.nr-root ::selection {
+  background: rgb(255 181 71 / 0.28);
+}
+
+/* The one input: a ruled line, not a box. */
+.nr-field {
+  position: relative;
+  border-bottom: 1px solid oklch(88% 0.02 85 / 0.22);
+  transition: border-color 0.3s var(--ease-out-quart);
+}
+.nr-field:focus-within {
+  border-color: var(--lp-signal);
+}
+.nr-field[data-error] {
+  border-color: var(--crash);
+}
+.nr-field input {
+  width: 100%;
+  background: transparent;
+  outline: none;
+  color: var(--lp-ink);
+}
+.nr-field input::placeholder {
+  color: oklch(60% 0.012 250 / 0.75);
+}
+
+/* Sentence chips: a native select dressed as an underlined amber word. */
+.nr-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+}
+.nr-chip select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed rgb(255 181 71 / 0.5);
+  border-radius: 0;
+  color: var(--lp-signal);
+  font: inherit;
+  padding: 0 1.05em 0.04em 0;
+  cursor: pointer;
+  max-width: 16ch;
+  field-sizing: content; /* size to the chosen option, not the widest one */
+  text-overflow: ellipsis;
+  transition: border-color 0.2s;
+}
+.nr-chip select:hover,
+.nr-chip select:focus-visible {
+  border-bottom-style: solid;
+  border-color: var(--lp-signal);
+  outline: none;
+}
+.nr-chip select option {
+  background: #0d1117;
+  color: #ece7dc;
+}
+.nr-chip::after {
+  content: "";
+  position: absolute;
+  right: 0.15em;
+  top: 50%;
+  width: 0.38em;
+  height: 0.38em;
+  border-right: 1.5px solid var(--lp-signal);
+  border-bottom: 1.5px solid var(--lp-signal);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.nr-example {
+  border: 1px solid oklch(88% 0.02 85 / 0.16);
+  border-radius: 999px;
+  padding: 0.32rem 0.8rem;
+  font-size: 13px;
+  color: var(--lp-ink-2);
+  transition:
+    border-color 0.25s,
+    color 0.25s,
+    background-color 0.25s;
+}
+.nr-example:hover,
+.nr-example:focus-visible {
+  border-color: rgb(255 181 71 / 0.55);
+  color: var(--lp-ink);
+  outline: none;
+}
+.nr-example[aria-pressed="true"] {
+  border-color: var(--lp-signal);
+  color: var(--lp-signal);
+  background: rgb(255 181 71 / 0.07);
+}
+
+/* The table preview: hairlines only; the target column glows amber. */
+.nr-table th,
+.nr-table td {
+  padding: 0.4rem 0.9rem 0.4rem 0;
+  white-space: nowrap;
+  text-align: left;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nr-table tbody tr {
+  border-top: 1px solid var(--lp-hair);
+}
+.nr-table [data-target] {
+  color: var(--lp-signal);
+}
+
+.nr-scan {
+  position: relative;
+  height: 1px;
+  overflow: hidden;
+  background: var(--lp-hair);
+}
+.nr-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  background: linear-gradient(to right, transparent, var(--lp-signal), transparent);
+  animation: nr-scan 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes nr-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nr-scan::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}

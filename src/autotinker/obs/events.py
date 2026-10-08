@@ -11,7 +11,16 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from autotinker.contracts import CVScore, DataProfile, Decision, Idea, LLMUsage, TaskSpec
+from autotinker.contracts import (
+    AgentStep,
+    CVScore,
+    DataProfile,
+    Decision,
+    HpoTrial,
+    Idea,
+    LLMUsage,
+    TaskSpec,
+)
 
 
 def _now() -> str:
@@ -37,6 +46,7 @@ class ExperimentStarted(_Base):
     exp_id: str
     parent_id: str | None
     idea: Idea
+    phase: str | None = None  # agentic: baseline | draft | improve | tune | ensemble (None in legacy runs)
 
 
 class LLMCall(_Base):
@@ -75,7 +85,9 @@ class DecisionMade(_Base):
 
 class Stopped(_Base):
     type: Literal["stopped"] = "stopped"
-    reason: Literal["ceiling", "max_experiments", "max_cost", "max_time", "user", "proposer_failure"]
+    reason: Literal[
+        "ceiling", "max_experiments", "max_cost", "max_time", "user", "proposer_failure", "max_tokens"
+    ]
     report: dict[str, Any]  # signal name -> {value, threshold, fired, detail}; see evolve/stopping.py
     summary: str  # human-readable explanation
 
@@ -92,6 +104,60 @@ class RunFinished(_Base):
     wall_time_s: float
 
 
+# ---------------------------------------------------------------- agentic events (v3, additive)
+
+
+class AgentStepStarted(_Base):
+    type: Literal["agent_step_started"] = "agent_step_started"
+    exp_id: str | None  # None for run-level steps (intake, profiler, reporter)
+    step_id: str
+    role: str
+    attempt: int = 0
+    input_summary: str = ""
+
+
+class AgentReasoning(_Base):
+    type: Literal["agent_reasoning"] = "agent_reasoning"
+    exp_id: str | None
+    step_id: str
+    role: str
+    text: str
+
+
+class AgentStepFinished(_Base):
+    type: Literal["agent_step_finished"] = "agent_step_finished"
+    exp_id: str | None
+    step: AgentStep
+
+
+class SandboxLog(_Base):
+    type: Literal["sandbox_log"] = "sandbox_log"
+    exp_id: str
+    attempt: int = 0
+    stream: Literal["stdout", "stderr"] = "stdout"
+    lines: list[str]  # throttled: at most a few dozen lines per event
+
+
+class HpoTrialEvent(_Base):
+    type: Literal["hpo_trial"] = "hpo_trial"
+    exp_id: str
+    trial: HpoTrial
+
+
+class SteerApplied(_Base):
+    """A steering message from the person watching was accepted: it is included in every later Planner and
+    Tuner prompt, starting with experiment `at_exp`."""
+
+    type: Literal["steer_applied"] = "steer_applied"
+    text: str
+    at_exp: str | None = None
+
+
+class ReportReady(_Base):
+    type: Literal["report_ready"] = "report_ready"
+    report: dict[str, Any]
+
+
 Event = Annotated[
     RunStarted
     | ExperimentStarted
@@ -100,7 +166,14 @@ Event = Annotated[
     | ExperimentScored
     | DecisionMade
     | Stopped
-    | RunFinished,
+    | RunFinished
+    | AgentStepStarted
+    | AgentReasoning
+    | AgentStepFinished
+    | SandboxLog
+    | HpoTrialEvent
+    | ReportReady
+    | SteerApplied,
     Field(discriminator="type"),
 ]
 

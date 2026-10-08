@@ -391,4 +391,90 @@ def load_run(path: str | Path) -> Run:
     return Run.load(path)
 
 
-__all__ = ["AutoTinker", "Run", "load_run", "resolve_llm"]
+__all__ = ["AutoTinker", "Run", "agentic_run", "load_run", "resolve_llm"]
+
+
+# ---------------------------------------------------------------- agentic (v3)
+
+
+def agentic_run(
+    source: str | Path | pd.DataFrame,
+    *,
+    target: str | None = None,
+    goal: str = "",
+    metric: str | None = None,
+    workdir: str | Path = "runs",
+    backend: Any = None,
+    max_experiments: int = 10,
+    max_time_s: float = 40 * 60,
+    max_tokens: int = 400_000,
+    seed: int = 0,
+    on_event: Callable[[Any], None] | None = None,
+    events_stdout: bool = False,
+    run_id: str | None = None,
+    config: Any = None,
+    control: Any = None,
+    **task_kwargs: Any,
+) -> Run:
+    """The agentic loop: intake, profile, baseline, drafts, improve/tune, ensemble, locked test, report.
+
+    `backend` is any ChatBackend (default: the provider Router over the keys in the environment).
+    `control` is an optional evolve.control.ControlChannel (live steering / graceful stop)."""
+    from autotinker.agent.router import Router
+    from autotinker.data.sources import load_dataframe, load_source, source_stem
+    from autotinker.evolve.agentic import AgenticConfig, run_agentic, run_intake
+    from autotinker.harness import Harness
+
+    if backend is None:
+        backend = Router()
+        if not backend.providers:
+            raise RuntimeError(
+                "no LLM provider is configured: set GROQ_API_KEY and/or GEMINI_API_KEY (see .env), "
+                "or use `autotinker evolve --llm heuristic` for the offline path"
+            )
+    if isinstance(source, pd.DataFrame):
+        df, stem = load_dataframe(source), "dataframe"
+    else:
+        df, stem = load_source(str(source)), source_stem(str(source))
+    if target is not None and target not in df.columns:
+        raise ValueError(f"target column {target!r} not found; columns: {list(df.columns)}")
+    intake = run_intake(backend, df, goal=goal, target=target, metric=metric)
+    task = TaskSpec(
+        target=intake.target,
+        description=goal,
+        metric=intake.metric,
+        problem_type=None,
+        seed=seed,
+        **task_kwargs,
+    )
+    rid = run_id or new_run_id(stem)
+    run_dir = (Path(workdir) / rid).resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    harness = Harness(df, task, run_dir / "harness")
+    cfg = config or AgenticConfig()
+    cfg.max_experiments = max_experiments
+    cfg.max_time_s = max_time_s
+    cfg.max_tokens = max_tokens
+    record = run_agentic(
+        harness,
+        backend,
+        cfg=cfg,
+        goal=intake.goal or goal,
+        intake=intake,
+        run_dir=run_dir,
+        run_id=rid,
+        task=harness.task,
+        on_event=on_event,
+        events_stdout=events_stdout,
+        control=control,
+        config={
+            "env": {"python": platform.python_version(), "seed": seed},
+            "source": str(source) if not isinstance(source, pd.DataFrame) else "dataframe",
+            "intake": {
+                "target": intake.target,
+                "metric": intake.metric.value if intake.metric else None,
+                "warnings": intake.warnings,
+            },
+        },
+    )
+    return Run(record, run_dir, df)

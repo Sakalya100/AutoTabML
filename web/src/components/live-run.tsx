@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PublicRunMeta } from "@/lib/api";
+import { TERMINAL, type PublicRunMeta } from "@/lib/api-types";
 import { coerceEvent, type AnyEvent } from "@/lib/events";
 import { fmtCost, fmtInt } from "@/lib/format";
 import { buildView } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
 import { RunView } from "./run-view";
-
-const TERMINAL = ["finished", "failed", "cancelled"];
 
 export function LiveRun({ id }: { id: string }) {
   const [meta, setMeta] = useState<PublicRunMeta | null>(null);
@@ -19,6 +18,7 @@ export function LiveRun({ id }: { id: string }) {
   const [connected, setConnected] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const lastSeq = useRef(-1);
+  const router = useRouter();
 
   const addEvents = (incoming: AnyEvent[]) => {
     const fresh = incoming.filter((e) => e.seq > lastSeq.current);
@@ -34,7 +34,7 @@ export function LiveRun({ id }: { id: string }) {
     const refresh = async () => {
       const res = await fetch(`/api/runs/${id}`, { cache: "no-store" });
       if (!res.ok) {
-        setError(res.status === 404 ? "This run doesn't exist, or it has expired (runs are kept for 24 hours)." : "Could not load this run.");
+        setError(res.status === 404 ? "This run doesn't exist in this browser." : "Could not load this run.");
         return null;
       }
       const body = (await res.json()) as {
@@ -43,6 +43,11 @@ export function LiveRun({ id }: { id: string }) {
         record: RunRecord | null;
       };
       if (cancelled) return null;
+      if (body.meta.sessionId) {
+        // Runs open in their session's workspace.
+        router.replace(`/s/${body.meta.sessionId}`);
+        return null;
+      }
       setMeta(body.meta);
       addEvents(body.events);
       if (body.record) setRecord(body.record);
@@ -77,7 +82,7 @@ export function LiveRun({ id }: { id: string }) {
       cancelled = true;
       es?.close();
     };
-  }, [id]);
+  }, [id, router]);
 
   const view = useMemo(() => buildView(events, record), [events, record]);
 
@@ -87,7 +92,7 @@ export function LiveRun({ id }: { id: string }) {
         <h1 className="font-display text-4xl">Run not found</h1>
         <p className="mt-3 text-ink-2">{error}</p>
         <p className="mt-6 flex gap-4 text-sm">
-          <Link href="/new" className="underline underline-offset-4">
+          <Link href="/s/new" className="underline underline-offset-4">
             Start a new run
           </Link>
           <Link href="/replays" className="underline underline-offset-4">
@@ -125,11 +130,12 @@ export function LiveRun({ id }: { id: string }) {
           <span className="text-ink">{statusText(meta.status)}</span>
           {active && <span>{connected ? "· live" : "· connecting…"}</span>}
         </span>
-        <span className="tabular" title="LLM spend so far (runs without an LLM cost nothing)">
+        <span className="tabular" title="LLM spend so far (free-tier models cost nothing)">
           {fmtCost(view.totalCostUsd)} · {fmtInt(view.totalInputTokens + view.totalOutputTokens)} tokens
         </span>
         <span>
-          {meta.llm === "heuristic" ? "no LLM: built-in search" : "ideas by Claude"} · up to {meta.maxExperiments} ideas
+          {meta.engine === "agentic" || !meta.llm ? "agents on free Groq / Gemini models" : meta.llm === "heuristic" ? "no LLM: built-in search" : "ideas by Claude"} · up to{" "}
+          {meta.maxExperiments} experiments
         </span>
         {active && (
           <button
@@ -149,7 +155,9 @@ export function LiveRun({ id }: { id: string }) {
           )}
         </div>
       )}
+      {meta.status === "finished" && meta.error && <p className="text-sm text-ink-3">{meta.error}</p>}
       {meta.status === "cancelled" && <p className="text-sm text-ink-3">This run was cancelled. Everything recorded up to then is below.</p>}
+      {meta.status === "timed_out" && <p className="text-sm text-ink-3">{meta.error ?? "This run timed out."} Everything recorded up to then is below.</p>}
     </div>
   );
 
@@ -162,8 +170,8 @@ export function LiveRun({ id }: { id: string }) {
       kicker={`Your run · ${meta.fileName}`}
       liveBar={bar}
       active={active}
-      endedAs={meta.status === "cancelled" || meta.status === "failed" ? meta.status : null}
-      emptyHint={meta.runner === "vercel-sandbox" ? "Creating a sandbox and installing the engine — a minute or two" : "Starting the engine and profiling your data"}
+      endedAs={meta.status === "cancelled" || meta.status === "failed" || meta.status === "timed_out" ? meta.status : null}
+      emptyHint={meta.runner === "sandbox" ? "Creating a sandbox and installing the engine — a minute or two" : meta.source === "url" ? "Downloading your data and starting the agents" : "Starting the engine and profiling your data"}
       plannedExperiments={meta.maxExperiments}
     />
   );
@@ -177,5 +185,6 @@ function statusText(s: PublicRunMeta["status"]): string {
     finished: "finished",
     failed: "failed",
     cancelled: "cancelled",
+    timed_out: "timed out",
   }[s];
 }

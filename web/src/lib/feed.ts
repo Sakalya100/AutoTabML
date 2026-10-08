@@ -45,6 +45,40 @@ export interface RunStartedItem {
 
 export type ExpStage = "running" | "scored" | "decided";
 
+/** One agent step as a feed line (agentic engine only). `running` until its agent_step_finished arrives. */
+export interface AgentStepLine {
+  stepId: string;
+  role: string;
+  plain: string;
+  status: "ok" | "error" | null;
+  model: string | null;
+  attempt: number;
+  running: boolean;
+  inputSummary: string;
+}
+
+/** A run-level agent step (intake, profiler, reporter: no experiment). */
+export interface AgentStepItem extends AgentStepLine {
+  kind: "agent_step";
+  key: string;
+  seq: number;
+}
+
+/** The Reporter's final report (report_ready). Every field is read defensively. */
+export interface ReportItem {
+  kind: "report";
+  key: string;
+  seq: number;
+  plain: string | null;
+  summary: string | null;
+  whatWorked: string[];
+  caveats: string[];
+  nextSteps: string[];
+}
+
+/** Sandbox log lines kept per experiment (the newest win). */
+export const MAX_LOG_LINES = 200;
+
 export interface ExperimentItem {
   kind: "experiment";
   key: string;
@@ -54,6 +88,11 @@ export interface ExperimentItem {
   parentId: string | null;
   idea: Idea;
   stage: ExpStage;
+  /** Agent steps for this experiment, in order (empty for heuristic/legacy runs). */
+  steps: AgentStepLine[];
+  /** Sandbox stdout/stderr lines, capped at MAX_LOG_LINES. */
+  logs: string[];
+  hpoTrials: number;
   attempts: FeedAttempt[];
   llmCalls: number;
   costUsd: number;
@@ -92,7 +131,7 @@ export interface FinishedItem {
   wallTimeS: number;
 }
 
-export type FeedItem = RunStartedItem | ExperimentItem | StoppedItem | FinishedItem;
+export type FeedItem = RunStartedItem | ExperimentItem | StoppedItem | FinishedItem | AgentStepItem | ReportItem;
 
 const num = (s: string | undefined): number | null => {
   if (s == null) return null;
@@ -114,11 +153,30 @@ export function parseGateReason(reason: string | null | undefined): GateSummary 
   };
 }
 
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim() !== "") : []);
+const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+interface Pending {
+  steps: AgentStepLine[];
+  logs: string[];
+  hpo: number;
+}
+
 /** Fold an ordered event prefix into feed items. O(events). */
 export function buildFeed(events: readonly AnyEvent[]): FeedItem[] {
   const out: FeedItem[] = [];
   const byId = new Map<string, ExperimentItem>();
   let maxExperiments: number | null = null;
+  // Planner/coder steps arrive before their experiment_started: hold them until the experiment appears.
+  const pending = new Map<string, Pending>();
+  const holder = (expId: string): Pending => {
+    const x = byId.get(expId);
+    if (x) return x as unknown as Pending;
+    let p = pending.get(expId);
+    if (!p) pending.set(expId, (p = { steps: [], logs: [], hpo: 0 }));
+    return p;
+  };
+  const runSteps = new Map<string, AgentStepItem>();
 
   for (const ev of events) {
     switch (ev.type) {
@@ -165,14 +223,84 @@ export function buildFeed(events: readonly AnyEvent[]): FeedItem[] {
           parentId: e.parent_id ?? null,
           idea: e.idea,
           stage: "running",
+          steps: pending.get(e.exp_id)?.steps ?? [],
+          logs: pending.get(e.exp_id)?.logs ?? [],
+          hpoTrials: pending.get(e.exp_id)?.hpo ?? 0,
           attempts: [],
           llmCalls: 0,
           costUsd: 0,
           scored: null,
           decision: null,
         };
+        pending.delete(e.exp_id);
         byId.set(item.id, item);
         out.push(item);
+        break;
+      }
+      case "agent_step_started": {
+        const e = ev as EventOf<"agent_step_started">;
+        const line: AgentStepLine = { stepId: e.step_id, role: e.role, plain: "", status: null, model: null, attempt: e.attempt ?? 0, running: true, inputSummary: e.input_summary ?? "" };
+        if (e.exp_id) holder(e.exp_id).steps.push(line);
+        else {
+          const item: AgentStepItem = { kind: "agent_step", key: `step-${e.step_id || e.seq}`, seq: e.seq, ...line };
+          runSteps.set(e.step_id, item);
+          out.push(item);
+        }
+        break;
+      }
+      case "agent_step_finished": {
+        const e = ev as EventOf<"agent_step_finished">;
+        const st = e.step;
+        const stepId = st.step_id ?? "";
+        const done: AgentStepLine = {
+          stepId,
+          role: st.role,
+          plain: st.plain ?? "",
+          status: st.status === "error" ? "error" : "ok",
+          model: st.model ?? null,
+          attempt: st.attempt ?? 0,
+          running: false,
+          inputSummary: st.input_summary ?? "",
+        };
+        if (e.exp_id) {
+          const list = holder(e.exp_id).steps;
+          const i = stepId ? list.findIndex((x) => x.stepId === stepId) : -1;
+          if (i >= 0) list[i] = done;
+          else list.push(done);
+        } else {
+          const item = stepId ? runSteps.get(stepId) : undefined;
+          if (item) Object.assign(item, done);
+          else out.push({ kind: "agent_step", key: `step-${stepId || e.seq}`, seq: e.seq, ...done });
+        }
+        break;
+      }
+      case "sandbox_log": {
+        const e = ev as EventOf<"sandbox_log">;
+        const h = holder(e.exp_id);
+        h.logs.push(...strings(e.lines));
+        if (h.logs.length > MAX_LOG_LINES) h.logs.splice(0, h.logs.length - MAX_LOG_LINES);
+        break;
+      }
+      case "hpo_trial": {
+        const e = ev as EventOf<"hpo_trial">;
+        const x = byId.get(e.exp_id);
+        if (x) x.hpoTrials++;
+        else holder(e.exp_id).hpo++;
+        break;
+      }
+      case "report_ready": {
+        const e = ev as EventOf<"report_ready">;
+        const r = (e.report ?? {}) as Record<string, unknown>;
+        out.push({
+          kind: "report",
+          key: `report-${e.seq}`,
+          seq: e.seq,
+          plain: str(r.plain),
+          summary: str(r.summary),
+          whatWorked: strings(r.what_worked),
+          caveats: strings(r.caveats),
+          nextSteps: strings(r.next_steps),
+        });
         break;
       }
       case "llm_call": {
@@ -251,12 +379,57 @@ export function buildFeed(events: readonly AnyEvent[]): FeedItem[] {
 export function feedSignature(items: readonly FeedItem[]): string {
   const last = items.at(-1);
   if (!last) return "0";
-  const tail = last.kind === "experiment" ? `${last.stage}:${last.attempts.length}:${last.llmCalls}` : last.kind;
+  const tail =
+    last.kind === "experiment"
+      ? `${last.stage}:${last.attempts.length}:${last.llmCalls}:${last.steps.length}:${last.steps.filter((x) => x.running).length}:${last.logs.length}:${last.hpoTrials}`
+      : last.kind === "agent_step"
+        ? `step:${last.running}`
+        : last.kind;
   return `${items.length}:${tail}`;
+}
+
+/** The newest agent step that has started but not finished, wherever it lives (null when none or for legacy runs). */
+export function activeAgentStep(events: readonly AnyEvent[]): { role: string; expId: string | null } | null {
+  const open = new Map<string, { role: string; expId: string | null }>();
+  for (const ev of events) {
+    if (ev.type === "agent_step_started") {
+      const e = ev as EventOf<"agent_step_started">;
+      open.delete(e.step_id);
+      open.set(e.step_id, { role: e.role, expId: e.exp_id ?? null });
+    } else if (ev.type === "agent_step_finished") {
+      open.delete((ev as EventOf<"agent_step_finished">).step.step_id ?? "");
+    }
+  }
+  return [...open.values()].at(-1) ?? null;
+}
+
+/** "planner" -> "Planner", "hpo_tuner" -> "Hpo tuner". */
+export function roleLabel(role: string): string {
+  const r = role.replace(/[_-]+/g, " ").trim();
+  return r ? r[0].toUpperCase() + r.slice(1) : "Agent";
 }
 
 /** The experiment still in flight (the "typing" message), if any. */
 export function inFlight(items: readonly FeedItem[]): ExperimentItem | null {
   const last = items.at(-1);
   return last?.kind === "experiment" && last.stage !== "decided" ? last : null;
+}
+
+const DOING: Record<string, string> = {
+  intake: "is reading your data",
+  profiler: "is profiling the data",
+  planner: "is choosing the next idea",
+  coder: "is writing the code",
+  executor: "is running the code in the sandbox",
+  debugger: "is fixing the code",
+  critic: "is checking the result for leaks",
+  judge: "is giving a second opinion",
+  tuner: "is setting up a hyperparameter search",
+  ensembler: "is blending the best models",
+  reporter: "is writing the report",
+};
+
+/** "Planner is choosing the next idea" — the one-line status for a running step. */
+export function roleDoing(role: string): string {
+  return `${roleLabel(role)} ${DOING[role] ?? "is working"}`;
 }

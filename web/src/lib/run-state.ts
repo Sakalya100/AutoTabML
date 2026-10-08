@@ -16,6 +16,16 @@ export interface Attempt {
   errorTail: string | null;
 }
 
+/** One agent step inside an experiment (agentic engine only; empty for heuristic/legacy runs). */
+export interface StepView {
+  stepId: string;
+  role: string;
+  plain: string;
+  status: "running" | "ok" | "error";
+  model: string | null;
+  attempt: number;
+}
+
 export interface ExpView {
   id: string;
   index: number; // 0-based experiment number, the x axis of the chart
@@ -36,6 +46,10 @@ export interface ExpView {
   /** Best kept experiment id after this experiment's decision. */
   bestAfter: string | null;
   bestMeanAfter: number | null;
+  /** Agent steps (planner, coder, executor, critic, …) in order. Empty for runs recorded before the agentic engine. */
+  steps: StepView[];
+  /** Optuna trials reported for this experiment (tuning experiments only). */
+  hpoTrials: number;
   /** From the RunRecord (only available for replays / finished runs). */
   code?: string;
   diff?: string;
@@ -85,6 +99,10 @@ export interface RunView {
   phase: "empty" | "running" | "stopped" | "finished";
   current: ExpView | null;
   eventCount: number;
+  /** Run-level agent steps (intake, profiler, reporter): exp_id was null. */
+  runSteps: StepView[];
+  /** The Reporter's final report (report_ready), if the engine sent one. */
+  report: Record<string, unknown> | null;
 }
 
 export function emptyView(): RunView {
@@ -107,6 +125,8 @@ export function emptyView(): RunView {
     phase: "empty",
     current: null,
     eventCount: 0,
+    runSteps: [],
+    report: null,
   };
 }
 
@@ -153,6 +173,17 @@ export function buildView(events: readonly AnyEvent[], record?: RunRecord | null
   const byId = new Map<string, ExpView>();
   let currentBest: string | null = null;
   let currentBestMean: number | null = null;
+  // Planner/coder steps (and tuning trials) arrive before their experiment_started; hold them until it does.
+  const pending = new Map<string, { steps: StepView[]; hpo: number }>();
+  const holder = (expId: string | null | undefined): { steps: StepView[]; hpo: number } | null => {
+    if (!expId) return null;
+    const x = byId.get(expId);
+    if (x) return { steps: x.steps, hpo: 0 };
+    let p = pending.get(expId);
+    if (!p) pending.set(expId, (p = { steps: [], hpo: 0 }));
+    return p;
+  };
+  const stepList = (expId: string | null | undefined): StepView[] => holder(expId)?.steps ?? v.runSteps;
 
   for (const ev of events) {
     v.eventCount++;
@@ -191,7 +222,10 @@ export function buildView(events: readonly AnyEvent[], record?: RunRecord | null
           durationS: null,
           bestAfter: currentBest,
           bestMeanAfter: currentBestMean,
+          steps: pending.get(e.exp_id)?.steps ?? [],
+          hpoTrials: pending.get(e.exp_id)?.hpo ?? 0,
         };
+        pending.delete(e.exp_id);
         byId.set(x.id, x);
         v.experiments.push(x);
         if (v.phase === "empty") v.phase = "running";
@@ -245,6 +279,43 @@ export function buildView(events: readonly AnyEvent[], record?: RunRecord | null
           x.bestAfter = currentBest;
           x.bestMeanAfter = currentBestMean;
         }
+        break;
+      }
+      case "agent_step_started": {
+        const e = ev as EventOf<"agent_step_started">;
+        stepList(e.exp_id).push({ stepId: e.step_id, role: e.role, plain: "", status: "running", model: null, attempt: e.attempt ?? 0 });
+        break;
+      }
+      case "agent_step_finished": {
+        const e = ev as EventOf<"agent_step_finished">;
+        const s = e.step;
+        const list = stepList(e.exp_id);
+        const done: StepView = {
+          stepId: s.step_id ?? "",
+          role: s.role,
+          plain: s.plain ?? "",
+          status: s.status === "error" ? "error" : "ok",
+          model: s.model ?? null,
+          attempt: s.attempt ?? 0,
+        };
+        const i = done.stepId ? list.findIndex((x) => x.stepId === done.stepId) : -1;
+        if (i >= 0) list[i] = done;
+        else list.push(done);
+        break;
+      }
+      case "hpo_trial": {
+        const e = ev as EventOf<"hpo_trial">;
+        const x = byId.get(e.exp_id);
+        if (x) x.hpoTrials++;
+        else {
+          const p = holder(e.exp_id);
+          if (p) p.hpo++;
+        }
+        break;
+      }
+      case "report_ready": {
+        const e = ev as EventOf<"report_ready">;
+        v.report = (e.report ?? null) as Record<string, unknown> | null;
         break;
       }
       case "stopped": {

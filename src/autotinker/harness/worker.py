@@ -7,6 +7,9 @@ and writes raw predictions (`preds.npz`) plus a status file (`result.json`). Sco
 Modes:
   cv    for each fixed fold: fit on dev-train, predict dev-val; then fit on all of dev, predict select
   test  fit on dev+select, predict test
+  tune  Optuna search over `set_params` paths (job["space"]) on the first job["tune_folds"] fixed dev folds;
+        trial scores are computed here (they only steer the search). The tuned solution is then scored by
+        the parent like any other through a normal `cv` run.
 """
 
 from __future__ import annotations
@@ -160,6 +163,8 @@ def run(job: dict[str, Any]) -> dict[str, Any]:
     elif mode == "test":
         fit_predict(data["X_fit"], data["y_fit"], data["X_test"], "test")
         fit_time = fit_times[0]
+    elif mode == "tune":
+        return _tune(job, data, build, profile, need_proba, n_classes)
     else:
         raise ValueError(f"unknown mode {mode!r}")
 
@@ -167,10 +172,100 @@ def run(job: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "fit_time_s": fit_time, "n_arrays": len(arrays)}
 
 
+def _suggest(trial: Any, name: str, sp: dict[str, Any]) -> Any:
+    kind = sp.get("type")
+    if kind == "categorical":
+        return trial.suggest_categorical(name, list(sp["choices"]))
+    if kind == "int":
+        return trial.suggest_int(name, int(sp["low"]), int(sp["high"]), log=bool(sp.get("log")))
+    return trial.suggest_float(name, float(sp["low"]), float(sp["high"]), log=bool(sp.get("log")))
+
+
+def _tune(
+    job: dict[str, Any],
+    data: dict[str, Any],
+    build: Any,
+    profile: dict[str, Any],
+    need_proba: bool,
+    n_classes: int,
+) -> dict[str, Any]:
+    import optuna
+
+    from autotinker.contracts import Metric, ProblemType
+    from autotinker.harness import scorer
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    metric, ptype = Metric(job["metric"]), ProblemType(job["problem_type"])
+    space: dict[str, dict[str, Any]] = job["space"]
+    X, y = data["X_dev"], data["y_dev"]
+    folds = list(data["folds"])[: max(int(job.get("tune_folds", 3)), 2)]
+    errors: list[str] = []
+
+    def objective(trial: Any) -> float:
+        params = {name: _suggest(trial, name, sp) for name, sp in space.items()}
+        scores = []
+        for tr, va in folds:
+            est = _fresh(build, profile)
+            est.set_params(**params)
+            est.fit(X.iloc[tr], y[tr])
+            pred = _predict(est, X.iloc[va], need_proba, n_classes)
+            _check_finite(pred, "predictions")
+            scores.append(scorer.score(metric, ptype, y[va], pred, n_classes))
+        value = float(np.mean(scores))
+        print(json.dumps({"trial": trial.number, "value": value, "params": params}, default=str), flush=True)
+        return value
+
+    def on_fail(study: Any, frozen: Any) -> None:
+        if frozen.state == optuna.trial.TrialState.FAIL:
+            msg = str(frozen.user_attrs.get("error") or frozen.system_attrs.get("fail_reason") or "failed")
+            errors.append(msg[-500:])
+
+    def guarded(trial: Any) -> float:
+        try:
+            return objective(trial)
+        except Exception as e:  # noqa: BLE001 - a bad parameter combination fails the trial, not the study
+            trial.set_user_attr("error", f"{type(e).__name__}: {e}")
+            print(f"trial {trial.number} failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+            raise
+
+    study = optuna.create_study(
+        direction="maximize", sampler=optuna.samplers.TPESampler(seed=int(job.get("seed", 0)))
+    )
+    t0 = time.perf_counter()
+    study.optimize(
+        guarded,
+        n_trials=int(job["n_trials"]),
+        timeout=float(job["time_budget_s"]),
+        catch=(Exception,),
+        callbacks=[on_fail],
+    )
+    trials: list[dict[str, Any]] = []
+    best: dict[str, Any] | None = None
+    for t in study.trials:
+        start, end = t.datetime_start, t.datetime_complete
+        dur = (end - start).total_seconds() if start is not None and end is not None else 0.0
+        val = float(t.value) if t.value is not None and np.isfinite(t.value) else None
+        state = {"COMPLETE": "complete", "PRUNED": "pruned"}.get(t.state.name, "fail")
+        row = {"number": t.number, "params": t.params, "value": val, "state": state, "duration_s": dur}
+        trials.append(row)
+        if state == "complete" and val is not None and (best is None or val > float(best["value"])):
+            best = row
+    if best is None:
+        raise InvalidOutputError("no tuning trial succeeded; first error: " + (errors[0] if errors else "?"))
+    np.savez(job["preds_path"], tune=np.zeros(1))
+    return {
+        "ok": True,
+        "fit_time_s": (time.perf_counter() - t0) / max(len(trials), 1),
+        "trials": trials,
+        "best_params": best["params"],
+        "best_value": best["value"],
+    }
+
+
 def _write_result(path: str, payload: dict[str, Any]) -> None:
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
-        json.dump(payload, f)
+        json.dump(payload, f, default=str)
     os.replace(tmp, path)
 
 

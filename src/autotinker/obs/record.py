@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from autotinker.contracts import CVScore, DataProfile, Decision, Idea, LLMUsage, TaskSpec
+from autotinker.contracts import AgentStep, CVScore, DataProfile, Decision, HpoTrial, Idea, LLMUsage, TaskSpec
 
 RECORD_VERSION = 1
 
@@ -30,6 +30,10 @@ class ExperimentRecord(BaseModel):
     cost_usd: float = 0.0
     duration_s: float = 0.0
     started_at: str = ""
+    # agentic (v3, additive)
+    phase: str | None = None  # baseline | draft | improve | tune | ensemble
+    steps: list[AgentStep] = Field(default_factory=list)
+    trials: list[HpoTrial] = Field(default_factory=list)
 
 
 class FinalScores(BaseModel):
@@ -57,3 +61,7 @@ class RunRecord(BaseModel):
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     wall_time_s: float = 0.0
+    # agentic (v3, additive)
+    steps: list[AgentStep] = Field(default_factory=list)  # run-level steps: intake, profiler, reporter
+    report: dict[str, Any] | None = None  # the Reporter's final report (numbers checked against this record)
+    usage: dict[str, Any] = Field(default_factory=dict)  # per provider/model call + token accounting

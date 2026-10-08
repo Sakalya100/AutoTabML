@@ -80,3 +80,54 @@ def test_evolve_events_stdout_is_pure_jsonl(tmp_path: Path, monkeypatch: pytest.
     assert "heuristic" in res.stderr
     run_json = next(tmp_path.glob("*/run.json"))
     assert json.loads(run_json.read_text())["final"]["test_score"] is not None
+
+
+def test_run_without_keys_fails_fast(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    for k in ("GROQ_API_KEY", "GEMINI_API_KEY", "CEREBRAS_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.chdir(tmp_path)  # no .env here
+    res = runner.invoke(app, ["run", str(DATA), "--target", "variety", "--out", str(tmp_path)])
+    assert res.exit_code == 2
+    assert "no LLM provider is configured" in res.output
+
+
+def test_new_events_round_trip_through_schema() -> None:
+    from autotinker.contracts import AgentStep, HpoTrial
+    from autotinker.obs.events import (
+        AgentReasoning,
+        AgentStepFinished,
+        AgentStepStarted,
+        EventAdapter,
+        HpoTrialEvent,
+        ReportReady,
+        SandboxLog,
+    )
+
+    evs = [
+        AgentStepStarted(run_id="r", exp_id=None, step_id="s", role="intake"),
+        AgentReasoning(run_id="r", exp_id="e001", step_id="s", role="planner", text="hmm"),
+        AgentStepFinished(run_id="r", exp_id="e001", step=AgentStep(role="coder", tokens_in=3)),
+        SandboxLog(run_id="r", exp_id="e001", lines=["a", "b"]),
+        HpoTrialEvent(run_id="r", exp_id="e002", trial=HpoTrial(number=0, params={"a": 1}, value=0.5)),
+        ReportReady(run_id="r", report={"summary": "x"}),
+    ]
+    for ev in evs:
+        assert parse_event(ev.model_dump_json()) == ev
+    names = json.dumps(EventAdapter.json_schema())
+    for t in (
+        "agent_step_started",
+        "agent_reasoning",
+        "agent_step_finished",
+        "sandbox_log",
+        "hpo_trial",
+        "report_ready",
+    ):
+        assert t in names
+
+
+def test_checked_in_schema_is_current(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1] / "schema"
+    res = runner.invoke(app, ["schema", str(tmp_path)])
+    assert res.exit_code == 0
+    for name in ("events.schema.json", "run_record.schema.json"):
+        assert json.loads((tmp_path / name).read_text()) == json.loads((root / name).read_text()), name
