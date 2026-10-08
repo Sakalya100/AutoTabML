@@ -192,6 +192,10 @@ def run(
     control_fifo: Annotated[
         Path | None, typer.Option("--control-fifo", help="read JSONL control commands from this FIFO")
     ] = None,
+    control_file: Annotated[
+        Path | None,
+        typer.Option("--control-file", help="poll this append-only JSONL file for control commands"),
+    ] = None,
 ) -> None:
     """The agentic AutoML loop: agents profile, plan, code, debug, tune and ensemble until the ceiling.
 
@@ -218,6 +222,8 @@ def run(
     control: ControlChannel | None = None
     if control_fifo is not None:
         control = ControlChannel.from_fifo(control_fifo)
+    elif control_file is not None:
+        control = ControlChannel.from_file(control_file)
     elif control_stdin:
         control = ControlChannel.from_stdin()
 
