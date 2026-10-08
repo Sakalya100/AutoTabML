@@ -56,6 +56,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <a href={DOCS_URL} className="hover:text-ink">
                 Roadmap &amp; design notes
               </a>
+              <Link href="/privacy" className="hover:text-ink">
+                Privacy
+              </Link>
             </div>
           </footer>
         </AuthProvider>
