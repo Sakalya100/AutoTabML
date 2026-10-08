@@ -4,10 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  TERMINAL as TERMINAL_STATUSES,
-  type PublicRunMeta,
-} from "@/lib/api-types";
+import { TERMINAL as TERMINAL_STATUSES, type PublicRunMeta } from "@/lib/api-types";
 import { buildChat, type ChatMessageInput } from "@/lib/chat";
 import { isStopCommand, MAX_STEER_CHARS, splitLink } from "@/lib/chat-input";
 import { coerceEvent, type AnyEvent } from "@/lib/events";
@@ -72,10 +69,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
       }
       setLoadError(null);
       setPayload(body);
-      setMessages((prev) => [
-        ...body.messages.map(toInput),
-        ...prev.filter((m) => m.pending),
-      ]);
+      setMessages((prev) => [...body.messages.map(toInput), ...prev.filter((m) => m.pending)]);
       setEvents((prev) => {
         const next = { ...prev };
         for (const r of body.runs) {
@@ -95,9 +89,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         return next;
       });
     } catch {
-      setLoadError(
-        "Couldn't reach the server. Check your connection; this page retries when you reload it.",
-      );
+      setLoadError("Couldn't reach the server. Check your connection; this page retries when you reload it.");
     }
   }, [sessionId]);
 
@@ -107,20 +99,14 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
   }, [load]);
 
   const runs = payload?.runs ?? [];
-  const statusOf = (id: string) =>
-    metas[id]?.status ?? runs.find((r) => r.row.id === id)?.row.status ?? null;
-  const activeRun =
-    [...runs]
-      .reverse()
-      .find((r) => !TERMINAL.has(statusOf(r.row.id) ?? "finished")) ?? null;
+  const statusOf = (id: string) => metas[id]?.status ?? runs.find((r) => r.row.id === id)?.row.status ?? null;
+  const activeRun = [...runs].reverse().find((r) => !TERMINAL.has(statusOf(r.row.id) ?? "finished")) ?? null;
   const activeId = activeRun?.row.id ?? null;
 
   /* ---- live tail of the running run (SSE resumes after the last seq we hold) ------------------------- */
   useEffect(() => {
     if (!activeId) return;
-    const es = new EventSource(
-      `/api/runs/${activeId}/stream?after=${lastSeq.current[activeId] ?? -1}`,
-    );
+    const es = new EventSource(`/api/runs/${activeId}/stream?after=${lastSeq.current[activeId] ?? -1}`);
     es.onopen = () => setConnected(true);
     es.onerror = () => setConnected(false);
     es.onmessage = (msg) => {
@@ -178,45 +164,28 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
     const st = statusOf(activeId);
     const act = activeAgentStep(activeEvents ?? []);
     if (act) return `${roleDoing(act.role)}…`;
-    if (!activeEvents?.length)
-      return st === "queued" || st === "starting"
-        ? "Starting the engine and downloading your data…"
-        : "Reading your data…";
+    if (!activeEvents?.length) return st === "queued" || st === "starting" ? "Starting the engine and downloading your data…" : "Reading your data…";
     const last = activeEvents.at(-1)?.type;
-    if (last === "stopped")
-      return "Scoring the best model once on the locked test…";
+    if (last === "stopped") return "Scoring the best model once on the locked test…";
     if (last === "run_finished") return "Writing the report…";
     if (last === "report_ready") return null;
     return "Thinking about the next step…";
   })();
 
   const stopRequested =
-    !!activeId &&
-    messages.some(
-      (m) =>
-        m.kind === "control" &&
-        m.role === "user" &&
-        Date.parse(m.created_at) >=
-          Date.parse(activeRun?.row.created_at ?? "0"),
-    );
+    !!activeId && messages.some((m) => m.kind === "control" && m.role === "user" && Date.parse(m.created_at) >= Date.parse(activeRun?.row.created_at ?? "0"));
   /** The engine has decided to stop (on its own or when asked): only the locked test and the report are left. */
   const finishing = !!activeEvents?.some((e) => e.type === "stopped");
 
   /* ---- selection sync ------------------------------------------------------------------------------- */
-  const onChatSelect = (runId: string, expId: string) =>
-    setSel((s) =>
-      s && s.runId === runId && s.expId === expId ? null : { runId, expId },
-    );
+  const onChatSelect = (runId: string, expId: string) => setSel((s) => (s && s.runId === runId && s.expId === expId ? null : { runId, expId }));
   const onMapSelect = (expId: string) => {
     if (!mapRunId) return;
     setSel({ runId: mapRunId, expId });
     setFocusKey((k) => k + 1);
   };
   const selectedKey = sel ? `${sel.runId}:${sel.expId}` : null;
-  const selectedExp =
-    sel && sel.runId === mapRunId
-      ? view.experiments.find((x) => x.id === sel.expId)
-      : undefined;
+  const selectedExp = sel && sel.runId === mapRunId ? view.experiments.find((x) => x.id === sel.expId) : undefined;
 
   /* ---- composer actions ----------------------------------------------------------------------------- */
   const [text, setText] = useState("");
@@ -238,9 +207,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         return;
       }
       if (!sessionId) {
-        setComposerError(
-          "Paste a link to a public CSV to begin, or attach a file.",
-        );
+        setComposerError("Paste a link to a public CSV to begin, or attach a file.");
         return;
       }
     }
@@ -261,13 +228,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
       const res = await fetch(`/api/sessions/${sessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          stop && !t
-            ? { kind: "stop" }
-            : stop
-              ? { kind: "stop", text: t }
-              : { text: t },
-        ),
+        body: JSON.stringify(stop && !t ? { kind: "stop" } : stop ? { kind: "stop", text: t } : { text: t }),
       });
       const body = (await res.json()) as {
         messages?: MessageRow[];
@@ -279,10 +240,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         setComposerError(body.error ?? "Couldn't send that. Try again.");
         return;
       }
-      setMessages((m) => [
-        ...m.filter((x) => x.id !== pending.id),
-        ...body.messages!.map(toInput),
-      ]);
+      setMessages((m) => [...m.filter((x) => x.id !== pending.id), ...body.messages!.map(toInput)]);
       if (stop) void load();
     } catch {
       setMessages((m) => m.filter((x) => x.id !== pending.id));
@@ -295,9 +253,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
 
   const cancelNow = async () => {
     if (!activeId) return;
-    await fetch(`/api/runs/${activeId}/cancel`, { method: "POST" }).catch(
-      () => null,
-    );
+    await fetch(`/api/runs/${activeId}/cancel`, { method: "POST" }).catch(() => null);
     void load();
   };
 
@@ -324,20 +280,15 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
   const activeStatus = activeId ? statusOf(activeId) : null;
   const decided = view.experiments.filter((x) => x.status !== "running").length;
   const best = view.experiments.find((x) => x.id === view.bestId);
-  const planned =
-    runs.find((r) => r.row.id === mapRunId)?.row.max_experiments ?? null;
+  const planned = runs.find((r) => r.row.id === mapRunId)?.row.max_experiments ?? null;
 
   if (loadError && !payload)
     return (
       <div className="ws-main">
         <div className="ws-empty">
           <p className="ws-kicker">Session</p>
-          <p className="mt-3 font-display text-[2rem] leading-tight">
-            This session isn’t here.
-          </p>
-          <p className="mt-2 max-w-[46ch] text-[14px] text-[var(--lp-ink-2)]">
-            {loadError} Sessions belong to the browser that started them.
-          </p>
+          <p className="mt-3 font-display text-[2rem] leading-tight">This session isn’t here.</p>
+          <p className="mt-2 max-w-[46ch] text-[14px] text-[var(--lp-ink-2)]">{loadError} Sessions belong to the browser that started them.</p>
           <Link href="/s/new" className="ws-start mt-6 inline-flex">
             Start a new session <span aria-hidden>→</span>
           </Link>
@@ -354,9 +305,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
             title={title}
             onRenamed={(t) => {
               if (sessionId) renameLocal(sessionId, t);
-              setPayload((p) =>
-                p ? { ...p, session: { ...p.session, title: t } } : p,
-              );
+              setPayload((p) => (p ? { ...p, session: { ...p.session, title: t } } : p));
             }}
           />
           <p className="ws-chat-status">
@@ -380,24 +329,14 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         </header>
         {settingUp ? (
           <div className="su-scroll">
-            <SetupPane
-              key={
-                draft.state.source?.kind === "link"
-                  ? draft.state.source.url
-                  : "file"
-              }
-              draft={draft}
-              onStart={startRun}
-            />
+            <SetupPane key={draft.state.source?.kind === "link" ? draft.state.source.url : "file"} draft={draft} onStart={startRun} />
           </div>
         ) : (
           <>
             <ChatLog
               items={items}
               metricOf={(runId) => {
-                const started = events[runId]?.find(
-                  (e) => e.type === "run_started",
-                ) as { profile?: { metric?: Metric } } | undefined;
+                const started = events[runId]?.find((e) => e.type === "run_started") as { profile?: { metric?: Metric } } | undefined;
                 return started?.profile?.metric ?? null;
               }}
               selected={selectedKey}
@@ -405,14 +344,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
               onSelect={onChatSelect}
               typing={typing}
               tail={null}
-              empty={
-                sessionId ? null : (
-                  <EmptyNew
-                    onExample={(u) => void send(u)}
-                    disabled={!liveEnabled}
-                  />
-                )
-              }
+              empty={sessionId ? null : <EmptyNew onExample={(u) => void send(u)} disabled={!liveEnabled} />}
             />
             <Composer
               mode={activeId ? "run" : "draft"}
@@ -451,9 +383,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         <header className="ws-map-head">
           <p className="ws-kicker">
             {mapActive ? "Live map" : "Map"}
-            {runs.length > 1 && mapRunId
-              ? ` · run ${runs.findIndex((r) => r.row.id === mapRunId) + 1} of ${runs.length}`
-              : ""}
+            {runs.length > 1 && mapRunId ? ` · run ${runs.findIndex((r) => r.row.id === mapRunId) + 1} of ${runs.length}` : ""}
           </p>
           {mapRunId && (
             <dl className="ws-facts">
@@ -461,22 +391,16 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
                 <dt>tried</dt>
                 <dd>
                   {decided}
-                  {planned ? (
-                    <span className="text-[var(--lp-ink-3)]">/{planned}</span>
-                  ) : null}
+                  {planned ? <span className="text-[var(--lp-ink-3)]">/{planned}</span> : null}
                 </dd>
               </div>
               <div>
                 <dt>best {metricInfo(metric).label}</dt>
-                <dd className="text-[var(--lp-signal)]">
-                  {best?.cv ? formatScore(metric, best.cv.mean) : "—"}
-                </dd>
+                <dd className="text-[var(--lp-signal)]">{best?.cv ? formatScore(metric, best.cv.mean) : "—"}</dd>
               </div>
               <div>
                 <dt>tokens</dt>
-                <dd>
-                  {fmtInt(view.totalInputTokens + view.totalOutputTokens)}
-                </dd>
+                <dd>{fmtInt(view.totalInputTokens + view.totalOutputTokens)}</dd>
               </div>
               <div>
                 <dt>cost</dt>
@@ -487,15 +411,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         </header>
         <div className="ws-map-body">
           {mapRunId && mapEvents.length > 0 ? (
-            <SurveyPanel
-              view={view}
-              selectedId={sel?.expId ?? null}
-              onSelect={onMapSelect}
-              staging={mapActive}
-              compact
-              bare
-              heightClass="h-full"
-            />
+            <SurveyPanel view={view} selectedId={sel?.expId ?? null} onSelect={onMapSelect} staging={mapActive} compact bare heightClass="h-full" />
           ) : (
             <div className="ws-map-empty">
               <p className="max-w-[30ch] text-[14px] leading-relaxed text-[var(--lp-ink-3)]">
@@ -527,12 +443,9 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
                     ) : (
                       "not kept"
                     )}
-                    {selectedExp.cv &&
-                      ` · CV ${formatScore(metric, selectedExp.cv.mean)}`}
+                    {selectedExp.cv && ` · CV ${formatScore(metric, selectedExp.cv.mean)}`}
                   </p>
-                  <p className="mt-0.5 truncate text-[13.5px] text-[var(--lp-ink)]">
-                    {plainIdea(selectedExp.idea)}
-                  </p>
+                  <p className="mt-0.5 truncate text-[13.5px] text-[var(--lp-ink)]">{plainIdea(selectedExp.idea)}</p>
                   <button
                     type="button"
                     className="ws-link mt-1 text-[13px]"
@@ -555,13 +468,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
 
 /* ---- pieces ------------------------------------------------------------------------------------------- */
 
-function EmptyNew({
-  onExample,
-  disabled,
-}: {
-  onExample: (url: string) => void;
-  disabled: boolean;
-}) {
+function EmptyNew({ onExample, disabled }: { onExample: (url: string) => void; disabled: boolean }) {
   return (
     <div className="ws-empty">
       <p className="ws-kicker">New session</p>
@@ -571,29 +478,17 @@ function EmptyNew({
         Press <span className="text-[var(--lp-signal)] italic">Start.</span>
       </h1>
       <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-ink-2)]">
-        A team of agents plans, writes and tests models on your table, keeps
-        only the gains that are real, and stops when the gains are noise. You
-        can steer them while they work.
+        A team of agents plans, writes and tests models on your table, keeps only the gains that are real, and stops when the gains are noise. You can steer
+        them while they work.
       </p>
       {disabled ? (
-        <p className="mt-6 text-[14px] text-[var(--lp-ink-3)]">
-          Live runs are switched off on this deployment. Watch a replay instead.
-        </p>
+        <p className="mt-6 text-[14px] text-[var(--lp-ink-3)]">Live runs are switched off on this deployment. Watch a replay instead.</p>
       ) : (
         <div className="mt-7 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[13px] text-[var(--lp-ink-3)]">
-            No data at hand? Try
-          </span>
+          <span className="mr-1 text-[13px] text-[var(--lp-ink-3)]">No data at hand? Try</span>
           {EXAMPLES.map((ex) => (
-            <button
-              key={ex.url}
-              type="button"
-              className="nr-example"
-              onClick={() => onExample(ex.url)}
-              title={ex.url}
-            >
-              {ex.name}{" "}
-              <span className="text-[var(--lp-ink-3)]">· {ex.blurb}</span>
+            <button key={ex.url} type="button" className="nr-example" onClick={() => onExample(ex.url)} title={ex.url}>
+              {ex.name} <span className="text-[var(--lp-ink-3)]">· {ex.blurb}</span>
             </button>
           ))}
         </div>
@@ -602,15 +497,7 @@ function EmptyNew({
   );
 }
 
-function TitleEditor({
-  sessionId,
-  title,
-  onRenamed,
-}: {
-  sessionId: string | null;
-  title: string;
-  onRenamed: (t: string) => void;
-}) {
+function TitleEditor({ sessionId, title, onRenamed }: { sessionId: string | null; title: string; onRenamed: (t: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(title);
   const [error, setError] = useState<string | null>(null);
@@ -664,13 +551,7 @@ function TitleEditor({
         <span className="truncate">{title || " "}</span>
         {sessionId && (
           <svg viewBox="0 0 16 16" className="ws-title-pen" aria-hidden>
-            <path
-              d="M3 11.5V13h1.5l7-7L10 4.5l-7 7ZM11 3.5l1.5 1.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              strokeLinejoin="round"
-            />
+            <path d="M3 11.5V13h1.5l7-7L10 4.5l-7 7ZM11 3.5l1.5 1.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
           </svg>
         )}
       </button>
@@ -743,20 +624,12 @@ function Composer(p: {
             }
           }}
           onKeyDown={(e) => {
-            if (
-              e.key === "Enter" &&
-              !e.shiftKey &&
-              !e.nativeEvent.isComposing
-            ) {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               p.onSend();
             }
           }}
-          placeholder={
-            run
-              ? "Steer the agents…"
-              : "Paste a link to a CSV, and say what to predict (optional)"
-          }
+          placeholder={run ? "Steer the agents…" : "Paste a link to a CSV, and say what to predict (optional)"}
           aria-label={run ? "Message the agents" : "Link to a CSV"}
           className="ws-input"
         />
@@ -778,11 +651,7 @@ function Composer(p: {
             title="Finish the current experiment, score the locked test once, write the report"
           >
             <span className="ws-stop-square" aria-hidden />
-            {p.finishing
-              ? "Finishing…"
-              : p.stopRequested
-                ? "Stopping…"
-                : "Stop"}
+            {p.finishing ? "Finishing…" : p.stopRequested ? "Stopping…" : "Stop"}
           </button>
         )}
       </div>
@@ -793,30 +662,22 @@ function Composer(p: {
           </span>
         ) : run ? (
           p.finishing ? (
-            <>
-              The agents have stopped. Scoring the best model once on the locked
-              test, then the report.
-            </>
+            <>The agents have stopped. Scoring the best model once on the locked test, then the report.</>
           ) : p.stopRequested ? (
             <>
-              Finishing the current experiment, then the locked test and the
-              report.{" "}
+              Finishing the current experiment, then the locked test and the report.{" "}
               <button type="button" className="ws-link" onClick={p.onCancelNow}>
                 Cancel now instead
               </button>
             </>
           ) : (
             <>
-              Steer in plain words, e.g. “prefer simple linear models”; it goes
-              into the next Planner prompt. “stop” finishes gracefully: the
-              locked test and report still run.
+              Steer in plain words, e.g. “prefer simple linear models”; it goes into the next Planner prompt. “stop” finishes gracefully: the locked test and
+              report still run.
             </>
           )
         ) : (
-          <>
-            Public https links: GitHub, Google Sheets &amp; Drive, Hugging Face,
-            Dropbox. Or attach a CSV.
-          </>
+          <>Public https links: GitHub, Google Sheets &amp; Drive, Hugging Face, Dropbox. Or attach a CSV.</>
         )}
       </p>
     </div>

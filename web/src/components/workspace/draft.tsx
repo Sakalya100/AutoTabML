@@ -7,28 +7,10 @@
  */
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useRef, useState } from "react";
-import {
-  parseTable,
-  type ColumnKind,
-  type ColumnStats,
-} from "@/lib/ingest/csv";
+import { parseTable, type ColumnKind, type ColumnStats } from "@/lib/ingest/csv";
 import type { Preview } from "@/lib/api-types";
-import {
-  METRIC_LABEL,
-  PROBLEM_LABEL,
-  suggest,
-  suggestionFor,
-  VALID_METRICS,
-  type MetricId,
-  type ProblemType,
-  type Suggestion,
-} from "@/lib/ingest/suggest";
-import {
-  DEFAULT_EXPERIMENTS,
-  MAX_UPLOAD_BYTES,
-  validateRunRequest,
-  validateUrlRunRequest,
-} from "@/lib/upload";
+import { METRIC_LABEL, PROBLEM_LABEL, suggest, suggestionFor, VALID_METRICS, type MetricId, type ProblemType, type Suggestion } from "@/lib/ingest/suggest";
+import { DEFAULT_EXPERIMENTS, MAX_UPLOAD_BYTES, validateRunRequest, validateUrlRunRequest } from "@/lib/upload";
 import { Listbox } from "./listbox";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -55,10 +37,7 @@ export type DraftStatus = "idle" | "loading" | "ready" | "error";
 
 export interface DraftState {
   status: DraftStatus;
-  source:
-    | { kind: "link"; url: string }
-    | { kind: "file"; file: File; head: string }
-    | null;
+  source: { kind: "link"; url: string } | { kind: "file"; file: File; head: string } | null;
   goal: string;
   table: DraftTable | null;
   chips: Chips | null;
@@ -85,9 +64,7 @@ const KIND_LABEL: Record<ColumnKind, string> = {
 /** "titanic.csv" for a link to a file, else the host. */
 const fileOf = (u: string) => {
   try {
-    const last = decodeURIComponent(
-      new URL(u).pathname.split("/").filter(Boolean).at(-1) ?? "",
-    );
+    const last = decodeURIComponent(new URL(u).pathname.split("/").filter(Boolean).at(-1) ?? "");
     return /\.(csv|tsv|txt|parquet)$/i.test(last) ? last : hostOf(u);
   } catch {
     return hostOf(u);
@@ -103,11 +80,7 @@ const hostOf = (u: string) => {
 };
 
 /** "Predict Survived (yes / no), scored by ROC AUC, over at most 8 experiments." — the run as the user confirmed it. */
-export function runSentence(
-  chips: Chips,
-  experiments: number,
-  label: string,
-): string {
+export function runSentence(chips: Chips, experiments: number, label: string): string {
   return `Predict ${chips.target} (${PROBLEM_LABEL[chips.problemType]}) in ${label}, scored by ${METRIC_LABEL[chips.metric]}, over at most ${experiments} experiments.`;
 }
 
@@ -210,8 +183,7 @@ export function useRunDraft(maxExperiments: number) {
         setS((p) => ({
           ...p,
           status: "error",
-          error:
-            "Couldn't reach the server. Check your connection and try again.",
+          error: "Couldn't reach the server. Check your connection and try again.",
         }));
       }
     },
@@ -245,8 +217,7 @@ export function useRunDraft(maxExperiments: number) {
           source: null,
           table: null,
           chips: null,
-          error:
-            "We couldn't find at least two columns. Is this a CSV with a header row?",
+          error: "We couldn't find at least two columns. Is this a CSV with a header row?",
         }));
         return;
       }
@@ -328,11 +299,8 @@ export function useRunDraft(maxExperiments: number) {
   };
 
   /** POST /api/runs; resolves to {id, sessionId} or null (the error is on the state). */
-  const start = async (
-    sessionId: string | null,
-  ): Promise<{ id: string; sessionId: string | null } | null> => {
-    if (s.status !== "ready" || !s.chips || !s.table || !s.source || s.starting)
-      return null;
+  const start = async (sessionId: string | null): Promise<{ id: string; sessionId: string | null } | null> => {
+    if (s.status !== "ready" || !s.chips || !s.table || !s.source || s.starting) return null;
     const { chips, experiments, goal } = s;
     const sentence = runSentence(chips, experiments, s.table.label);
     let init: RequestInit;
@@ -414,8 +382,7 @@ export function useRunDraft(maxExperiments: number) {
       setS((p) => ({
         ...p,
         starting: false,
-        startError:
-          "Couldn't reach the server. Check your connection and try again.",
+        startError: "Couldn't reach the server. Check your connection and try again.",
       }));
       return null;
     }
@@ -465,35 +432,20 @@ const METRIC_HINT: Record<MetricId, string> = {
  * Setting up a run, in the chat pane itself (before any chat exists): what it read, the three choices as custom
  * controls, a peek at the table, and Start. Start hands over to the chat; "Use different data" goes back.
  */
-export function SetupPane({
-  draft,
-  onStart,
-}: {
-  draft: RunDraft;
-  onStart: () => void;
-}) {
+export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => void }) {
   const { state: s, reduced } = draft;
   const [goal, setGoalText] = useState(s.goal);
   if (s.status === "idle") return null;
-  const from =
-    s.source?.kind === "link"
-      ? hostOf(s.source.url) || "the link"
-      : "your file";
+  const from = s.source?.kind === "link" ? hostOf(s.source.url) || "the link" : "your file";
 
   if (s.status === "loading")
     return (
       <div className="su-pane" aria-live="polite">
         <p className="ws-kicker">New run · reading the data</p>
         <p className="su-title">Reading {from}…</p>
-        <p className="su-sub">
-          Checking the header, the column types and a sample of rows.
-        </p>
+        <p className="su-sub">Checking the header, the column types and a sample of rows.</p>
         <div className="nr-scan mt-5 max-w-[22rem]" aria-hidden />
-        <button
-          type="button"
-          onClick={draft.clear}
-          className="ws-link mt-8 text-[14px]"
-        >
+        <button type="button" onClick={draft.clear} className="ws-link mt-8 text-[14px]">
           Cancel
         </button>
       </div>
@@ -501,9 +453,7 @@ export function SetupPane({
   if (s.status === "error")
     return (
       <div className="su-pane" role="alert">
-        <p className="ws-kicker text-[var(--crash)]">
-          New run · couldn’t read it
-        </p>
+        <p className="ws-kicker text-[var(--crash)]">New run · couldn’t read it</p>
         <p className="su-title">That link didn’t work.</p>
         <p className="su-sub text-[var(--lp-ink-2)]">{s.error}</p>
         <button type="button" onClick={draft.clear} className="ws-start mt-7">
@@ -540,21 +490,13 @@ export function SetupPane({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="ws-kicker">New run · set it up</p>
-        <button
-          type="button"
-          onClick={draft.clear}
-          disabled={s.starting}
-          className="ws-link text-[13px]"
-        >
+        <button type="button" onClick={draft.clear} disabled={s.starting} className="ws-link text-[13px]">
           <span aria-hidden>←</span> Use different data
         </button>
       </div>
       <p className="su-title">{table.label}</p>
       <p className="su-meta">
-        {table.rows == null
-          ? "rows: unknown"
-          : `${table.rowsExact ? "" : "≈ "}${table.rows.toLocaleString("en-US")} rows`}{" "}
-        · {table.columns.length} columns
+        {table.rows == null ? "rows: unknown" : `${table.rowsExact ? "" : "≈ "}${table.rows.toLocaleString("en-US")} rows`} · {table.columns.length} columns
         {s.source?.kind === "link" && ` · from ${from}`}
         {table.rewritten && " · share link → direct download"}
       </p>
@@ -565,13 +507,7 @@ export function SetupPane({
             What to predict
           </span>
           <div className="su-control">
-            <Listbox
-              label="Column to predict"
-              value={chips.target}
-              options={targets}
-              onChange={draft.setTarget}
-              disabled={s.starting}
-            />
+            <Listbox label="Column to predict" value={chips.target} options={targets} onChange={draft.setTarget} disabled={s.starting} />
             <span className="su-aside">
               as <em>{PROBLEM_LABEL[chips.problemType]}</em>
             </span>
@@ -580,13 +516,7 @@ export function SetupPane({
         <div className="su-field">
           <span className="su-label">Score by</span>
           <div className="su-control">
-            <Listbox
-              label="Metric"
-              value={chips.metric}
-              options={metrics}
-              onChange={(m) => draft.setMetric(m)}
-              disabled={s.starting}
-            />
+            <Listbox label="Metric" value={chips.metric} options={metrics} onChange={(m) => draft.setMetric(m)} disabled={s.starting} />
             <span className="su-aside">{METRIC_HINT[chips.metric]}</span>
           </div>
         </div>
@@ -610,9 +540,7 @@ export function SetupPane({
                 </button>
               ))}
             </div>
-            <span className="su-aside">
-              at most; it stops early once gains are noise
-            </span>
+            <span className="su-aside">at most; it stops early once gains are noise</span>
           </div>
         </div>
         <div className="su-field">
@@ -639,15 +567,9 @@ export function SetupPane({
 
       <p className="su-why">
         {s.goalPlain}
-        {!s.touched && s.why && (
-          <> Why: {s.why.text.replace(/\.$/, "")}.</>
-        )}{" "}
+        {!s.touched && s.why && <> Why: {s.why.text.replace(/\.$/, "")}.</>}{" "}
         <span className="font-mono text-[12px] text-[var(--lp-ink-3)]">
-          {s.touched
-            ? "· your pick"
-            : s.why?.source === "llm"
-              ? "· suggested by gpt-oss"
-              : "· suggested by rules of thumb"}
+          {s.touched ? "· your pick" : s.why?.source === "llm" ? "· suggested by gpt-oss" : "· suggested by rules of thumb"}
         </span>
       </p>
 
@@ -656,15 +578,9 @@ export function SetupPane({
           <thead>
             <tr>
               {table.columns.map((c) => (
-                <th
-                  key={c}
-                  data-target={c === chips.target ? "" : undefined}
-                  className="align-bottom font-normal"
-                >
+                <th key={c} data-target={c === chips.target ? "" : undefined} className="align-bottom font-normal">
                   <span className="block">{c}</span>
-                  <span className="block text-[11px] text-[var(--lp-ink-3)]">
-                    {KIND_LABEL[statBy.get(c)?.kind ?? "text"]}
-                  </span>
+                  <span className="block text-[11px] text-[var(--lp-ink-3)]">{KIND_LABEL[statBy.get(c)?.kind ?? "text"]}</span>
                 </th>
               ))}
             </tr>
@@ -673,16 +589,8 @@ export function SetupPane({
             {table.sample.slice(0, SHOWN_ROWS).map((r, i) => (
               <tr key={i}>
                 {table.columns.map((c, j) => (
-                  <td
-                    key={c}
-                    data-target={c === chips.target ? "" : undefined}
-                    title={r[j]}
-                  >
-                    {r[j] === "" ? (
-                      <span className="text-[var(--lp-ink-3)]">·</span>
-                    ) : (
-                      r[j]
-                    )}
+                  <td key={c} data-target={c === chips.target ? "" : undefined} title={r[j]}>
+                    {r[j] === "" ? <span className="text-[var(--lp-ink-3)]">·</span> : r[j]}
                   </td>
                 ))}
               </tr>
@@ -691,18 +599,10 @@ export function SetupPane({
         </table>
       </div>
 
-      <p className="mt-5 text-[13px] text-[var(--lp-ink-3)]">
-        Runs on free Groq and Gemini models; data rows are never sent to Gemini.
-      </p>
+      <p className="mt-5 text-[13px] text-[var(--lp-ink-3)]">Runs on free Groq and Gemini models; data rows are never sent to Gemini.</p>
       <div className="su-actions">
-        <button
-          type="button"
-          onClick={onStart}
-          disabled={s.starting}
-          className="ws-start"
-        >
-          {s.starting ? "Starting…" : "Start the run"}{" "}
-          <span aria-hidden>→</span>
+        <button type="button" onClick={onStart} disabled={s.starting} className="ws-start">
+          {s.starting ? "Starting…" : "Start the run"} <span aria-hidden>→</span>
         </button>
         <p className="text-[13.5px] leading-snug text-[var(--lp-ink-3)]">
           {s.startError ? (
@@ -710,10 +610,7 @@ export function SetupPane({
               {s.startError}
             </span>
           ) : (
-            runSentence(chips, s.experiments, table.label).replace(
-              ` in ${table.label}`,
-              "",
-            )
+            runSentence(chips, s.experiments, table.label).replace(` in ${table.label}`, "")
           )}
         </p>
       </div>

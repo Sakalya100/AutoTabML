@@ -3,15 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { formatScore } from "@/lib/metrics";
 import type { SessionListItem } from "@/lib/session-types";
 
@@ -25,12 +17,7 @@ interface ShellCtx {
   renameLocal: (id: string, title: string) => void;
 }
 
-const Ctx = createContext<ShellCtx>({
-  tab: "chat",
-  setTab: () => {},
-  refreshSessions: () => {},
-  renameLocal: () => {},
-});
+const Ctx = createContext<ShellCtx>({ tab: "chat", setTab: () => {}, refreshSessions: () => {}, renameLocal: () => {} });
 export const useShell = () => useContext(Ctx);
 
 const RUNNING = new Set(["queued", "starting", "running"]);
@@ -70,28 +57,16 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   }, [anyRunning, refresh]);
 
   const setTab = useCallback((t: MobileTab) => setTabState(t), []);
-  const renameLocal = useCallback(
-    (id: string, title: string) =>
-      setSessions(
-        (xs) => xs?.map((s) => (s.id === id ? { ...s, title } : s)) ?? xs,
-      ),
-    [],
-  );
+  const renameLocal = useCallback((id: string, title: string) => setSessions((xs) => xs?.map((s) => (s.id === id ? { ...s, title } : s)) ?? xs), []);
 
   return (
-    <Ctx.Provider
-      value={{ tab, setTab, refreshSessions: refresh, renameLocal }}
-    >
+    <Ctx.Provider value={{ tab, setTab, refreshSessions: refresh, renameLocal }}>
       <div data-terra className="ws-root" data-tab={tab}>
         <MobileTabs />
         <aside className="ws-sessions" aria-label="Sessions">
           <div className="ws-sessions-head">
             <h2 className="ws-kicker">Sessions</h2>
-            <Link
-              href="/s/new"
-              className="ws-new"
-              onClick={() => setTabState("chat")}
-            >
+            <Link href="/s/new" className="ws-new" onClick={() => setTabState("chat")}>
               <span aria-hidden>+</span> New
             </Link>
           </div>
@@ -99,22 +74,15 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             {sessions === null && !unavailable && (
               <div className="space-y-3 px-4 pt-2" aria-hidden>
                 {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="h-9 animate-pulse rounded bg-[rgb(236_231_220/0.04)]"
-                  />
+                  <div key={i} className="h-9 animate-pulse rounded bg-[rgb(236_231_220/0.04)]" />
                 ))}
               </div>
             )}
             {unavailable && (
-              <p className="px-4 pt-2 text-[12.5px] leading-relaxed text-[var(--lp-ink-3)]">
-                Saved sessions are unavailable right now. Runs still work.
-              </p>
+              <p className="px-4 pt-2 text-[12.5px] leading-relaxed text-[var(--lp-ink-3)]">Saved sessions are unavailable right now. Runs still work.</p>
             )}
             {sessions?.length === 0 && !unavailable && (
-              <p className="px-4 pt-2 text-[12.5px] leading-relaxed text-[var(--lp-ink-3)]">
-                Your runs will be listed here. They stay in this browser.
-              </p>
+              <p className="px-4 pt-2 text-[12.5px] leading-relaxed text-[var(--lp-ink-3)]">Your runs will be listed here. They stay in this browser.</p>
             )}
             <ul>
               <AnimatePresence initial={false}>
@@ -127,33 +95,16 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <Link
-                      href={`/s/${s.id}`}
-                      onClick={() => setTabState("chat")}
-                      aria-current={s.id === current ? "page" : undefined}
-                      className="ws-session"
-                    >
-                      <span
-                        className={`ws-sdot ws-sdot-${s.status ?? "none"}`}
-                        aria-label={s.status ?? "no run"}
-                      />
+                    <Link href={`/s/${s.id}`} onClick={() => setTabState("chat")} aria-current={s.id === current ? "page" : undefined} className="ws-session">
+                      <span className={`ws-sdot ws-sdot-${s.status ?? "none"}`} aria-label={s.status ?? "no run"} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13.5px] text-[var(--lp-ink)]">
-                          {s.title}
-                        </span>
+                        <span className="block truncate text-[13.5px] text-[var(--lp-ink)]">{s.title}</span>
                         <span className="mt-0.5 flex items-baseline gap-2 font-mono text-[10.5px] text-[var(--lp-ink-3)] tabular-nums">
-                          {s.best != null && (
-                            <span className="text-[var(--lp-ink-2)]">
-                              {formatScore(s.metric, s.best)}
-                            </span>
-                          )}
+                          {s.best != null && <span className="text-[var(--lp-ink-2)]">{formatScore(s.metric, s.best)}</span>}
                           <span className="truncate">{s.fileName}</span>
                         </span>
                       </span>
-                      <time
-                        className="shrink-0 font-mono text-[10px] text-[var(--lp-ink-3)]"
-                        dateTime={s.updatedAt}
-                      >
+                      <time className="shrink-0 font-mono text-[10px] text-[var(--lp-ink-3)]" dateTime={s.updatedAt}>
                         {relTime(s.updatedAt)}
                       </time>
                     </Link>
@@ -177,10 +128,7 @@ export function relTime(iso: string, now = Date.now()): string {
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
   if (s < 7 * 86400) return `${Math.floor(s / 86400)}d`;
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 /** Phone-only tab bar (Chat | Map | Sessions). */
@@ -194,22 +142,9 @@ export function MobileTabs() {
   return (
     <div className="ws-tabs" role="tablist" aria-label="Workspace">
       {tabs.map(([k, label]) => (
-        <button
-          key={k}
-          type="button"
-          role="tab"
-          aria-selected={tab === k}
-          onClick={() => setTab(k)}
-          className="ws-tab"
-        >
+        <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className="ws-tab">
           {label}
-          {tab === k && (
-            <motion.span
-              layoutId="ws-tab-ink"
-              className="ws-tab-ink"
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            />
-          )}
+          {tab === k && <motion.span layoutId="ws-tab-ink" className="ws-tab-ink" transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} />}
         </button>
       ))}
     </div>

@@ -194,13 +194,7 @@
   inset: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 18px,
-    #000 calc(100% - 28px),
-    transparent
-  );
+  mask-image: linear-gradient(to bottom, transparent, #000 18px, #000 calc(100% - 28px), transparent);
 }
 .ws-thread {
   max-width: 44rem;

@@ -51,9 +51,7 @@ export function Listbox<T extends string>({
   useEffect(() => {
     if (!open) return;
     list.current?.focus();
-    list.current
-      ?.querySelector<HTMLElement>(`[data-i="${active}"]`)
-      ?.scrollIntoView({ block: "nearest" });
+    list.current?.querySelector<HTMLElement>(`[data-i="${active}"]`)?.scrollIntoView({ block: "nearest" });
   }, [open, active]);
 
   const openAt = () => {
@@ -94,14 +92,10 @@ export function Listbox<T extends string>({
     } else if (e.key.length === 1 && /\S/.test(e.key)) {
       const now = e.timeStamp;
       typed.current = {
-        text:
-          (now - typed.current.at < 700 ? typed.current.text : "") +
-          e.key.toLowerCase(),
+        text: (now - typed.current.at < 700 ? typed.current.text : "") + e.key.toLowerCase(),
         at: now,
       };
-      const hit = options.findIndex((o) =>
-        o.label.toLowerCase().startsWith(typed.current.text),
-      );
+      const hit = options.findIndex((o) => o.label.toLowerCase().startsWith(typed.current.text));
       if (hit >= 0) setActive(hit);
     }
   };
@@ -128,14 +122,7 @@ export function Listbox<T extends string>({
         <span className="lb-value">{current?.label ?? value}</span>
         {current?.badge && <span className="lb-badge">{current.badge}</span>}
         <svg viewBox="0 0 12 12" className="lb-chev" aria-hidden>
-          <path
-            d="M3 4.5 6 7.5 9 4.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && (
@@ -147,9 +134,7 @@ export function Listbox<T extends string>({
           tabIndex={-1}
           className="lb-list"
           // Long hints (a metric's meaning) go under the label; short ones (a column's kind) sit at the right.
-          data-stacked={
-            options.some((o) => (o.hint?.length ?? 0) > 12) || undefined
-          }
+          data-stacked={options.some((o) => (o.hint?.length ?? 0) > 12) || undefined}
           aria-activedescendant={`${id}-o${active}`}
           onKeyDown={onListKey}
         >
@@ -165,23 +150,12 @@ export function Listbox<T extends string>({
               onPointerMove={() => setActive(i)}
               onClick={() => pick(i)}
             >
-              <span
-                className={`lb-option-label ${mono ? "font-mono tabular-nums" : ""}`}
-              >
-                {o.label}
-              </span>
+              <span className={`lb-option-label ${mono ? "font-mono tabular-nums" : ""}`}>{o.label}</span>
               {o.badge && <span className="lb-badge">{o.badge}</span>}
               {o.hint && <span className="lb-hint">{o.hint}</span>}
               {o.value === value && (
                 <svg viewBox="0 0 12 12" className="lb-check" aria-hidden>
-                  <path
-                    d="M2.5 6.2 5 8.6 9.5 3.6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
+                  <path d="M2.5 6.2 5 8.6 9.5 3.6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
             </li>
