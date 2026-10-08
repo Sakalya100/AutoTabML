@@ -29,8 +29,10 @@ _store: Store | None = None
 _runner: Any = None
 
 TERMINAL = {"finished", "failed", "cancelled"}
-SECRET_PATTERNS = re.compile(r"(gsk_[A-Za-z0-9]+|AIza[0-9A-Za-z_\-]+|AQ\.[A-Za-z0-9_\-\.]+|csk-[A-Za-z0-9]+|"
-                             r"npg_[A-Za-z0-9]+|Bearer\s+\S+)")
+SECRET_ENV = (
+    "GROQ_API_KEY", "GEMINI_API_KEY", "DATABASE_URL_POOLED", "DATABASE_URL", "VERCEL_AUTOMATION_BYPASS_SECRET",
+)
+BEARER = re.compile(r"Bearer\s+\S+")
 
 
 def get_store() -> Store:
@@ -60,7 +62,12 @@ def sha256(s: str) -> str:
 
 
 def redact(text: str) -> str:
-    return SECRET_PATTERNS.sub("[redacted]", text)
+    """Defence in depth for the stderr tail (the VM never holds these values): drop known secrets and bearer tokens."""
+    for k in SECRET_ENV:
+        v = os.environ.get(k)
+        if v and len(v) >= 8:
+            text = text.replace(v, "[redacted]")
+    return BEARER.sub("Bearer [redacted]", text)
 
 
 def public_base(request: Request) -> str:

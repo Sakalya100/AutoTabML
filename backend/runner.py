@@ -12,6 +12,7 @@ providers. The per-run ingest token is the one credential the VM holds; it is sc
 
 from __future__ import annotations
 
+import contextlib
 import os
 import subprocess
 import time
@@ -253,7 +254,5 @@ class SandboxRunner:
 
 
 async def _quiet_stop(box: object) -> None:
-    try:
+    with contextlib.suppress(Exception):
         await box.stop()  # type: ignore[attr-defined]
-    except Exception:  # noqa: BLE001
-        pass

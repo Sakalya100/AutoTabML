@@ -94,16 +94,19 @@ def test_events_are_ordered_deduplicated_and_paged(env: tuple[TestClient, FakeRu
     assert client.get(f"/py/runs/{rid}", params={"after": 3}).json()["next_after"] == 3
 
 
-def test_exit_finishes_the_run_and_stops_the_sandbox(env: tuple[TestClient, FakeRunner]) -> None:
+def test_exit_finishes_the_run_and_stops_the_sandbox(
+    env: tuple[TestClient, FakeRunner], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client, runner = env
+    monkeypatch.setenv("GROQ_API_KEY", "groq-test-secret-value")
     rid = _start(client)
-    tail = "boom\nAuthorization: Bearer gsk_abc123"
+    tail = "boom groq-test-secret-value\nAuthorization: Bearer some-token"
     r = client.post(f"/py/runs/{rid}/ingest", json={"kind": "exit", "exit_code": 0, "stderr_tail": tail},
                     headers={"X-Ingest-Token": runner.token})
     assert r.status_code == 200
     run = client.get(f"/py/runs/{rid}").json()["run"]
     assert run["status"] == "finished" and run["exit_code"] == 0
-    assert "gsk_" not in run["error_tail"] and "[redacted]" in run["error_tail"]
+    assert "groq-test-secret-value" not in run["error_tail"] and "some-token" not in run["error_tail"]
     assert ("cancel", "autotinker-spike-x") in runner.calls
 
 
@@ -118,7 +121,7 @@ def test_stop_graceful_then_hard(env: tuple[TestClient, FakeRunner]) -> None:
 
 
 def test_run_policy_brokers_secrets_and_engine_env_holds_none() -> None:
-    env = {"GROQ_API_KEY": "gsk_real", "GEMINI_API_KEY": "AIza_real", "VERCEL_AUTOMATION_BYPASS_SECRET": "byp"}
+    env = {"GROQ_API_KEY": "groq-real", "GEMINI_API_KEY": "gemini-real", "VERCEL_AUTOMATION_BYPASS_SECRET": "byp"}
     policy = run_policy("https://raw.githubusercontent.com/a/b/c.csv", "spike.vercel.app", env)
     dumped = repr(policy)
     for host in ("api.groq.com", "generativelanguage.googleapis.com", "raw.githubusercontent.com",
@@ -127,7 +130,7 @@ def test_run_policy_brokers_secrets_and_engine_env_holds_none() -> None:
     assert "pypi.org" not in dumped and "github.com'" not in dumped
     eenv = engine_env(env)
     assert eenv["GROQ_API_KEY"] == PLACEHOLDER_KEY and eenv["GEMINI_API_KEY"] == PLACEHOLDER_KEY
-    assert not any(v in json.dumps(eenv) for v in ("gsk_real", "AIza_real", "byp"))
+    assert not any(v in json.dumps(eenv) for v in ("groq-real", "gemini-real", "byp"))
     assert dataset_hosts("https://github.com/a/b/blob/main/x.csv") == ["github.com", "raw.githubusercontent.com"]
 
 
