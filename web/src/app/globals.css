@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Theme: html[data-theme] is set before paint by the inline script in layout.tsx (system preference by default). */
+/* Night throughout: layout.tsx renders html[data-theme="dark"]; the :root values below are the unused paper defaults. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
@@ -179,10 +179,7 @@ body:has([data-landing]) > footer {
   --lp-hair: oklch(88% 0.02 85 / 0.12);
   --lp-void: #05070a;
 }
-/* The landing is night in both themes, so the theme toggle has nothing to switch there. */
-body:has([data-landing]) .theme-toggle {
-  display: none;
-}
+
 body:has([data-landing]) > header {
   position: relative;
   z-index: 30;

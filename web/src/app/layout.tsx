@@ -1,9 +1,7 @@
-import Script from "next/script";
 import type { Metadata } from "next";
 import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import { AuthControls, AuthProvider } from "@/components/auth";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { GITHUB_URL, DOCS_URL } from "@/lib/links";
 import "./globals.css";
 
@@ -17,20 +15,15 @@ export const metadata: Metadata = {
     "AutoTinker evolves a readable ML pipeline for your table, keeps only statistically real gains, stops at the problem's ceiling, and reports how much it overfit.",
 };
 
-// Runs before paint so there is no light/dark flash. Dark unless the visitor picked light with the toggle: the landing is
-// always night, so following a light system setting made the workspace flip to paper right after it.
-const themeScript = `(function(){var t="dark";try{if(localStorage.getItem("theme")==="light")t="light"}catch(e){}document.documentElement.dataset.theme=t})()`;
+// The site is night throughout: no light theme. data-theme="dark" selects the dark tokens in globals.css.
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${display.variable} ${body.variable} ${code.variable} h-full antialiased`}>
-      <head>
-        <Script id="theme" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
+    <html lang="en" data-theme="dark" style={{ colorScheme: "dark" }} className={`${display.variable} ${body.variable} ${code.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <AuthProvider>
           <header className="border-b border-rule">
-            <div className="mx-auto flex max-w-[1240px] items-center gap-6 px-4 py-3 sm:px-6">
+            <div className="flex items-center gap-6 px-4 py-3">
               <Link href="/" className="font-display text-[1.6rem] leading-none tracking-tight">
                 Auto<span className="italic text-best">Tinker</span>
               </Link>
@@ -41,7 +34,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <a href={GITHUB_URL} className="hidden rounded px-2 py-1.5 text-ink-2 hover:text-ink sm:inline">
                   GitHub
                 </a>
-                <ThemeToggle />
                 <AuthControls />
               </nav>
             </div>

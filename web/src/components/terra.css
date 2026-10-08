@@ -52,48 +52,6 @@
   --del-bg: rgb(255 90 60 / 0.1);
 }
 
-/* Light: paper and ink. Amber darkens for text on paper (AA), stays bright as a surface. */
-:root[data-theme="light"]:has([data-terra]) {
-  color-scheme: light;
-  --lp-ink: #1c1915;
-  --lp-ink-2: #46413a;
-  --lp-ink-3: #625d54;
-  --lp-hair: rgb(28 25 21 / 0.13);
-  --lp-signal: #8f5400;
-  --lp-page: #f4efe5;
-  --lp-page-rgb: 244 239 229;
-  --lp-ink-rgb: 28 25 21;
-  --lp-line: 22% 0.012 70;
-  --lp-mute: 32% 0.012 250;
-  --lp-signal-rgb: 214 128 12;
-  --lp-crash-rgb: 181 50 26;
-  --lp-signal-fill: #f2a640;
-  --lp-bar-on: #1c1915;
-  --lp-on-ink: #f4efe5;
-  --lp-panel: #fbf9f4;
-  --lp-code-bg: #ebe5d8;
-  --lp-shadow: rgb(60 45 20 / 0.22);
-  --paper: #f4efe5;
-  --paper-2: #ebe5d8;
-  --paper-3: #e1d9c8;
-  --ink: #1c1915;
-  --ink-2: #46413a;
-  --ink-3: #625d54;
-  --rule: #ddd5c4;
-  --rule-strong: #c2b8a3;
-  --best: #9a5a00;
-  --best-soft: rgb(214 128 12 / 0.12);
-  --keep: #9a5a00;
-  --discard: #8a8478;
-  --crash: #b5321a;
-  --select: #2a6f6a;
-  --test: #1c1915;
-  --focus: #9a5a00;
-  --code-bg: #ebe5d8;
-  --add-bg: rgb(214 128 12 / 0.12);
-  --del-bg: rgb(181 50 26 / 0.1);
-}
-
 /*
  * Night islands: the world and the frames it sits in are night in both themes, so whatever is drawn over a canvas
  * (map headers, picks, survey labels) keeps bone type. In the dark theme this re-states the values it inherits.
@@ -159,11 +117,6 @@ body:has([data-terra]) > footer {
   box-shadow:
     0 0 0 1px rgb(217 211 196 / 0.09),
     0 40px 90px -50px rgb(5 7 10 / 0.7);
-}
-:root[data-theme="light"] .terra-frame {
-  box-shadow:
-    0 0 0 1px rgb(28 25 21 / 0.16),
-    0 30px 70px -40px rgb(60 45 20 / 0.45);
 }
 
 /* The gate's balance: the beam tips toward the new probe only on a keep. */
