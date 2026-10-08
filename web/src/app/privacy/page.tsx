@@ -110,7 +110,7 @@ export default function PrivacyPage() {
       <Section title="Cookies and local storage">
         <p>
           Clerk sets cookies to keep you signed in. If you used AutoTinker before signing in, a signed cookie identified your browser’s sessions; it is removed
-          once those sessions move to your account. Your light / dark theme choice is kept in your browser’s local storage. No advertising or tracking cookies.
+          once those sessions move to your account. No advertising or tracking cookies.
         </p>
       </Section>
 
