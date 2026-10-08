@@ -62,6 +62,7 @@ const PACE: Record<EventType, number> = {
   hpo_trial: 30,
   report_ready: 900,
   steer_applied: 300,
+  assets_ready: 300,
 };
 const FIRST_STEP_DELAY = 1500; // let the reader take in the "run started" message
 const SPEEDS = [1, 2, 4] as const;

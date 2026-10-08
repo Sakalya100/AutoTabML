@@ -10,6 +10,13 @@ export type AnyEvent = Normalize<RunEvent>;
 export type EventType = AnyEvent["type"];
 export type EventOf<K extends EventType> = Extract<AnyEvent, { type: K }>;
 
+/**
+ * Event types the engine emits that the generated schema doesn't describe yet. Typed by hand where they are consumed
+ * (src/lib/assets.ts); kept separate from EVENT_TYPES so this compiles before and after schema.ts is regenerated.
+ */
+export const EXTRA_EVENT_TYPES = ["assets_ready"] as const;
+export type ExtraEventType = (typeof EXTRA_EVENT_TYPES)[number];
+
 export const EVENT_TYPES: readonly EventType[] = [
   "run_started",
   "experiment_started",
@@ -28,7 +35,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   "steer_applied",
 ] as const;
 
-const REQUIRED: Record<EventType, readonly string[]> = {
+const REQUIRED: Record<EventType | ExtraEventType, readonly string[]> = {
   run_started: ["task", "profile", "config", "proposer"],
   experiment_started: ["exp_id", "idea"],
   llm_call: ["usage"],
@@ -45,10 +52,17 @@ const REQUIRED: Record<EventType, readonly string[]> = {
   hpo_trial: ["exp_id", "trial"],
   report_ready: ["report"],
   steer_applied: ["text"],
+  // Charts and downloadable files, after the report. Unknown chart kinds are skipped where it is read.
+  assets_ready: ["charts", "files"],
 };
 
-export function isEventType(t: unknown): t is EventType {
-  return typeof t === "string" && (EVENT_TYPES as readonly string[]).includes(t);
+export function isEventType(t: unknown): t is EventType | ExtraEventType {
+  return typeof t === "string" && ((EVENT_TYPES as readonly string[]).includes(t) || (EXTRA_EVENT_TYPES as readonly string[]).includes(t));
+}
+
+/** True for the engine's assets_ready event (compared as a string: the generated schema may not list it yet). */
+export function isAssetsReady(ev: { type: string }): boolean {
+  return (ev.type as string) === "assets_ready";
 }
 
 /**
@@ -68,6 +82,7 @@ export function coerceEvent(obj: unknown): AnyEvent | null {
   if (o.type === "sandbox_log" && !Array.isArray(o.lines)) return null;
   if (o.type === "report_ready" && (!o.report || typeof o.report !== "object")) return null;
   if (o.type === "steer_applied" && typeof o.text !== "string") return null;
+  if (o.type === "assets_ready" && (!Array.isArray(o.charts) || !Array.isArray(o.files))) return null;
   return { ...o, ts: typeof o.ts === "string" ? o.ts : new Date().toISOString() } as unknown as AnyEvent;
 }
 

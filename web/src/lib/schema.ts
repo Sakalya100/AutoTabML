@@ -18,7 +18,8 @@ export type RunEvent =
   | SandboxLog
   | HpoTrialEvent
   | ReportReady
-  | SteerApplied;
+  | SteerApplied
+  | AssetsReady;
 export type RunId = string;
 export type Seq = number;
 export type Ts = string;
@@ -245,12 +246,56 @@ export type Ts14 = string;
 export type Type14 = "steer_applied";
 export type Text1 = string;
 export type AtExp = string | null;
-export type Version = number;
 export type RunId15 = string;
+export type Seq15 = number;
+export type Ts15 = string;
+export type Type15 = "assets_ready";
+export type Id = string;
+export type Title1 = string;
+export type Kind = "curve";
+export type XLabel = string;
+export type YLabel = string;
+export type Name1 = string;
+export type Points = number[][];
+export type Series = CurveSeries[];
+export type Diagonal = boolean;
+export type Note = string | null;
+export type Id1 = string;
+export type Title2 = string;
+export type Kind1 = "matrix";
+export type Labels = string[];
+export type Matrix = number[][];
+export type Note1 = string | null;
+export type Id2 = string;
+export type Title3 = string;
+export type Kind2 = "scatter";
+export type XLabel1 = string;
+export type YLabel1 = string;
+export type Points1 = number[][];
+export type Diagonal1 = boolean;
+export type Note2 = string | null;
+export type Id3 = string;
+export type Title4 = string;
+export type Kind3 = "histogram";
+export type XLabel2 = string;
+export type X0 = number;
+export type X1 = number;
+export type Count = number;
+export type Bins = HistogramBin[];
+export type Note3 = string | null;
+export type Charts = (CurveChart | MatrixChart | ScatterChart | HistogramChart)[];
+export type Name2 = string;
+export type Path = string;
+export type Bytes = number;
+export type Kind4 = "model" | "code";
+export type ContentType = string;
+export type Files = AssetFile[];
+export type Version = number;
+export type RunId16 = string;
 export type CreatedAt = string;
 export type Mode = string;
 export type Proposer1 = string;
-export type Id = string;
+export type Id4 = string;
 export type ParentId1 = string | null;
 export type Code1 = string;
 export type Diff1 = string;
@@ -640,12 +685,111 @@ export interface SteerApplied {
   at_exp?: AtExp;
 }
 /**
+ * Charts computed on the locked test split, and the downloadable files written to `<run_dir>/assets/`.
+ * Emitted after `run_finished` and before `report_ready`.
+ *
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "AssetsReady".
+ */
+export interface AssetsReady {
+  run_id: RunId15;
+  seq?: Seq15;
+  ts?: Ts15;
+  type?: Type15;
+  charts?: Charts;
+  files?: Files;
+}
+/**
+ * ROC / precision-recall style line chart.
+ *
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "CurveChart".
+ */
+export interface CurveChart {
+  id: Id;
+  title: Title1;
+  kind?: Kind;
+  x_label: XLabel;
+  y_label: YLabel;
+  series: Series;
+  diagonal?: Diagonal;
+  note?: Note;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "CurveSeries".
+ */
+export interface CurveSeries {
+  name: Name1;
+  points: Points;
+}
+/**
+ * Confusion matrix: rows = actual, columns = predicted, both in `labels` order.
+ *
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "MatrixChart".
+ */
+export interface MatrixChart {
+  id: Id1;
+  title: Title2;
+  kind?: Kind1;
+  labels: Labels;
+  matrix: Matrix;
+  note?: Note1;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "ScatterChart".
+ */
+export interface ScatterChart {
+  id: Id2;
+  title: Title3;
+  kind?: Kind2;
+  x_label: XLabel1;
+  y_label: YLabel1;
+  points: Points1;
+  diagonal?: Diagonal1;
+  note?: Note2;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "HistogramChart".
+ */
+export interface HistogramChart {
+  id: Id3;
+  title: Title4;
+  kind?: Kind3;
+  x_label: XLabel2;
+  bins: Bins;
+  note?: Note3;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "HistogramBin".
+ */
+export interface HistogramBin {
+  x0: X0;
+  x1: X1;
+  count: Count;
+}
+/**
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "AssetFile".
+ */
+export interface AssetFile {
+  name: Name2;
+  path: Path;
+  bytes: Bytes;
+  kind: Kind4;
+  content_type: ContentType;
+}
+/**
  * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
  * via the `definition` "RunRecord".
  */
 export interface RunRecord {
   version?: Version;
-  run_id: RunId15;
+  run_id: RunId16;
   created_at: CreatedAt;
   mode: Mode;
   proposer: Proposer1;
@@ -672,7 +816,7 @@ export interface Config1 {
  * via the `definition` "ExperimentRecord".
  */
 export interface ExperimentRecord {
-  id: Id;
+  id: Id4;
   parent_id: ParentId1;
   idea: Idea;
   code: Code1;
