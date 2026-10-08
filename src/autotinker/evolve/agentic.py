@@ -1166,6 +1166,7 @@ class AgenticRunner(_Runner):
         return facts
 
     def _before_close(self) -> None:
+        self.emit_assets()
         facts = self._facts()
         lines = [
             f"{e.id} {e.status.value} [{e.phase or '-'}] {e.idea.title[:90]} "

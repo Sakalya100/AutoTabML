@@ -87,7 +87,12 @@ def test_state_machine_phases_events_and_record(tmp_path: Path) -> None:
     assert types[0] == "run_started"
     for t in ("agent_step_started", "agent_reasoning", "agent_step_finished", "report_ready", "llm_call"):
         assert t in types
-    assert types.index("run_finished") < types.index("report_ready")
+    assert types.index("run_finished") < types.index("assets_ready") < types.index("report_ready")
+    assets = next(e for e in events if e.type == "assets_ready")
+    assert assets.charts == []  # FakeHarness leaves no test outputs; the code file is still written
+    assert [f.path for f in assets.files] == ["assets/pipeline.py"]  # type: ignore[union-attr]
+    best_code = next(e.code for e in rec.experiments if e.id == rec.best_exp_id)
+    assert (tmp_path / "assets" / "pipeline.py").read_text() == best_code
     assert [e.seq for e in events] == list(range(1, len(events) + 1))
     on_disk = RunRecord.model_validate_json((tmp_path / "run.json").read_text())
     assert on_disk.report is not None and len(on_disk.experiments) == 6

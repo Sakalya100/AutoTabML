@@ -158,6 +158,84 @@ class ReportReady(_Base):
     report: dict[str, Any]
 
 
+# ---------------------------------------------------------------- run assets (charts + downloads)
+
+
+class CurveSeries(BaseModel):
+    name: str  # legend label, e.g. "AUC 0.873"
+    points: list[list[float]]  # [x, y] pairs, at most 200 per series
+
+
+class CurveChart(BaseModel):
+    """ROC / precision-recall style line chart."""
+
+    id: str  # "roc" | "pr"
+    title: str
+    kind: Literal["curve"] = "curve"
+    x_label: str
+    y_label: str
+    series: list[CurveSeries]
+    diagonal: bool = False  # draw the y = x reference line
+    note: str | None = None
+
+
+class MatrixChart(BaseModel):
+    """Confusion matrix: rows = actual, columns = predicted, both in `labels` order."""
+
+    id: str  # "confusion"
+    title: str
+    kind: Literal["matrix"] = "matrix"
+    labels: list[str]  # original (decoded) class labels
+    matrix: list[list[int]]
+    note: str | None = None
+
+
+class ScatterChart(BaseModel):
+    id: str  # "pred_vs_actual"
+    title: str
+    kind: Literal["scatter"] = "scatter"
+    x_label: str
+    y_label: str
+    points: list[list[float]]  # [x, y] = [actual, predicted], at most 500, sampled deterministically
+    diagonal: bool = False
+    note: str | None = None
+
+
+class HistogramBin(BaseModel):
+    x0: float
+    x1: float
+    count: int
+
+
+class HistogramChart(BaseModel):
+    id: str  # "residuals"
+    title: str
+    kind: Literal["histogram"] = "histogram"
+    x_label: str
+    bins: list[HistogramBin]
+    note: str | None = None
+
+
+Chart = Annotated[CurveChart | MatrixChart | ScatterChart | HistogramChart, Field(discriminator="kind")]
+
+
+class AssetFile(BaseModel):
+    name: str  # "model.joblib"
+    path: str  # relative to the run directory, e.g. "assets/model.joblib"
+    bytes: int
+    kind: Literal["model", "code"]
+    content_type: str
+
+
+class AssetsReady(_Base):
+    """Charts computed on the locked test split, and the downloadable files written to `<run_dir>/assets/`.
+    Emitted after `run_finished` and before `report_ready`."""
+
+    type: Literal["assets_ready"] = "assets_ready"
+    charts: list[Chart] = Field(default_factory=list)
+    files: list[AssetFile] = Field(default_factory=list)
+
+
 Event = Annotated[
     RunStarted
     | ExperimentStarted
@@ -173,7 +251,8 @@ Event = Annotated[
     | SandboxLog
     | HpoTrialEvent
     | ReportReady
-    | SteerApplied,
+    | SteerApplied
+    | AssetsReady,
     Field(discriminator="type"),
 ]
 
