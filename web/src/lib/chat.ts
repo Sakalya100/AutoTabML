@@ -123,6 +123,9 @@ export type ChatItem =
       gap: number;
       nExperiments: number;
       costUsd: number;
+      /** All of the run's LLM tokens, for the equivalent cost (set after every event is read). */
+      tokensIn: number;
+      tokensOut: number;
       wallTimeS: number;
     }
   | {
@@ -406,6 +409,8 @@ export function runItems(run: ChatRunInput): ChatItem[] {
           gap: e.optimism_gap,
           nExperiments: e.n_experiments,
           costUsd: e.total_cost_usd,
+          tokensIn: 0,
+          tokensOut: 0,
           wallTimeS: e.wall_time_s,
         });
         break;
@@ -439,6 +444,19 @@ export function runItems(run: ChatRunInput): ChatItem[] {
   }
 
   for (const x of exps.values()) x.stage = experimentStage(x, x.phase);
+  // The final card counts every LLM call of the run, the Reporter's (which come after run_finished) included.
+  let tokIn = 0;
+  let tokOut = 0;
+  for (const e of run.events) {
+    if (e.type !== "llm_call") continue;
+    tokIn += e.usage?.input_tokens ?? 0;
+    tokOut += e.usage?.output_tokens ?? 0;
+  }
+  for (const it of items) {
+    if (it.kind !== "final") continue;
+    it.tokensIn = tokIn;
+    it.tokensOut = tokOut;
+  }
 
   if (run.status === "failed" || run.status === "cancelled" || run.status === "timed_out")
     items.push({ kind: "run_end", key: `${rid}:end`, ts: run.finishedAt ?? lastTs ?? "", runId: rid, status: run.status, error: run.error ?? null });

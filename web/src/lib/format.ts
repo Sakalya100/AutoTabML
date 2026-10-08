@@ -14,6 +14,19 @@ export function fmtCost(usd: number | null | undefined): string {
   return `$${usd.toFixed(2)}`;
 }
 
+/**
+ * List price of gpt-oss-120b on Groq, USD per million tokens (input, output); the same figure the engine's provider
+ * table uses (src/autotinker/agent/providers.py). Runs use free tiers, so the real spend is $0: costs are shown as what
+ * the tokens would cost on that paid API, so runs can be compared.
+ */
+export const EQUIV_PRICE = { model: "gpt-oss-120b", provider: "Groq", input: 0.15, output: 0.6 } as const;
+
+export function equivCost(tokensIn: number | null | undefined, tokensOut: number | null | undefined): number {
+  return ((tokensIn ?? 0) * EQUIV_PRICE.input + (tokensOut ?? 0) * EQUIV_PRICE.output) / 1e6;
+}
+
+export const EQUIV_NOTE = `What these tokens would cost on ${EQUIV_PRICE.provider} ${EQUIV_PRICE.model} ($${EQUIV_PRICE.input} in / $${EQUIV_PRICE.output} out per million tokens). Runs use free tiers, so the actual spend is $0.`;
+
 export function fmtInt(n: number | null | undefined): string {
   return n == null ? "—" : n.toLocaleString("en-US");
 }

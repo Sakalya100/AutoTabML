@@ -22,6 +22,10 @@
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--lp-ink-rgb, 236 231 220) / 0.16) transparent;
 }
+/* The site header closes the workspace grid: without a rule under it the column dividers ran up into nothing. */
+html body:has(.ws-root) > header {
+  border-bottom: 1px solid var(--lp-hair);
+}
 .ws-root ::selection {
   background: rgb(var(--lp-signal-rgb) / 0.28);
 }
