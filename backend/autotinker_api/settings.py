@@ -71,12 +71,16 @@ def load_env_files() -> None:
         _loaded = True
         return
     _loaded = True
+    # A database chosen in the process environment wins as a whole: don't mix in another one's pooled/direct URL.
+    db_from_env = any(os.environ.get(k) for k in ("DATABASE_URL", "DATABASE_URL_POOLED", "DATABASE_URL_UNPOOLED"))
     for path, allowed in ((REPO_ROOT / ".env", None), (REPO_ROOT / "web" / ".env.local", _WEB_ENV_NAMES)):
         try:
             values = parse_dotenv(path.read_text())
         except OSError:
             continue
         for k, v in values.items():
+            if db_from_env and k.startswith("DATABASE_URL"):
+                continue
             if (allowed is None or k in allowed) and v and not os.environ.get(k):
                 os.environ[k] = v
 

@@ -265,3 +265,23 @@ def test_migration_001_matches_the_one_already_applied_by_the_web_app() -> None:
 
     ours = (migrate.MIGRATIONS / "001_sessions.sql").read_bytes()
     assert hashlib.sha256(ours).hexdigest() == "1a241e38038d501ebd6b3b56fb66e5a8e4d396a9ec4147c57828e55e3d26a694"
+
+
+def test_env_files_never_mix_databases(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "repo"
+    (root / "web").mkdir(parents=True)
+    (root / ".env").write_text("DATABASE_URL_POOLED=postgresql://file-pooled/db\nGROQ_API_KEY=from-file-123\n")
+    web_env = "AUTOTINKER_SESSION_SECRET=s3cret-from-web-env-local-0123456789\nOTHER=x\n"
+    (root / "web" / ".env.local").write_text(web_env)
+    monkeypatch.setattr(settings, "REPO_ROOT", root)
+    monkeypatch.setattr(settings, "_loaded", False)
+    monkeypatch.delenv("AUTOTINKER_NO_DOTENV")
+    monkeypatch.delenv("AUTOTINKER_SESSION_SECRET")
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("OTHER", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://explicit/db")
+    settings.load_env_files()
+    assert settings.database_url() == "postgresql://explicit/db"
+    assert settings.env("GROQ_API_KEY") == "from-file-123"
+    assert settings.env("AUTOTINKER_SESSION_SECRET", "").startswith("s3cret")
+    assert settings.env("OTHER") is None  # only the backend's names are taken from web/.env.local
