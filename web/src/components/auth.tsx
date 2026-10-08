@@ -5,7 +5,7 @@
  * as before (anonymous sessions tied to a browser cookie) and none of this renders. The FastAPI backend checks the
  * same Clerk session cookie (`__session`), so the browser never handles a token itself.
  */
-import { ClerkProvider, Show, SignInButton, UserButton, useAuth } from "@clerk/nextjs";
+import { ClerkProvider, Show, SignInButton, UserButton, useAuth, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AUTH_ENABLED } from "@/lib/auth-flag";
@@ -75,6 +75,15 @@ const useAnonymousState = (): SignedInState => anonymous;
 
 /** Chosen once per build, so hooks run in the same order on every render. */
 export const useSignedIn: () => SignedInState = AUTH_ENABLED ? useClerkState : useAnonymousState;
+
+/** Opens the sign-in modal and lands on `url` after signing in (or up); null when auth is off. */
+type OpenSignIn = ((url: string) => void) | null;
+function useClerkOpenSignIn(): OpenSignIn {
+  const clerk = useClerk();
+  return (url) => clerk.openSignIn({ forceRedirectUrl: url, signUpForceRedirectUrl: url });
+}
+const useNoSignIn = (): OpenSignIn => null;
+export const useOpenSignIn: () => OpenSignIn = AUTH_ENABLED ? useClerkOpenSignIn : useNoSignIn;
 
 /** The workspace's call to sign in: in the chat pane when signed out. */
 export function SignInPrompt({ title = "Sign in to start a run." }: { title?: string }) {
