@@ -19,6 +19,7 @@ import { plainIdea } from "@/lib/story";
 import { SurveyPanel } from "../survey-panel";
 import { ChatLog } from "./chat";
 import { SetupPane, useRunDraft } from "./draft";
+import { SignInPrompt, useSignedIn } from "../auth";
 import { useShell } from "./shell";
 
 const TERMINAL = new Set<string>(TERMINAL_STATUSES);
@@ -54,10 +55,12 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
   const [connected, setConnected] = useState(false);
   const lastSeq = useRef<Record<string, number>>({});
   const draft = useRunDraft(maxExperiments);
+  const auth = useSignedIn();
+  const signedOut = auth.loaded && !auth.signedIn;
 
   /* ---- load (and reload) the whole session from Postgres ---------------------------------------------- */
   const load = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !auth.loaded || !auth.signedIn) return;
     try {
       const res = await fetch(`/api/sessions/${sessionId}`, {
         cache: "no-store",
@@ -91,12 +94,12 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
     } catch {
       setLoadError("Couldn't reach the server. Check your connection; this page retries when you reload it.");
     }
-  }, [sessionId]);
+  }, [sessionId, auth.loaded, auth.signedIn]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load of external data
     void load();
-  }, [load]);
+  }, [load, auth.userId]);
 
   const runs = payload?.runs ?? [];
   const statusOf = (id: string) => metas[id]?.status ?? runs.find((r) => r.row.id === id)?.row.status ?? null;
@@ -288,7 +291,9 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         <div className="ws-empty">
           <p className="ws-kicker">Session</p>
           <p className="mt-3 font-display text-[2rem] leading-tight">This session isn’t here.</p>
-          <p className="mt-2 max-w-[46ch] text-[14px] text-[var(--lp-ink-2)]">{loadError} Sessions belong to the browser that started them.</p>
+          <p className="mt-2 max-w-[46ch] text-[14px] text-[var(--lp-ink-2)]">
+            {loadError} {auth.enabled ? "Sessions belong to the account that started them." : "Sessions belong to the browser that started them."}
+          </p>
           <Link href="/s/new" className="ws-start mt-6 inline-flex">
             Start a new session <span aria-hidden>→</span>
           </Link>
@@ -327,7 +332,11 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
             )}
           </p>
         </header>
-        {settingUp ? (
+        {signedOut ? (
+          <div className="su-scroll ws-thread">
+            <SignInPrompt title={sessionId ? "Sign in to see this session." : "Sign in to start a run."} />
+          </div>
+        ) : settingUp ? (
           <div className="su-scroll">
             <SetupPane key={draft.state.source?.kind === "link" ? draft.state.source.url : "file"} draft={draft} onStart={startRun} />
           </div>

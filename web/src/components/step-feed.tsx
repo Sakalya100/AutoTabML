@@ -425,7 +425,7 @@ function ExperimentMsg({
       aria-current={selected || undefined}
       aria-label={`Idea ${item.index + 1}: ${idea}. ${v.text}, ${v.outcome}.`}
       className={`group relative -mx-3 grid cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 rounded-lg px-3 py-3.5 transition-colors duration-300 ${
-        selected ? "bg-[rgb(255_181_71/0.06)]" : "hover:bg-[rgb(236_231_220/0.03)]"
+        selected ? "bg-[rgb(var(--lp-signal-rgb,255_181_71)/0.06)]" : "hover:bg-[rgb(var(--lp-ink-rgb,236_231_220)/0.03)]"
       }`}
     >
       <div className="flex flex-col items-start pt-[0.42rem]">
