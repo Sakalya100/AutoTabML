@@ -173,10 +173,11 @@ File upload stays available as a secondary option.
 
 ## 7. Where things run on Vercel
 
-- **Next.js on Vercel:** the UI, the API, the preview fetch, the SSE stream and the session DB.
+- **Next.js on Vercel (`web/`):** the UI only.
+- **FastAPI on Vercel (`backend/`):** the API, the preview fetch, the SSE stream and the session DB (Postgres is the run store; no Redis). Both services deploy from the root `vercel.json`.
 - **Vercel Sandbox, one per run:** the Python engine runs the **orchestrator *and* the agent calls *and* the training code**.
   - The orchestrator lives here because a run takes minutes and a route handler can't stay alive that long.
-  - It POSTs events to `/api/runs/[id]/ingest` → Redis → SSE.
+  - It POSTs events to `/api/runs/[id]/ingest` → Postgres → SSE.
   - Agent LLM calls go to Groq from inside the sandbox.
   - The network policy allows only `api.groq.com` and the dataset host.
   - **Agent-written code runs in a nested subprocess with no network**, using the existing harness sandbox.

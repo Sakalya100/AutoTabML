@@ -71,15 +71,17 @@ run.export("model/") # solution.py + standalone train.py + requirements + run.js
 
 ## Web app
 
-`web/` is a single Next.js app on Vercel. Its route handlers are the backend, and the Python engine runs out of process. The app lets you:
-- watch a recorded run evolve: the score chart with the noise band, the experiment ledger with code diffs, the stop report, and the optimism gap
-- start a live run on your own CSV, with progress streamed over SSE
-
-During development the runner is a local subprocess. On Vercel it is a Vercel Sandbox microVM with locked-down network egress. See [web/README.md](web/README.md).
+The web app is two services deployed together from the root `vercel.json`:
+- `web/`: a frontend-only Next.js app. Watch a recorded run evolve (score chart with the noise band, the experiment ledger with code diffs, the stop report, the optimism gap), or paste a link to a CSV and watch a live agentic run in a session, steer it, and stop it.
+- `backend/`: a FastAPI service for sessions, runs, the SSE event stream and link previews, on Neon Postgres. During development a run is a local engine process; on Vercel it is a Vercel Sandbox microVM with locked-down network egress.
 
 ```bash
-cd web && npm install && npm run dev
+uv sync && uv sync --project backend && (cd web && npm install)
+make migrate      # apply backend/migrations to DATABASE_URL (repo-root .env)
+make dev          # API on :8000, web on :3000
 ```
+
+See [web/README.md](web/README.md) and [backend/.env.example](backend/.env.example).
 
 ## Benchmarks
 
@@ -112,10 +114,11 @@ Reproduce: `uv run python benchmarks/run.py --llm heuristic --max-experiments 40
 
 ```bash
 uv sync && uv run pytest -q && uv run ruff check src tests && uv run mypy
+cd backend && uv sync && uv run pytest -q && uv run ruff check . && uv run mypy      # needs postgres or TEST_DATABASE_URL
 cd web && npm ci && npm run lint && npm test && npm run build
 ```
 
-The layout: `src/autotinker/{data,harness,agent,evolve,obs}`, `api.py` (SDK), `cli.py`; `web/` (Next.js); `benchmarks/`; `schema/` (generated JSON Schemas); [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The layout: `src/autotinker/{data,harness,agent,evolve,obs}`, `api.py` (SDK), `cli.py`; `backend/` (FastAPI); `web/` (Next.js); `benchmarks/`; `schema/` (generated JSON Schemas); [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Contributors
 
