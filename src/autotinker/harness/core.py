@@ -23,6 +23,23 @@ _SAFE_ID = re.compile(r"[^A-Za-z0-9_.-]")
 
 
 @dataclass
+class TestOutputs:
+    """What the single locked-test run left behind, kept for the run assets (charts + downloadable model).
+    `pred` is the scored output (probabilities for proba metrics, else encoded labels); `proba` is the
+    class-probability matrix when available (always for proba metrics, best-effort otherwise)."""
+
+    __test__ = False  # not a pytest test class
+
+    problem_type: str
+    y_true: np.ndarray[Any, Any]  # encoded labels 0..k-1, or the float target
+    pred: np.ndarray[Any, Any]
+    proba: np.ndarray[Any, Any] | None
+    classes: list[Any] | None  # encoded label i == classes[i]
+    model_path: Path | None  # joblib dump of the estimator fitted on dev+select (None if it failed)
+    model_error: str | None = None
+
+
+@dataclass
 class TuneResult:
     ok: bool
     trials: list[HpoTrial] = field(default_factory=list)
@@ -60,6 +77,7 @@ class Harness:
         self.allowed_imports: frozenset[str] = allowed_imports()
         self._test_used = False
         self._n_runs = 0
+        self.test_outputs: TestOutputs | None = None  # set by score_test
 
     # ------------------------------------------------------------------ internals
 
@@ -85,13 +103,14 @@ class Harness:
         *,
         timeout_s: float | None = None,
         extra: dict[str, Any] | None = None,
+        job_dir: Path | None = None,
     ) -> SandboxResult:
         assert self.task.metric is not None
         return run_in_sandbox(
             code,
             mode=mode,
             data_path=self._dev_path if mode in ("cv", "tune") else self._test_path,
-            job_dir=self._job_dir(label),
+            job_dir=job_dir if job_dir is not None else self._job_dir(label),
             profile=self._profile_dict,
             need_proba=scorer.needs_proba(self.task.metric),
             n_classes=self._splits.n_classes,
@@ -226,13 +245,27 @@ class Harness:
         errors, _ = static_check(code, self.allowed_imports)
         if errors:
             raise RuntimeError("score_test: static check failed:\n" + "\n".join(errors))
-        res = self._sandbox(code, "test", "test")
+        job_dir = self._job_dir("test")
+        model_path = job_dir / "model.joblib"
+        res = self._sandbox(code, "test", "test", job_dir=job_dir, extra={"model_path": str(model_path)})
         if not res.ok or res.preds_path is None:
             raise RuntimeError(f"score_test: solution failed ({res.error_kind}):\n{res.error_tail}")
         preds = self._load_preds(res.preds_path)
         if "test" not in preds:
             raise RuntimeError("score_test: worker produced no test predictions")
         try:
-            return self._score(self._splits.y_test, preds["test"])
+            test = self._score(self._splits.y_test, preds["test"])
         except scorer.InvalidOutput as e:
             raise RuntimeError(f"score_test: invalid output: {e}") from e
+        assert self.task.metric is not None and self.task.problem_type is not None
+        payload = res.payload or {}
+        self.test_outputs = TestOutputs(
+            problem_type=self.task.problem_type.value,
+            y_true=self._splits.y_test.copy(),
+            pred=preds["test"],
+            proba=preds["test"] if scorer.needs_proba(self.task.metric) else preds.get("test_proba"),
+            classes=list(self._splits.classes) if self._splits.classes is not None else None,
+            model_path=model_path if model_path.is_file() else None,
+            model_error=payload.get("model_error"),
+        )
+        return test

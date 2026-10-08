@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildChat, experimentStage, runItems, type ChatExperiment, type ChatItem } from "@/lib/chat";
+import { buildChat, chatSignature, experimentStage, runItems, type ChatAssets, type ChatExperiment, type ChatItem, type ChatTask } from "@/lib/chat";
 import type { AnyEvent } from "@/lib/events";
 
 let seq = 0;
 const at = (s: number) => new Date(Date.UTC(2026, 9, 8, 10, 0, s)).toISOString();
-const e = (s: number, type: string, body: Record<string, unknown> = {}): AnyEvent => ({ run_id: "r-x", seq: ++seq, ts: at(s), type, ...body }) as unknown as AnyEvent;
-const started = (s: number, step_id: string, role: string, exp_id: string | null, input_summary = "") => e(s, "agent_step_started", { step_id, role, exp_id, input_summary });
+const e = (s: number, type: string, body: Record<string, unknown> = {}): AnyEvent =>
+  ({ run_id: "r-x", seq: ++seq, ts: at(s), type, ...body }) as unknown as AnyEvent;
+const started = (s: number, step_id: string, role: string, exp_id: string | null, input_summary = "") =>
+  e(s, "agent_step_started", { step_id, role, exp_id, input_summary });
 const finished = (s: number, step_id: string, role: string, exp_id: string | null, extra: Record<string, unknown> = {}) =>
   e(s, "agent_step_finished", { exp_id, step: { step_id, role, plain: `${role} done`, tokens_in: 10, tokens_out: 5, ...extra } });
 const idea = (title: string, category = "model_family") => ({ title, category, rationale: "", radical: false });
@@ -13,7 +15,12 @@ const idea = (title: string, category = "model_family") => ({ title, category, r
 function run(): AnyEvent[] {
   seq = 0;
   return [
-    e(0, "run_started", { task: { target: "y" }, profile: { target: "y", n_rows: 100, n_cols: 5, metric: "roc_auc", problem_type: "binary", columns: [] }, config: { stop_rule: { max_experiments: 4 } }, proposer: "agentic" }),
+    e(0, "run_started", {
+      task: { target: "y" },
+      profile: { target: "y", n_rows: 100, n_cols: 5, metric: "roc_auc", problem_type: "binary", columns: [] },
+      config: { stop_rule: { max_experiments: 4 } },
+      proposer: "agentic",
+    }),
     started(1, "s1", "intake", null),
     finished(2, "s1", "intake", null),
     started(3, "s2", "profiler", null),
@@ -33,28 +40,50 @@ function run(): AnyEvent[] {
     e(16, "experiment_started", { exp_id: "e002", parent_id: "e001", idea: idea("Tune RF", "hyperparameters") }), // no phase: inferred
     e(17, "decision", { exp_id: "e002", decision: "discard", reason: "not significant: p=0.4", best_exp_id: "e001", best_cv_mean: 0.8 }),
     e(18, "stopped", { reason: "user", summary: "stopped by the user after e002", report: {} }),
-    e(19, "run_finished", { best_exp_id: "e001", dev_cv_mean: 0.8, select_score: 0.79, test_score: 0.78, optimism_gap: 0.01, n_experiments: 3, total_cost_usd: 0, wall_time_s: 60 }),
+    e(19, "run_finished", {
+      best_exp_id: "e001",
+      dev_cv_mean: 0.8,
+      select_score: 0.79,
+      test_score: 0.78,
+      optimism_gap: 0.01,
+      n_experiments: 3,
+      total_cost_usd: 0,
+      wall_time_s: 60,
+    }),
     started(20, "s6", "reporter", null),
     finished(21, "s6", "reporter", null),
-    e(22, "report_ready", { report: { plain: "Found it.", summary: "sum", what_worked: ["rf"], caveats: [], next_steps: [], notes: ["User asked: prefer simple linear models"] } }),
+    e(22, "report_ready", {
+      report: { plain: "Found it.", summary: "sum", what_worked: ["rf"], caveats: [], next_steps: [], notes: ["User asked: prefer simple linear models"] },
+    }),
   ];
 }
 
-const kinds = (xs: ChatItem[]) => xs.map((x) => (x.kind === "divider" ? `|${x.stage}` : x.kind));
+const kinds = (xs: ChatItem[]) => xs.map((x) => (x.kind === "phase" ? `|${x.stage}` : x.kind));
 
 describe("chat reducer", () => {
-  it("groups steps per experiment, with stage dividers in run order", () => {
+  it("groups steps per experiment under quiet phase labels; setup steps fold into the Task card", () => {
     const items = runItems({ id: "r-x", events: run(), status: "finished" });
     expect(kinds(items)).toEqual([
-      "|intake", "task", "step", // intake
-      "|profiling", "step",
-      "|baseline", "experiment",
-      "|drafts", "experiment", "steer_ack",
-      "|tuning", "experiment",
-      "|stop", "stopped",
-      "|locked_test", "final",
-      "|report", "report", // the finished reporter step is folded into the report
+      "task", // intake + profiler steps live inside it
+      "|baseline",
+      "experiment",
+      "|drafts",
+      "experiment",
+      "steer_ack",
+      "|tuning",
+      "experiment",
+      "stopped",
+      "final",
+      "report", // the finished reporter step is folded into the report
+      "assets", // the CV-per-experiment chart, for every finished run
     ]);
+    const task = items[0] as ChatTask;
+    expect(task.steps.map((s) => s.role)).toEqual(["intake", "profiler"]);
+    expect(task).toMatchObject({ target: "y", nRows: 100, maxExperiments: 4 });
+    expect(items.filter((x) => x.kind === "phase").map((x) => (x.kind === "phase" ? x.count : 0))).toEqual([1, 1, 1]);
+    const assets = items.at(-1) as ChatAssets;
+    expect(assets).toMatchObject({ ready: false, charts: [], files: [] });
+    expect(assets.cv).toEqual([{ id: "e001", mean: 0.8, se: 0.01, verdict: "keep", best: true }]);
     const e001 = items.find((x): x is ChatExperiment => x.kind === "experiment" && x.id === "e001")!;
     expect(e001.steps.map((s) => s.role)).toEqual(["planner", "coder"]); // held from before experiment_started
     expect(e001.steps[0].reasoning).toBe("think");
@@ -97,5 +126,47 @@ describe("chat reducer", () => {
     expect(steerAt).toBeGreaterThan(0);
     expect(steerAt).toBeLessThan(ackAt); // the user's steer, then the engine's acknowledgement
     expect(items.at(-1)).toMatchObject({ kind: "run_end", status: "cancelled" });
+  });
+
+  it("places assets_ready right after the report, skipping unknown chart kinds", () => {
+    const evs = [...run().slice(0, 18)];
+    evs.push(
+      e(30, "assets_ready", {
+        charts: [
+          {
+            id: "roc",
+            title: "ROC curve",
+            kind: "curve",
+            series: [
+              {
+                name: "AUC",
+                points: [
+                  [0, 0],
+                  [1, 1],
+                ],
+              },
+            ],
+            diagonal: true,
+          },
+          { id: "z", title: "?", kind: "radar" },
+        ],
+        files: [{ name: "model.joblib", path: "assets/model.joblib", bytes: 10, kind: "model" }],
+      }),
+    );
+    evs.push(...run().slice(18)); // the report arrives after the assets
+    const items = runItems({ id: "r-x", events: evs, status: "finished" });
+    const k = kinds(items);
+    expect(k.slice(-2)).toEqual(["report", "assets"]);
+    const a = items.at(-1) as ChatAssets;
+    expect(a.ready).toBe(true);
+    expect(a.charts.map((c) => c.id)).toEqual(["roc"]);
+    expect(a.files.map((f) => [f.name, f.available])).toEqual([["model.joblib", false]]);
+    expect(chatSignature(items)).toContain("assets:1:1:true");
+  });
+
+  it("has no assets card while the run is going", () => {
+    const items = runItems({ id: "r-x", events: run().slice(0, 15), status: "running" });
+    expect(items.some((x) => x.kind === "assets")).toBe(false);
+    expect(kinds(items)[0]).toBe("task");
   });
 });

@@ -398,3 +398,40 @@ async def set_setting(conn: Conn, key: str, value: str) -> None:
 
 async def delete_setting(conn: Conn, key: str) -> None:
     await conn.execute("delete from app_settings where key = %s", (key,))
+
+
+# ------------------------------------------------------------------------------------------------------- assets
+
+_ASSET_COLUMNS = ("kind", "content_type", "bytes", "storage", "blob_url", "blob_pathname", "local_path", "note")
+
+
+async def upsert_asset(conn: Conn, run_id: str, name: str, **fields: Any) -> None:
+    """Insert or replace a run's file (idempotent on (run_id, name): a retried registration just overwrites)."""
+    row = {k: fields.get(k) for k in _ASSET_COLUMNS}
+    row["kind"] = row["kind"] or "file"
+    row["content_type"] = row["content_type"] or "application/octet-stream"
+    row["bytes"] = int(row["bytes"] or 0)
+    cols = ", ".join(_ASSET_COLUMNS)
+    vals = ", ".join(f"%({k})s" for k in _ASSET_COLUMNS)
+    updates = ", ".join(f"{k} = excluded.{k}" for k in _ASSET_COLUMNS)
+    await conn.execute(
+        f"""insert into run_assets (run_id, name, {cols}) values (%(run_id)s, %(name)s, {vals})
+            on conflict (run_id, name) do update set {updates}, created_at = now()""",
+        {**row, "run_id": run_id, "name": name},
+    )
+
+
+async def list_assets(conn: Conn, run_id: str) -> list[dict[str, Any]]:
+    cur = await conn.execute("select * from run_assets where run_id = %s order by created_at, name", (run_id,))
+    return list(await cur.fetchall())
+
+
+async def get_asset(conn: Conn, run_id: str, name: str) -> dict[str, Any] | None:
+    cur = await conn.execute("select * from run_assets where run_id = %s and name = %s", (run_id, name))
+    return await cur.fetchone()
+
+
+async def count_assets(conn: Conn, run_id: str) -> int:
+    cur = await conn.execute("select count(*) as n from run_assets where run_id = %s", (run_id,))
+    row = await cur.fetchone()
+    return int(row["n"]) if row else 0

@@ -11,6 +11,10 @@ Steering and stop are appended to the control file, which the engine polls; that
 as long as the engine process is alive. The process runs in its own process group (runner_ref = its pgid) so cancel
 kills uv, python and the harness's experiment subprocesses together.
 
+Files: the engine's `assets_ready` event (sent after the locked test) lists files under its run dir's assets/ folder;
+after the process exits they are registered in run_assets, uploaded to Vercel Blob when BLOB_READ_WRITE_TOKEN is set,
+otherwise served from this disk (see assets.py).
+
 Environment: an allow-list of system variables plus provider keys and AUTOTINKER_* settings (settings.engine_env);
 DATABASE_URL*, the session secret and other credentials are blanked. Generated pipelines are sandboxed by the
 engine's own harness, not by this process; only run this runner on a machine you trust with the data.
@@ -28,7 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from autotinker_api import background, db, repo, settings
+from autotinker_api import assets, background, db, repo, settings
 from autotinker_api.events import JsonlDecoder
 from autotinker_api.runners.base import ControlCommand, StartRequest, engine_args, exit_status
 
@@ -149,6 +153,7 @@ class LocalRunner:
         secrets = settings.known_secrets()
         tail: list[str] = []
         decoder = JsonlDecoder()
+        announced: list[dict[str, Any]] = []  # the engine's assets_ready event, if it sends one
         conn = await db.connect()
         try:
 
@@ -160,9 +165,11 @@ class LocalRunner:
                         break
                     events = decoder.push(chunk.decode("utf-8", errors="replace"))
                     if events:
+                        announced.extend(e for e in events if e.get("type") == "assets_ready")
                         await repo.append_events(conn, run_id, events)
                 events = decoder.end()
                 if events:
+                    announced.extend(e for e in events if e.get("type") == "assets_ready")
                     await repo.append_events(conn, run_id, events)
                 for line in decoder.other:
                     log.info("[run %s] stdout: %s", run_id, settings.redact(line, secrets)[:500])
@@ -192,6 +199,11 @@ class LocalRunner:
             record = _find_record(out_dir)
             if record is not None:
                 await repo.update_run(conn, run_id, record=record)
+            if announced:  # before the run turns terminal, so a finished run already lists its files
+                try:
+                    await assets.register_local(conn, run_id, announced[-1], out_dir, data_root())
+                except Exception:
+                    log.exception("[run %s] registering the run's files failed", run_id)
             (work / "input.csv").unlink(missing_ok=True)  # uploads are not kept after the run
             root = str(settings.REPO_ROOT)
             error_tail = "\n".join(ln.replace(root, "…") for ln in tail[-40:] if not ln.startswith("run directory:"))

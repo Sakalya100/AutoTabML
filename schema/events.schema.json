@@ -354,6 +354,108 @@
       "title": "AgentStepStarted",
       "type": "object"
     },
+    "AssetFile": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "bytes": {
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "model",
+            "code"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "content_type": {
+          "title": "Content Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "path",
+        "bytes",
+        "kind",
+        "content_type"
+      ],
+      "title": "AssetFile",
+      "type": "object"
+    },
+    "AssetsReady": {
+      "description": "Charts computed on the locked test split, and the downloadable files written to `<run_dir>/assets/`.\nEmitted after `run_finished` and before `report_ready`.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "assets_ready",
+          "default": "assets_ready",
+          "title": "Type",
+          "type": "string"
+        },
+        "charts": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "curve": "#/$defs/CurveChart",
+                "histogram": "#/$defs/HistogramChart",
+                "matrix": "#/$defs/MatrixChart",
+                "scatter": "#/$defs/ScatterChart"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CurveChart"
+              },
+              {
+                "$ref": "#/$defs/MatrixChart"
+              },
+              {
+                "$ref": "#/$defs/ScatterChart"
+              },
+              {
+                "$ref": "#/$defs/HistogramChart"
+              }
+            ]
+          },
+          "title": "Charts",
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/AssetFile"
+          },
+          "title": "Files",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "AssetsReady",
+      "type": "object"
+    },
     "CVScore": {
       "properties": {
         "mean": {
@@ -465,6 +567,90 @@
         "n_unique"
       ],
       "title": "ColumnProfile",
+      "type": "object"
+    },
+    "CurveChart": {
+      "description": "ROC / precision-recall style line chart.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "kind": {
+          "const": "curve",
+          "default": "curve",
+          "title": "Kind",
+          "type": "string"
+        },
+        "x_label": {
+          "title": "X Label",
+          "type": "string"
+        },
+        "y_label": {
+          "title": "Y Label",
+          "type": "string"
+        },
+        "series": {
+          "items": {
+            "$ref": "#/$defs/CurveSeries"
+          },
+          "title": "Series",
+          "type": "array"
+        },
+        "diagonal": {
+          "default": false,
+          "title": "Diagonal",
+          "type": "boolean"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "x_label",
+        "y_label",
+        "series"
+      ],
+      "title": "CurveChart",
+      "type": "object"
+    },
+    "CurveSeries": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "Points",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "points"
+      ],
+      "title": "CurveSeries",
       "type": "object"
     },
     "DataProfile": {
@@ -701,6 +887,78 @@
       "title": "ExperimentStarted",
       "type": "object"
     },
+    "HistogramBin": {
+      "properties": {
+        "x0": {
+          "title": "X0",
+          "type": "number"
+        },
+        "x1": {
+          "title": "X1",
+          "type": "number"
+        },
+        "count": {
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x0",
+        "x1",
+        "count"
+      ],
+      "title": "HistogramBin",
+      "type": "object"
+    },
+    "HistogramChart": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "kind": {
+          "const": "histogram",
+          "default": "histogram",
+          "title": "Kind",
+          "type": "string"
+        },
+        "x_label": {
+          "title": "X Label",
+          "type": "string"
+        },
+        "bins": {
+          "items": {
+            "$ref": "#/$defs/HistogramBin"
+          },
+          "title": "Bins",
+          "type": "array"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "x_label",
+        "bins"
+      ],
+      "title": "HistogramChart",
+      "type": "object"
+    },
     "HpoTrial": {
       "properties": {
         "number": {
@@ -920,6 +1178,62 @@
         "model"
       ],
       "title": "LLMUsage",
+      "type": "object"
+    },
+    "MatrixChart": {
+      "description": "Confusion matrix: rows = actual, columns = predicted, both in `labels` order.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "kind": {
+          "const": "matrix",
+          "default": "matrix",
+          "title": "Kind",
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Labels",
+          "type": "array"
+        },
+        "matrix": {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "title": "Matrix",
+          "type": "array"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "labels",
+        "matrix"
+      ],
+      "title": "MatrixChart",
       "type": "object"
     },
     "Metric": {
@@ -1220,6 +1534,68 @@
       "title": "SandboxLog",
       "type": "object"
     },
+    "ScatterChart": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "kind": {
+          "const": "scatter",
+          "default": "scatter",
+          "title": "Kind",
+          "type": "string"
+        },
+        "x_label": {
+          "title": "X Label",
+          "type": "string"
+        },
+        "y_label": {
+          "title": "Y Label",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "Points",
+          "type": "array"
+        },
+        "diagonal": {
+          "default": false,
+          "title": "Diagonal",
+          "type": "boolean"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "x_label",
+        "y_label",
+        "points"
+      ],
+      "title": "ScatterChart",
+      "type": "object"
+    },
     "SteerApplied": {
       "description": "A steering message from the person watching was accepted: it is included in every later Planner and\nTuner prompt, starting with experiment `at_exp`.",
       "properties": {
@@ -1400,6 +1776,7 @@
       "agent_reasoning": "#/$defs/AgentReasoning",
       "agent_step_finished": "#/$defs/AgentStepFinished",
       "agent_step_started": "#/$defs/AgentStepStarted",
+      "assets_ready": "#/$defs/AssetsReady",
       "decision": "#/$defs/DecisionMade",
       "experiment_scored": "#/$defs/ExperimentScored",
       "experiment_started": "#/$defs/ExperimentStarted",
@@ -1460,6 +1837,9 @@
     },
     {
       "$ref": "#/$defs/SteerApplied"
+    },
+    {
+      "$ref": "#/$defs/AssetsReady"
     }
   ]
 }

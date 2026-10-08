@@ -11,6 +11,7 @@ run.json + events.jsonl + ledger.jsonl + best_solution.py into the run directory
 from __future__ import annotations
 
 import difflib
+import logging
 import sys
 import time
 import uuid
@@ -474,6 +475,22 @@ class _Runner:
 
     def _before_close(self) -> None:
         """Hook for subclasses: runs after run_finished, before the event stream closes (e.g. the report)."""
+
+    def emit_assets(self) -> None:
+        """Write `<run_dir>/assets/` (fitted model, final solution source) and emit `assets_ready` with the
+        locked-test charts. Call after `score_test`. Best-effort: a failure is logged, never raised."""
+        from autotinker.obs.assets import build_assets_event
+
+        best = self.best
+        if best is None:
+            return
+        try:
+            ev = build_assets_event(
+                self.run_id, self.run_dir, best.code, getattr(self.h, "test_outputs", None)
+            )
+            self.emitter.emit(ev)
+        except Exception as e:  # noqa: BLE001 - assets must never fail a run
+            logging.getLogger(__name__).warning("run assets failed: %s: %s", type(e).__name__, e)
 
     def save(self) -> None:
         self.record.wall_time_s = self.elapsed

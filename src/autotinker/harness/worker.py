@@ -6,7 +6,9 @@ and writes raw predictions (`preds.npz`) plus a status file (`result.json`). Sco
 
 Modes:
   cv    for each fixed fold: fit on dev-train, predict dev-val; then fit on all of dev, predict select
-  test  fit on dev+select, predict test
+  test  fit on dev+select, predict test. Best-effort extras that never fail the run: class probabilities
+        (`test_proba`) when the metric only needed labels, and the fitted estimator dumped with joblib to
+        job["model_path"] (the downloadable final model).
   tune  Optuna search over `set_params` paths (job["space"]) on the first job["tune_folds"] fixed dev folds;
         trial scores are computed here (they only steer the search). The tuned solution is then scored by
         the parent like any other through a normal `cv` run.
@@ -114,11 +116,18 @@ def _check_finite(arr: np.ndarray[Any, Any], what: str) -> None:
         raise InvalidOutputError(f"{what} contain NaN or inf")
 
 
+# Module name the solution is imported under. Registered in sys.modules so estimator classes defined in the
+# solution can be pickled; the run's `assets/pipeline.py` carries the same code, so `joblib.load` works
+# from that directory.
+SOLUTION_MODULE = "pipeline"
+
+
 def _load_solution(path: str) -> Any:
-    spec = importlib.util.spec_from_file_location("solution", path)
+    spec = importlib.util.spec_from_file_location(SOLUTION_MODULE, path)
     if spec is None or spec.loader is None:
         raise RuntimeError("could not load solution.py")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[SOLUTION_MODULE] = module
     spec.loader.exec_module(module)
     build = getattr(module, "build_pipeline", None)
     if not callable(build):
@@ -144,7 +153,7 @@ def run(job: dict[str, Any]) -> dict[str, Any]:
     arrays: dict[str, np.ndarray[Any, Any]] = {}
     fit_times: list[float] = []
 
-    def fit_predict(X_fit: Any, y_fit: Any, X_pred: Any, key: str) -> None:
+    def fit_predict(X_fit: Any, y_fit: Any, X_pred: Any, key: str) -> Any:
         est = _fresh(build, profile)
         t0 = time.perf_counter()
         est.fit(X_fit, y_fit)
@@ -152,6 +161,7 @@ def run(job: dict[str, Any]) -> dict[str, Any]:
         pred = _predict(est, X_pred, need_proba, n_classes)
         _check_finite(pred, f"predictions ({key})")
         arrays[key] = pred
+        return est
 
     if mode == "cv":
         X, y = data["X_dev"], data["y_dev"]
@@ -160,16 +170,50 @@ def run(job: dict[str, Any]) -> dict[str, Any]:
         cv_fit_times = list(fit_times)
         fit_predict(X, y, data["X_select"], "select")
         fit_time = float(np.mean(cv_fit_times))
+        extras: dict[str, Any] = {}
     elif mode == "test":
-        fit_predict(data["X_fit"], data["y_fit"], data["X_test"], "test")
+        est = fit_predict(data["X_fit"], data["y_fit"], data["X_test"], "test")
         fit_time = fit_times[0]
+        extras = _test_extras(job, est, data["X_test"], arrays, need_proba, n_classes)
     elif mode == "tune":
         return _tune(job, data, build, profile, need_proba, n_classes)
     else:
         raise ValueError(f"unknown mode {mode!r}")
 
     np.savez(job["preds_path"], **arrays)  # type: ignore[arg-type]
-    return {"ok": True, "fit_time_s": fit_time, "n_arrays": len(arrays)}
+    return {"ok": True, "fit_time_s": fit_time, "n_arrays": len(arrays), **extras}
+
+
+def _test_extras(
+    job: dict[str, Any],
+    est: Any,
+    X_test: Any,
+    arrays: dict[str, np.ndarray[Any, Any]],
+    need_proba: bool,
+    n_classes: int,
+) -> dict[str, Any]:
+    """Run assets for the locked test (charts need probabilities; the download needs the fitted model).
+    Failures are reported in the payload, never raised: they must not affect the test score."""
+    out: dict[str, Any] = {}
+    if n_classes >= 2 and not need_proba and hasattr(est, "predict_proba"):
+        try:
+            proba = _predict(est, X_test, True, n_classes)
+            _check_finite(proba, "probabilities")
+            arrays["test_proba"] = proba
+        except Exception as e:  # noqa: BLE001 - optional output
+            out["proba_error"] = f"{type(e).__name__}: {e}"[:500]
+    model_path = job.get("model_path")
+    if model_path:
+        try:
+            import joblib
+
+            joblib.dump(est, model_path, compress=3)
+            out["model_path"] = model_path
+        except Exception as e:  # noqa: BLE001 - e.g. an unpicklable lambda inside the pipeline
+            with contextlib.suppress(OSError):
+                os.unlink(model_path)
+            out["model_error"] = f"{type(e).__name__}: {e}"[:500]
+    return out
 
 
 def _suggest(trial: Any, name: str, sp: dict[str, Any]) -> Any:

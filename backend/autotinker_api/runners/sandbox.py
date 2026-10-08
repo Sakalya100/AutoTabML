@@ -5,12 +5,15 @@
                       ─► lock egress down ─► start run.sh, detached ─► return
     in the VM:  autotinker run … --events-stdout --control-file control.jsonl --max-time <limit − 3 min>
                   | forward.py ─► POST /api/runs/<id>/ingest  (events, a heartbeat every minute, run.json, exit code)
+                    forward.py ─► PUT presigned Blob URL       (the files of `assets_ready`, straight to Vercel Blob)
     steer/stop: append to control.jsonl through the sandbox filesystem API (the engine polls it)
     cancel:     box.stop()   ·   the exit post and the watchdog also stop the box
 
 Secrets never enter the VM: the provider keys and the deployment-protection bypass are injected as request headers by
 the sandbox firewall (credentials brokering); the engine sees placeholder values only. The per-run ingest token is the
-one credential the VM holds; it is scoped to this run and stored hashed.
+one credential the VM holds; it is scoped to this run and stored hashed. BLOB_READ_WRITE_TOKEN never enters the VM
+either: for each file the API hands out a presigned PUT URL for exactly `runs/<run id>/<name>`, size-capped and valid
+for minutes (see blob.py), and the VM may reach the Blob API host without any injected header.
 
 Limits: AUTOTINKER_SANDBOX_MINUTES (default 40, Hobby allows 45) is the VM's execution limit; the engine gets
 `--max-time` = limit − 3 min, so it finishes (locked test + report) before the VM is killed.
@@ -28,10 +31,11 @@ import logging
 import subprocess
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from autotinker_api import db, repo, settings
+from autotinker_api import blob, db, repo, settings
 from autotinker_api.runners.base import ControlCommand, StartRequest, engine_args
 
 log = logging.getLogger("autotinker.runner.sandbox")
@@ -56,91 +60,14 @@ PROVIDER_HOSTS = {
     "CEREBRAS_API_KEY": "api.cerebras.ai",
 }
 
-# Runs inside the VM. stdlib only. Streams JSONL from stdin to the ingest route in small batches (≤ 1 s latency),
-# posts a heartbeat every minute while the engine lives; `--final CODE OUT_DIR LOG…` posts run.json, then the exit
-# code and the tail of the logs.
-FORWARD_PY = r"""
-import glob, json, os, queue, sys, threading, time, urllib.request
-
-URL = os.environ["INGEST_URL"]
-TOKEN = os.environ["INGEST_TOKEN"]
-
-
-def post(body, attempts=6):
-    data = json.dumps(body).encode()
-    for attempt in range(attempts):
-        try:
-            req = urllib.request.Request(URL, data=data, method="POST", headers={
-                "Content-Type": "application/json", "X-Ingest-Token": TOKEN})
-            with urllib.request.urlopen(req, timeout=30) as r:
-                r.read()
-            return True
-        except Exception as e:  # noqa: BLE001
-            sys.stderr.write("[forward] ingest attempt %d failed: %s\n" % (attempt + 1, e))
-            time.sleep(min(2 ** attempt, 15))
-    return False
-
-
-def final(code, out_dir, logs):
-    paths = [os.path.join(out_dir, "run.json")] + sorted(glob.glob(os.path.join(out_dir, "*", "run.json")))
-    for p in paths:
-        if os.path.isfile(p):
-            try:
-                post({"kind": "record", "record": json.load(open(p))})
-            except ValueError:
-                pass
-            break
-    tail = []
-    for p in logs:
-        try:
-            tail += open(p, errors="replace").read().splitlines()[-30:]
-        except OSError:
-            pass
-    post({"kind": "exit", "exit_code": int(code), "stderr_tail": "\n".join(tail[-60:])})
-
-
-def heartbeat():
-    while True:
-        time.sleep(60)
-        post({"kind": "heartbeat"}, attempts=1)
-
-
-def stream():
-    q = queue.Queue()
-
-    def reader():
-        for line in sys.stdin:
-            if line.strip():
-                q.put(line.rstrip("\n"))
-        q.put(None)
-
-    threading.Thread(target=reader, daemon=True).start()
-    threading.Thread(target=heartbeat, daemon=True).start()
-    buf, last, done = [], time.monotonic(), False
-    while not done:
-        try:
-            item = q.get(timeout=0.5)
-            if item is None:
-                done = True
-            else:
-                buf.append(item)
-        except queue.Empty:
-            pass
-        if buf and (done or len(buf) >= 50 or time.monotonic() - last >= 1.0):
-            post({"kind": "events", "lines": buf})
-            buf, last = [], time.monotonic()
-
-
-if sys.argv[1:2] == ["--final"]:
-    final(sys.argv[2], sys.argv[3], sys.argv[4:])
-else:
-    stream()
-"""
+# Runs inside the VM (stdlib only): streams the engine's JSONL to the ingest route, uploads the run's files to Blob when
+# the stream ends, and with `--final` posts run.json and the exit code. See forward.py.
+FORWARD_PY = Path(__file__).with_name("forward.py").read_text()
 
 RUN_SH = f"""#!/bin/bash
 set -o pipefail
 cd {WORK}
-.venv/bin/python -m autotinker "$@" 2> stderr.log | .venv/bin/python forward.py 2> forward.log
+.venv/bin/python -m autotinker "$@" 2> stderr.log | .venv/bin/python forward.py --out {WORK}/out 2> forward.log
 code=${{PIPESTATUS[0]}}
 .venv/bin/python forward.py --final "$code" {WORK}/out stderr.log forward.log 2>> forward.log
 """
@@ -180,7 +107,8 @@ def dataset_hosts(url: str | None) -> list[str]:
 
 
 def run_policy(dataset_url: str | None, ingest_host: str, env: dict[str, str]) -> Any:
-    """Run-phase egress: LLM providers (keys brokered), the dataset host and our own ingest host only."""
+    """Run-phase egress: LLM providers (keys brokered), the dataset host, our own ingest host and, when a Blob store is
+    configured, the Blob API host (no credential: the VM uploads with presigned URLs scoped to one pathname each)."""
     from vercel.sandbox import NetworkPolicy, NetworkPolicyRule, NetworkPolicyTransform
 
     def brokered(headers: dict[str, str]) -> list[Any]:
@@ -192,7 +120,13 @@ def run_policy(dataset_url: str | None, ingest_host: str, env: dict[str, str]) -
     for key, host in PROVIDER_HOSTS.items():
         if env.get(key):
             allow[host] = brokered({"Authorization": f"Bearer {env[key]}"})
+    if env.get("BLOB_READ_WRITE_TOKEN"):
+        allow.setdefault(blob_api_host(env), [])
     return NetworkPolicy.custom(allow=allow)
+
+
+def blob_api_host(env: dict[str, str]) -> str:
+    return urlsplit(env.get("VERCEL_BLOB_API_URL") or blob.DEFAULT_API).hostname or "vercel.com"
 
 
 def engine_env(env: dict[str, str]) -> dict[str, str]:

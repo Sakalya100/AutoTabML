@@ -249,6 +249,7 @@ def test_migrations_are_idempotent_and_checksummed(migrated: str, tmp_path: Path
         "schema_migrations",
         "rate_limits",
         "app_settings",
+        "run_assets",
     ):
         assert t in tables
     d = tmp_path / "m"

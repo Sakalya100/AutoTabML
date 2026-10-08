@@ -37,6 +37,8 @@ for _k in (
     "CLERK_JWT_KEY",
     "CLERK_AUTHORIZED_PARTIES",
     "AUTOTINKER_PUBLIC_URL",
+    "BLOB_READ_WRITE_TOKEN",
+    "VERCEL_BLOB_API_URL",
 ):
     os.environ.pop(_k, None)
 
@@ -120,7 +122,9 @@ async def _ping(url: str) -> None:
 
 async def _reset(url: str) -> None:
     async with db.connection(url) as conn:
-        await conn.execute("truncate owners, sessions, runs, run_events, messages, rate_limits, app_settings cascade")
+        await conn.execute(
+            "truncate owners, sessions, runs, run_events, messages, rate_limits, app_settings, run_assets cascade"
+        )
 
 
 @pytest.fixture(scope="session")

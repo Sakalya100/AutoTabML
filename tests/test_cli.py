@@ -121,6 +121,7 @@ def test_new_events_round_trip_through_schema() -> None:
         "sandbox_log",
         "hpo_trial",
         "report_ready",
+        "assets_ready",
     ):
         assert t in names
 

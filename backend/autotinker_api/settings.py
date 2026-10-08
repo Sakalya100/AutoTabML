@@ -8,7 +8,8 @@ the process environment. Values are never logged.
 Auth: CLERK_PUBLISHABLE_KEY (or NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) switches from anonymous cookies to Clerk sign-in;
 CLERK_JWT_KEY and CLERK_AUTHORIZED_PARTIES are optional. See auth.py.
 
-Secrets this process holds (provider keys, DATABASE_URL*, AUTOTINKER_SESSION_SECRET, the protection-bypass secret)
+Secrets this process holds (provider keys, DATABASE_URL*, AUTOTINKER_SESSION_SECRET, the protection-bypass secret,
+BLOB_READ_WRITE_TOKEN)
 never reach the engine: the local runner builds the engine's environment from an allow-list (`engine_env`), and the
 sandbox runner only passes placeholders (the real provider keys are injected by the sandbox firewall).
 """
@@ -35,6 +36,7 @@ BLOCKED_FROM_DOTENV = (
     "ANTHROPIC_API_KEY",
     "AUTOTINKER_SESSION_SECRET",
     "VERCEL_AUTOMATION_BYPASS_SECRET",
+    "BLOB_READ_WRITE_TOKEN",
 )
 _ENV_ALLOW = re.compile(
     r"^(PATH|HOME|USER|LANG|LC_[A-Z]+|TMPDIR|TEMP|TMP|SHELL|UV_[A-Z_]+|PYTHON[A-Z_]*|VIRTUAL_ENV|CONDA_[A-Z_]+"
@@ -157,6 +159,7 @@ def known_secrets() -> list[str]:
         "DATABASE_URL_POOLED",
         "DATABASE_URL_UNPOOLED",
         "VERCEL_AUTOMATION_BYPASS_SECRET",
+        "BLOB_READ_WRITE_TOKEN",
     )
     return [v for v in (env(k) for k in names) if v]
 
@@ -172,6 +175,8 @@ _KEY_PATTERNS = [
         "AI" + r"za[A-Za-z0-9_-]{20,}",
         "csk" + r"-[A-Za-z0-9]{8,}",
         "npg" + r"_[A-Za-z0-9]{6,}",
+        "vercel_blob" + r"_rw_[A-Za-z0-9_]{8,}",
+        r"vercel-blob-signature=[A-Za-z0-9_-]+",
         r"Bearer\s+\S+",
     )
 ]

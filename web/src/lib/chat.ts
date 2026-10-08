@@ -1,11 +1,13 @@
 /**
  * The session chat: one pure reducer turns a session's runs (their event streams) and its stored messages into the
- * chat timeline. Every agent step becomes a message; steps are grouped per experiment with the gate's verdict; stage
- * dividers mark Intake → Profiling → Baseline → Drafts → Improve → Tuning → Ensemble → Stop → Locked test → Report.
+ * chat timeline: one Task card for the setup (intake + profiler steps), one card per experiment (its agent steps and the
+ * gate's verdict), a quiet phase label ("Drafts · 3") where the experiments' phase changes, then the stop, the locked
+ * test, the report and the run's assets (charts and files).
  *
  * Pure and O(events + messages), so a reload rebuilds exactly what a live viewer saw.
  */
-import type { AnyEvent, EventOf } from "./events";
+import { parseAssetsEvent, type AssetChart, type AssetFile, type CvPoint } from "./assets";
+import { isAssetsReady, type AnyEvent, type EventOf } from "./events";
 import { parseGateReason, type GateSummary } from "./feed";
 import type { Decision, Idea, Metric } from "./schema";
 
@@ -73,6 +75,10 @@ export interface ChatTask {
   key: string;
   ts: string;
   runId: string;
+  /** Intake and profiler steps (the setup), shown as step lines in the Task card. */
+  steps: ChatStep[];
+  /** The user's own goal text, when they gave one. */
+  description: string | null;
   target: string | null;
   problemType: string | null;
   metric: Metric | null;
@@ -82,8 +88,22 @@ export interface ChatTask {
   warnings: string[];
 }
 
+export interface ChatAssets {
+  kind: "assets";
+  key: string;
+  ts: string;
+  runId: string;
+  /** From assets_ready (empty until it arrives). */
+  charts: AssetChart[];
+  files: AssetFile[];
+  /** Every scored experiment, for the "CV score per experiment" chart. */
+  cv: CvPoint[];
+  /** assets_ready has arrived (otherwise only the CV chart is shown). */
+  ready: boolean;
+}
+
 export type ChatItem =
-  | { kind: "divider"; key: string; ts: string; runId: string; stage: Stage; label: string }
+  | { kind: "phase"; key: string; ts: string; runId: string; stage: Stage; label: string; count: number }
   | { kind: "user"; key: string; ts: string; id: string; text: string; msgKind: "chat" | "steer" | "control"; pending?: boolean }
   | { kind: "system"; key: string; ts: string; text: string; tone: "info" | "warn" }
   | ChatTask
@@ -118,6 +138,7 @@ export type ChatItem =
       notes: string[];
       faithful: boolean | null;
     }
+  | ChatAssets
   | { kind: "run_end"; key: string; ts: string; runId: string; status: "failed" | "cancelled" | "timed_out"; error: string | null };
 
 export interface ChatRunInput {
@@ -142,6 +163,10 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 const RUN_STAGE: Record<string, Stage> = { intake: "intake", profiler: "profiling", reporter: "report" };
+/** Run-level roles whose steps fold into the Task card. */
+const SETUP_ROLES = new Set(["intake", "profiler"]);
+/** Stages that get a phase label above their experiments. */
+const EXP_STAGES = new Set<Stage>(["baseline", "drafts", "improve", "tuning", "ensemble"]);
 const PHASE_STAGE: Record<string, Stage> = { baseline: "baseline", draft: "drafts", improve: "improve", tune: "tuning", ensemble: "ensemble" };
 
 /** The stage an experiment belongs to: the engine's `phase` when present, else inferred from its steps. */
@@ -182,14 +207,43 @@ function emptyStep(stepId: string, role: string): ChatStep {
   };
 }
 
-/** Fold one run's events into chat items (with stage dividers). */
+/** Fold one run's events into chat items (with phase labels and the assets card). */
 export function runItems(run: ChatRunInput): ChatItem[] {
   const items: ChatItem[] = [];
   const exps = new Map<string, ChatExperiment & { phase: string | null }>();
-  const runSteps = new Map<string, ChatStep>();
   const stepOwner = new Map<string, ChatStep>(); // step_id -> step (experiment or run-level)
   const rid = run.id;
   let lastTs = "";
+  let task: ChatTask | null = null;
+  let assets: { charts: AssetChart[]; files: AssetFile[]; ts: string } | null = null;
+  let terminal = run.status === "finished" || run.status === "failed" || run.status === "cancelled" || run.status === "timed_out";
+
+  // The Task card appears with whichever comes first: run_started or the intake/profiler step.
+  const taskItem = (ts: string): ChatTask => {
+    if (!task) {
+      task = {
+        kind: "task",
+        key: `${rid}:task`,
+        ts,
+        runId: rid,
+        steps: [],
+        description: null,
+        target: null,
+        problemType: null,
+        metric: null,
+        nRows: null,
+        nCols: null,
+        maxExperiments: null,
+        warnings: [],
+      };
+      items.push(task);
+    }
+    return task;
+  };
+  const addRunStep = (st: ChatStep, ts: string, seq: number) => {
+    if (SETUP_ROLES.has(st.role)) taskItem(ts).steps.push(st);
+    else items.push({ kind: "step", key: `${rid}:step:${st.stepId || seq}`, ts, runId: rid, stage: RUN_STAGE[st.role] ?? "profiling", step: st });
+  };
 
   const experiment = (expId: string, ts: string) => {
     let x = exps.get(expId);
@@ -225,20 +279,19 @@ export function runItems(run: ChatRunInput): ChatItem[] {
         const cfg = (e.config ?? {}) as Record<string, unknown>;
         const stopRule = (cfg.stop_rule ?? {}) as Record<string, unknown>;
         const agentic = (cfg.agentic ?? {}) as Record<string, unknown>;
+        const intake = (cfg.intake ?? {}) as Record<string, unknown>;
         const max = cfg.max_experiments ?? stopRule.max_experiments ?? agentic.max_experiments;
-        items.push({
-          kind: "task",
-          key: `${rid}:task`,
-          ts: e.ts,
-          runId: rid,
+        const warnings = [...strings(e.profile?.warnings), ...strings(intake.warnings)];
+        Object.assign(taskItem(e.ts), {
+          description: str((e.task as { description?: unknown } | undefined)?.description),
           target: e.profile?.target ?? e.task?.target ?? null,
-          problemType: e.profile?.problem_type ?? null,
+          problemType: e.profile?.problem_type ?? (e.task as { problem_type?: string } | undefined)?.problem_type ?? null,
           metric: e.profile?.metric ?? e.task?.metric ?? null,
           nRows: e.profile?.n_rows ?? null,
           nCols: e.profile?.n_cols ?? null,
           maxExperiments: typeof max === "number" ? max : null,
-          warnings: e.profile?.warnings ?? [],
-        });
+          warnings: [...new Set(warnings)],
+        } satisfies Partial<ChatTask>);
         break;
       }
       case "agent_step_started": {
@@ -246,10 +299,7 @@ export function runItems(run: ChatRunInput): ChatItem[] {
         const st = { ...emptyStep(e.step_id, e.role), attempt: e.attempt ?? 0, inputSummary: e.input_summary ?? "" };
         stepOwner.set(e.step_id, st);
         if (e.exp_id) experiment(e.exp_id, e.ts).steps.push(st);
-        else {
-          runSteps.set(e.step_id, st);
-          items.push({ kind: "step", key: `${rid}:step:${e.step_id || e.seq}`, ts: e.ts, runId: rid, stage: RUN_STAGE[e.role] ?? "profiling", step: st });
-        }
+        else addRunStep(st, e.ts, e.seq);
         break;
       }
       case "agent_reasoning": {
@@ -267,7 +317,7 @@ export function runItems(run: ChatRunInput): ChatItem[] {
           st = emptyStep(id, s.role);
           if (id) stepOwner.set(id, st);
           if (e.exp_id) experiment(e.exp_id, e.ts).steps.push(st);
-          else items.push({ kind: "step", key: `${rid}:step:${id || e.seq}`, ts: e.ts, runId: rid, stage: RUN_STAGE[s.role] ?? "profiling", step: st });
+          else addRunStep(st, e.ts, e.seq);
         }
         Object.assign(st, {
           role: s.role,
@@ -343,6 +393,7 @@ export function runItems(run: ChatRunInput): ChatItem[] {
       }
       case "run_finished": {
         const e = ev as EventOf<"run_finished">;
+        terminal = true;
         items.push({
           kind: "final",
           key: `${rid}:final`,
@@ -376,8 +427,14 @@ export function runItems(run: ChatRunInput): ChatItem[] {
           notes: strings(r.notes),
           faithful: typeof checks.faithful === "boolean" ? checks.faithful : null,
         });
+        terminal = true;
         break;
       }
+      default:
+        if (isAssetsReady(ev)) {
+          assets = { ...parseAssetsEvent(ev), ts: ev.ts };
+          terminal = true;
+        }
     }
   }
 
@@ -390,36 +447,49 @@ export function runItems(run: ChatRunInput): ChatItem[] {
   const hasReport = items.some((it) => it.kind === "report");
   const shown = hasReport ? items.filter((it) => !(it.kind === "step" && it.step.role === "reporter" && it.step.status === "ok")) : items;
 
-  // Stage dividers: one whenever the stage changes along the run.
+  // The assets card (charts + files), once the run is over: right after the report, else after the locked test,
+  // else last (before a failed/cancelled run's closing message).
+  const cv: CvPoint[] = [...exps.values()]
+    .filter((x) => x.scored)
+    .map((x) => ({ id: x.id, mean: x.scored!.cvMean, se: x.scored!.cvSe, verdict: x.decision?.verdict ?? null, best: false }));
+  const lastBest = [...exps.values()].reverse().find((x) => x.decision)?.decision?.bestId;
+  for (const p of cv) p.best = p.id === lastBest;
+  const got = assets as { charts: AssetChart[]; files: AssetFile[]; ts: string } | null;
+  if (terminal && (got || cv.length)) {
+    const at = Math.max(
+      shown.findIndex((it) => it.kind === "report"),
+      shown.findIndex((it) => it.kind === "final"),
+    );
+    const endAt = shown.findIndex((it) => it.kind === "run_end");
+    const pos = at >= 0 ? at + 1 : endAt >= 0 ? endAt : shown.length;
+    const ts = got?.ts ?? shown[pos - 1]?.ts ?? lastTs;
+    shown.splice(pos, 0, { kind: "assets", key: `${rid}:assets`, ts, runId: rid, charts: got?.charts ?? [], files: got?.files ?? [], cv, ready: !!got });
+  }
+
+  // A quiet phase label above each run of experiments in the same phase ("Drafts · 3").
   const out: ChatItem[] = [];
   let stage: Stage | null = null;
+  let label: Extract<ChatItem, { kind: "phase" }> | null = null;
   for (const it of shown) {
-    const s = itemStage(it);
-    if (s && s !== stage) {
-      stage = s;
-      out.push({ kind: "divider", key: `${rid}:div:${out.length}:${s}`, ts: it.ts, runId: rid, stage: s, label: STAGE_LABEL[s] });
+    if (it.kind === "experiment" && EXP_STAGES.has(it.stage)) {
+      if (it.stage !== stage || !label) {
+        stage = it.stage;
+        label = {
+          kind: "phase",
+          key: `${rid}:phase:${out.length}:${it.stage}`,
+          ts: it.ts,
+          runId: rid,
+          stage: it.stage,
+          label: STAGE_LABEL[it.stage],
+          count: 0,
+        };
+        out.push(label);
+      }
+      label.count++;
     }
     out.push(it);
   }
   return out;
-}
-
-function itemStage(it: ChatItem): Stage | null {
-  switch (it.kind) {
-    case "task":
-      return "intake";
-    case "step":
-    case "experiment":
-      return it.stage;
-    case "stopped":
-      return "stop";
-    case "final":
-      return "locked_test";
-    case "report":
-      return "report";
-    default:
-      return null;
-  }
 }
 
 /**
@@ -458,5 +528,7 @@ export function chatSignature(items: readonly ChatItem[]): string {
   if (last.kind === "experiment")
     return `${items.length}:${last.steps.length}:${last.steps.filter((s) => s.status === "running").length}:${last.logs.length}:${last.decision?.verdict ?? ""}:${last.attempts.length}`;
   if (last.kind === "step") return `${items.length}:${last.step.status}`;
+  if (last.kind === "task") return `${items.length}:task:${last.steps.length}:${last.steps.filter((s) => s.status === "running").length}`;
+  if (last.kind === "assets") return `${items.length}:assets:${last.charts.length}:${last.files.length}:${last.ready}`;
   return `${items.length}:${last.kind}`;
 }

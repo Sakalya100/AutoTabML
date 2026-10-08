@@ -160,6 +160,8 @@ def test_signed_out_requests_get_401(clerk: None, client: TestClient) -> None:
         (client.get("/api/runs/r-abcdefabcd"), sessions_msg),
         (client.get("/api/runs/r-abcdefabcd/stream"), sessions_msg),
         (client.post("/api/runs/r-abcdefabcd/cancel"), sessions_msg),
+        (client.get("/api/runs/r-abcdefabcd/assets"), sessions_msg),
+        (client.get("/api/runs/r-abcdefabcd/assets/model.joblib"), sessions_msg),
     ):
         assert r.status_code == 401 and r.json() == want, r.text
         assert "set-cookie" not in r.headers  # no anonymous identity in clerk mode
