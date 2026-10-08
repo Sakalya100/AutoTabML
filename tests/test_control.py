@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -159,6 +160,8 @@ def test_stop_is_graceful_locked_test_and_report_still_run(tmp_path: Path) -> No
 
 
 def test_cli_control_flags_are_listed() -> None:
-    res = CliRunner().invoke(app, ["run", "--help"], env={"COLUMNS": "200"})
+    # CI forces colour (GITHUB_ACTIONS / FORCE_COLOR), and Rich's ANSI codes split option names; strip them.
+    res = CliRunner().invoke(app, ["run", "--help"], env={"COLUMNS": "200", "NO_COLOR": "1", "TERM": "dumb"})
     assert res.exit_code == 0
-    assert "--control-stdin" in res.output and "--control-fifo" in res.output
+    out = re.sub(r"\x1b\[[0-9;]*m", "", res.output)
+    assert "--control-stdin" in out and "--control-fifo" in out
