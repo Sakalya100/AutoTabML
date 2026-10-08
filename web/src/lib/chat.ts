@@ -118,12 +118,12 @@ export type ChatItem =
       notes: string[];
       faithful: boolean | null;
     }
-  | { kind: "run_end"; key: string; ts: string; runId: string; status: "failed" | "cancelled"; error: string | null };
+  | { kind: "run_end"; key: string; ts: string; runId: string; status: "failed" | "cancelled" | "timed_out"; error: string | null };
 
 export interface ChatRunInput {
   id: string;
   events: readonly AnyEvent[];
-  /** Run status from the store/DB; failed/cancelled adds a closing message. */
+  /** Run status from the API; failed/cancelled/timed_out adds a closing message. */
   status?: string | null;
   error?: string | null;
   finishedAt?: string | null;
@@ -383,7 +383,7 @@ export function runItems(run: ChatRunInput): ChatItem[] {
 
   for (const x of exps.values()) x.stage = experimentStage(x, x.phase);
 
-  if (run.status === "failed" || run.status === "cancelled")
+  if (run.status === "failed" || run.status === "cancelled" || run.status === "timed_out")
     items.push({ kind: "run_end", key: `${rid}:end`, ts: run.finishedAt ?? lastTs ?? "", runId: rid, status: run.status, error: run.error ?? null });
 
   // The report message carries the Reporter's headline; its finished step line would only repeat it.

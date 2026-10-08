@@ -1,13 +1,11 @@
-/** Wire types of the sessions API (shared by route handlers and the workspace UI). */
-import type { PublicRunMeta } from "./api";
-import type { MessageRow, RunRow } from "./db/repo";
+/** Wire types of the sessions API (the backend's GET /api/sessions/{id}). */
+import type { MessageRow, PublicRunMeta, RunRow } from "./api-types";
 import type { AnyEvent } from "./events";
 
-export type { MessageRow, RunRow, SessionListItem } from "./db/repo";
+export type { MessageRow, RunRow, SessionListItem } from "./api-types";
 
 export interface SessionRunPayload {
   row: RunRow;
-  /** Live meta from the run store (null once it has expired there; the row then carries the status). */
   meta: PublicRunMeta | null;
   events: AnyEvent[];
 }

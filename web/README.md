@@ -1,60 +1,63 @@
 # AutoTinker web
 
-The hosted demo and observability UI for AutoTinker v2: watch a recorded run evolve, or upload a CSV and watch a live one. One Next.js (App Router) project; its route handlers are the backend. The Python engine always runs **out of process** through a pluggable runner. The UI is only a client of the engine's JSONL event stream (`src/autotinker/obs/events.py`).
+The hosted demo and observability UI for AutoTinker v2: watch a recorded run evolve, or paste a link to a CSV and
+watch a live agentic run in a session. This is a **frontend-only** Next.js (App Router) app. The API is the FastAPI
+service in [`../backend`](../backend), and the Python engine always runs out of process (a local child process in dev,
+a Vercel Sandbox microVM in production). The UI is only a client of the engine's JSONL event stream
+(`src/autotinker/obs/events.py`), relayed by the backend over SSE.
 
 ## Develop
 
+From the repo root, once: `uv sync` (the engine), `uv sync --project backend` (the API), `cd web && npm install`.
+The backend needs a Postgres: the repo-root `.env` `DATABASE_URL*` (Neon), or any local one, then `make migrate`.
+
 ```bash
-cd web
-npm install
-npm run dev            # http://localhost:3000
+make dev                  # backend on :8000 + next dev on :3000 (Ctrl-C stops both)
+make dev API_PORT=8001    # if :8000 is taken
 ```
 
-Replays work with nothing else installed. Live runs use the **local runner**, which needs [`uv`](https://docs.astral.sh/uv/) and the Python package in the repo root (`uv sync` there once). The runner spawns:
+or by hand, in two terminals:
 
-```
-uv run --project <repo root> python -m autotinker evolve <csv> --target <t> --llm <spec> \
-  --max-experiments N --max-cost <usd> --out web/.data/runs/<id>/out --events-stdout [--description …]
+```bash
+uv run --project backend uvicorn backend.main:app --port 8000      # repo root; no --reload (see the Makefile)
+cd web && AUTOTINKER_API_URL=http://127.0.0.1:8000 npm run dev
 ```
 
-and stores stdout events in `web/.data/runs/<id>/events.jsonl`. Override the command with `AUTOTINKER_PYTHON_CMD`. To work on the UI without Python, set `AUTOTINKER_PYTHON_CMD="node scripts/fake-engine.mjs"`. It replays the hand-written fixture in `scripts/fixtures/` as if it were live. **It is not the engine.**
+In `next dev`, `next.config.ts` rewrites `/api/*` to `AUTOTINKER_API_URL` (dev only). On Vercel the root
+`vercel.json` routes `/api/*` to the backend service, so the browser always calls same-origin `/api/*`.
+
+Replays need nothing but the frontend. Live runs use the backend's **local runner**, which spawns
+`uv run --project <repo root> python -m autotinker run <link> --target … --events-stdout --control-file …`
+(override with `AUTOTINKER_PYTHON_CMD`). To work on the UI without Python, start the backend with
+`AUTOTINKER_PYTHON_CMD="node web/scripts/fake-engine.mjs"`: it replays the hand-written fixture in
+`scripts/fixtures/` as if it were live. **It is not the engine.**
 
 | script | what it does |
 |---|---|
 | `npm run lint` / `npm run typecheck` / `npm run build` | ESLint, `tsc --noEmit`, production build |
-| `npm test` | vitest: event parsing, metric orientation, stores, upload validation, run-state reducer |
+| `npm test` | vitest: event parsing, run-state/feed/chat reducers, CSV parsing + suggestion heuristics, upload validation |
 | `npm run gen:types` | regenerate `src/lib/schema.ts` from `../schema/*.schema.json` (run after `python -m autotinker.obs.schema`) |
 | `npm run validate:replays` | validate `public/replays/*` against the JSON Schemas (ajv) plus cross-file checks |
 | `node scripts/make-fixture-replay.mjs` | rebuild the hand-written iris fixture replay |
 
 ### Adding a real replay
 
-From the repo root: `uv run python benchmarks/export_replays.py runs/<run-dir>:<name> ...` copies `run.json` and `events.jsonl` into `public/replays/<name>/` and rebuilds `public/replays/index.json`. Then run `npm run validate:replays`. All bundled replays are real engine runs. The hand-written `scripts/fixtures/iris-heuristic` exists only for `fake-engine.mjs` and the unit tests.
+From the repo root: `uv run python benchmarks/export_replays.py runs/<run-dir>:<name> ...` copies `run.json` and
+`events.jsonl` into `public/replays/<name>/` and rebuilds `public/replays/index.json`. Then run
+`npm run validate:replays`. Replays are static files served from `public/replays`; the pages read them at render time.
 
-## API
+## API (served by the backend)
 
 | route | |
 |---|---|
-| `POST /api/runs` | multipart: `file` (CSV ≤ 5 MB), `target`, `description`, `maxExperiments` (≤ 30), `llm` = `heuristic` \| `anthropic`. BYOK key in the `x-anthropic-api-key` header. Rate-limited per IP |
+| `GET /api/sessions` · `GET/PATCH /api/sessions/:id` | your sessions; one session with its messages and every run's events; rename |
+| `POST /api/sessions/:id/messages` | `{text}` or `{kind: "stop"}`: chat, steer the Planner, or stop gracefully |
+| `POST /api/preview` | `{url, goal?}`: SSRF-guarded preview of a public CSV link + target/metric suggestion |
+| `POST /api/runs` | JSON `{url, target, metric?, goal?, maxExperiments, sessionId?, sentence?}` or multipart with `file` (≤ 5 MB) |
 | `GET /api/runs/:id` | meta + events (`?after=<seq>`) + `record` (run.json) once written |
-| `GET /api/runs/:id/stream` | SSE: replays stored events, then tails the store. Supports `Last-Event-ID`. Sends `event: meta` and `event: end` |
-| `POST /api/runs/:id/cancel` | kills the process group (local) or stops the sandbox |
-| `POST /api/runs/:id/ingest` | event ingest for the vercel-sandbox runner (per-run bearer token) |
-| `GET /api/replays` | bundled replays |
+| `GET /api/runs/:id/stream` | SSE: stored events, then live ones; `Last-Event-ID` resume; `event: meta` / `event: end`; ≤ 280 s per connection |
+| `POST /api/runs/:id/cancel` | hard stop (process group / sandbox) |
+| `POST /api/runs/:id/ingest` | the sandbox forwarder's event ingest (per-run token) |
 
-**Secrets:** a BYOK key goes into the engine's environment for that run only (local runner). On Vercel Sandbox, the firewall injects it as a header, so it never enters the VM. It is never written to the store or to logs. Stderr is redacted before it is logged or shown.
-
-## Deploy (Vercel)
-
-- **Root Directory:** `web`. Framework preset: Next.js.
-- **Store:** set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The file store does not work on serverless.
-- **Runner:** `vercel-sandbox` is chosen automatically on Vercel. Set `AUTOTINKER_PUBLIC_URL` (where the sandbox posts events) and optionally `AUTOTINKER_SANDBOX_PACKAGE` (defaults to the GitHub `v2` branch). Deployment Protection must let the sandbox reach `/api/runs/*/ingest`.
-- **Replays-only demo:** set `AUTOTINKER_LIVE_RUNS=0`.
-- **Limits:** Vercel Sandbox sessions run for at most 45 min on Hobby and 24 h on Pro/Enterprise (`AUTOTINKER_SANDBOX_TIMEOUT_MS`, default 45 min). Each vCPU comes with 2 GB of RAM. The per-IP rate limit is in memory and applies per function instance, so move it to Redis before relying on it.
-
-See `.env.example` for every variable.
-
-### Status
-
-- **Verified locally:** local runner + file store against the real engine (heuristic proposer), SSE live tailing, cancel, validation errors, rate limit, and that BYOK keys don't leak.
-- **Untested:** the `vercel-sandbox` runner (`src/lib/runner/vercel-sandbox.ts`) and the ingest route end to end, as well as `RedisStore` (`src/lib/store/redis-store.ts`). They follow the current `@vercel/sandbox` 3.x API and the Upstash REST protocol, but no credentials were available to run them.
+Identity is an anonymous signed `at_owner` cookie minted by the backend; every session/run route checks ownership.
+See [`../backend/.env.example`](../backend/.env.example) for configuration and limits.

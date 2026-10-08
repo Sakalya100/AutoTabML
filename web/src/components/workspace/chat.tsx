@@ -250,9 +250,14 @@ function Item({ it, metric, selected, onSelect }: { it: ChatItem; metric: Metric
     case "run_end":
       return (
         <Enter className="ws-moment">
-          <p className={`ws-kicker ${it.status === "failed" ? "text-[var(--crash)]" : ""}`}>{it.status === "failed" ? "The run failed" : "Cancelled"}</p>
+          <p className={`ws-kicker ${it.status === "failed" ? "text-[var(--crash)]" : ""}`}>{it.status === "failed" ? "The run failed" : it.status === "timed_out" ? "Timed out" : "Cancelled"}</p>
           <p className="mt-1 text-[14px] text-[var(--lp-ink-2)]">
-            {it.error ?? (it.status === "failed" ? "The engine stopped with an error." : "The run was cancelled before the locked test.")}
+            {it.error ??
+              (it.status === "failed"
+                ? "The engine stopped with an error."
+                : it.status === "timed_out"
+                  ? "The run timed out before the locked test; every experiment so far is kept."
+                  : "The run was cancelled before the locked test.")}
           </p>
         </Enter>
       );

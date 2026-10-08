@@ -1,5 +1,5 @@
 /**
- * Run-request validation shared by the /new form (client) and POST /api/runs (server). No Node-only imports.
+ * Run-request validation for the new-run form (the backend repeats these checks in backend/autotinker_api/validation.py).
  * Two sources: a public https link (the engine downloads it) or an uploaded CSV file.
  */
 
@@ -145,15 +145,4 @@ export function validateRunRequest(input: RunRequestInput, opts: { maxExperiment
   const v = validateRunOptions(input, columns, opts);
   if (!v.ok) return v;
   return { ok: true, value: { ...v.value, columns } };
-}
-
-/** Provider-key shapes: Anthropic, Groq, Google (AQ. / AIza), Cerebras, Neon Postgres passwords. */
-const KEY_PATTERNS = [/sk-ant-[A-Za-z0-9_-]{8,}/g, /gsk_[A-Za-z0-9]{8,}/g, /\bAQ\.[A-Za-z0-9_-]{8,}/g, /AIza[A-Za-z0-9_-]{20,}/g, /csk-[A-Za-z0-9]{8,}/g, /npg_[A-Za-z0-9]{6,}/g];
-
-/** Replace any occurrence of the given secrets (and anything shaped like a provider key) in log text. */
-export function redact(text: string, secrets: (string | null | undefined)[] = []): string {
-  let out = text;
-  for (const s of secrets) if (s && s.length >= 8) out = out.split(s).join("[redacted]");
-  for (const re of KEY_PATTERNS) out = out.replace(re, "[redacted]");
-  return out;
 }

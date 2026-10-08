@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SessionView } from "@/components/workspace/session-view";
-import { liveRunsEnabled } from "@/lib/runner";
+import { liveRunsEnabled } from "@/lib/flags";
 import { MAX_EXPERIMENTS_PUBLIC } from "@/lib/upload";
 
 export const metadata: Metadata = { title: "Session" };

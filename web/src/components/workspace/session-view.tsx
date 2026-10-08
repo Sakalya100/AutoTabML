@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PublicRunMeta } from "@/lib/api";
+import { TERMINAL as TERMINAL_STATUSES, type PublicRunMeta } from "@/lib/api-types";
 import { buildChat, type ChatMessageInput } from "@/lib/chat";
 import { isStopCommand, MAX_STEER_CHARS, splitLink } from "@/lib/chat-input";
 import { coerceEvent, type AnyEvent } from "@/lib/events";
@@ -21,7 +21,7 @@ import { ChatLog } from "./chat";
 import { DraftCard, useRunDraft } from "./draft";
 import { useShell } from "./shell";
 
-const TERMINAL = new Set(["finished", "failed", "cancelled"]);
+const TERMINAL = new Set<string>(TERMINAL_STATUSES);
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 interface Props {

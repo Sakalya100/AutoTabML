@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { MAX_UPLOAD_BYTES, previewCsv, redact, splitCsvLine, validateRunRequest, validateUrlRunRequest, type RunRequestInput } from "@/lib/upload";
+import { MAX_UPLOAD_BYTES, previewCsv, splitCsvLine, validateRunRequest, validateUrlRunRequest, type RunRequestInput } from "@/lib/upload";
 
 const iris = readFileSync(path.join(__dirname, "../../examples/data/iris_classification.csv"), "utf8");
 const base = (over: Partial<RunRequestInput> = {}): RunRequestInput => ({
@@ -74,16 +74,5 @@ describe("validateUrlRunRequest", () => {
     const r = validateUrlRunRequest({ ...ok, ...over } as Parameters<typeof validateUrlRunRequest>[0]);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.field).toBe(field);
-  });
-});
-
-describe("redact", () => {
-  it("removes explicit secrets and anything shaped like an Anthropic key", () => {
-    expect(redact("key=supersecretvalue!", ["supersecretvalue"])).toBe("key=[redacted]!");
-    expect(redact("auth sk-ant-api03-AbC_dEf-123456 failed")).toBe("auth [redacted] failed");
-  });
-  it("removes Groq, Google, Cerebras and Neon key shapes", () => {
-    const fake = ["gsk_" + "A1b2C3d4E5f6G7h8", "AQ." + "Ab12_cd34-ef56gh", "csk-" + "abcd1234efgh5678", "npg_" + "AbCdEf123456"];
-    for (const k of fake) expect(redact(`x ${k} y`)).toBe("x [redacted] y");
   });
 });

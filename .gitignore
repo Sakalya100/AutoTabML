@@ -161,8 +161,8 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# AutoTinker run artifacts
-runs/
+# AutoTinker run artifacts (anchored: an unanchored `runs/` also hid web/src/app/runs and web/src/app/api/runs)
+/runs/
 
 # screen recordings
 *.mov

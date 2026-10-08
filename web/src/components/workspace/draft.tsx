@@ -8,7 +8,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useRef, useState } from "react";
 import { parseTable, type ColumnKind, type ColumnStats } from "@/lib/ingest/csv";
-import type { Preview } from "@/lib/ingest/fetch-preview";
+import type { Preview } from "@/lib/api-types";
 import { METRIC_LABEL, PROBLEM_LABEL, suggest, suggestionFor, VALID_METRICS, type MetricId, type ProblemType, type Suggestion } from "@/lib/ingest/suggest";
 import { DEFAULT_EXPERIMENTS, MAX_UPLOAD_BYTES, validateRunRequest, validateUrlRunRequest } from "@/lib/upload";
 
