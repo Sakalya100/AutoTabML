@@ -1,0 +1,82 @@
+"""The FastAPI app: identity middleware, error shapes and the routers. Served as `main:app` (backend/main.py)."""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Awaitable, Callable
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, Response
+
+from autotinker_api import db, identity, settings
+from autotinker_api.http import ApiError, error_response, json_ok
+from autotinker_api.routes import preview, runs, sessions
+
+settings.load_env_files()
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+
+app = FastAPI(title="autotinker", docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
+
+
+def _wants_identity(path: str) -> bool:
+    return path.startswith("/api/") and not path.endswith("/ingest") and path != "/api/health"
+
+
+@app.middleware("http")
+async def request_context(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    try:  # the Sandbox SDK reads the per-request OIDC token (x-vercel-oidc-token) from this context
+        from vercel.headers import set_headers
+
+        set_headers(dict(request.headers))
+    except ImportError:  # pragma: no cover
+        pass
+    minted: str | None = None
+    owner: str | None = None
+    if _wants_identity(request.url.path):
+        # The anonymous owner cookie: minted on the first API call without a valid one (the sessions list, which the
+        # workspace loads first), so later calls in the same browser all see the same owner.
+        owner = identity.verify_owner(request.cookies.get(identity.OWNER_COOKIE))
+        if owner is None:
+            owner = identity.new_owner_id()
+            minted = identity.sign_owner(owner)
+    request.state.owner = owner
+    response = await call_next(request)
+    if minted:
+        response.set_cookie(
+            identity.OWNER_COOKIE,
+            minted,
+            max_age=identity.ONE_YEAR_S,
+            path="/",
+            httponly=True,
+            samesite="lax",
+            secure=settings.on_vercel() or request.url.scheme == "https",
+        )
+    return response
+
+
+@app.exception_handler(ApiError)
+async def api_error(_: Request, e: ApiError) -> JSONResponse:
+    return error_response(e)
+
+
+@app.exception_handler(db.DatabaseUnavailable)
+async def db_unavailable(_: Request, e: db.DatabaseUnavailable) -> JSONResponse:
+    logging.getLogger("autotinker.db").warning("database unavailable: %s", e)
+    return error_response(ApiError(503, "Saved sessions are unavailable right now. Try again in a minute."))
+
+
+@app.get("/api/health")
+async def health() -> JSONResponse:
+    return json_ok(
+        {
+            "ok": True,
+            "runner": settings.runner_kind(),
+            "liveRuns": settings.live_runs_enabled(),
+            "database": bool(settings.database_url()),
+        }
+    )
+
+
+app.include_router(sessions.router)
+app.include_router(runs.router)
+app.include_router(preview.router)

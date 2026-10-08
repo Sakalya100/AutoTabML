@@ -166,3 +166,6 @@ runs/
 
 # screen recordings
 *.mov
+
+# backend local runner data (run dirs, uploads)
+backend/.data/
