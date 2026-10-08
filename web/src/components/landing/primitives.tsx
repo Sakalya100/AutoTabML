@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "motion/react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { useOpenSignIn, useSignedIn } from "../auth";
 
 export const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -64,8 +65,23 @@ export function Ticker({ value, format, className }: { value: number | null; for
 }
 
 /** CTA that leans toward the cursor. */
-export function MagneticLink({ href, children, variant = "primary", external = false }: { href: string; children: ReactNode; variant?: "primary" | "ghost"; external?: boolean }) {
+export function MagneticLink({
+  href,
+  children,
+  variant = "primary",
+  external = false,
+  requireAuth = false,
+}: {
+  href: string;
+  children: ReactNode;
+  variant?: "primary" | "ghost";
+  external?: boolean;
+  /** Signed out: open the sign-in modal here and continue to `href` after, instead of a page that only says "sign in". */
+  requireAuth?: boolean;
+}) {
   const ref = useRef<HTMLAnchorElement>(null);
+  const auth = useSignedIn();
+  const openSignIn = useOpenSignIn();
   const reduce = useReducedMotion();
   const x = useSpring(0, { stiffness: 220, damping: 16, mass: 0.4 });
   const y = useSpring(0, { stiffness: 220, damping: 16, mass: 0.4 });
@@ -90,7 +106,20 @@ export function MagneticLink({ href, children, variant = "primary", external = f
   );
   const MotionLink = external ? motion.a : MotionNextLink;
   return (
-    <MotionLink ref={ref} href={href} className={cls} style={{ x, y }} onPointerMove={onMove} onPointerLeave={reset}>
+    <MotionLink
+      ref={ref}
+      href={href}
+      className={cls}
+      style={{ x, y }}
+      onPointerMove={onMove}
+      onPointerLeave={reset}
+      onClick={(e: React.MouseEvent) => {
+        if (requireAuth && openSignIn && auth.loaded && !auth.signedIn) {
+          e.preventDefault();
+          openSignIn(href);
+        }
+      }}
+    >
       {inner}
     </MotionLink>
   );

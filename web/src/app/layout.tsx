@@ -17,8 +17,9 @@ export const metadata: Metadata = {
     "AutoTinker evolves a readable ML pipeline for your table, keeps only statistically real gains, stops at the problem's ceiling, and reports how much it overfit.",
 };
 
-// Runs before paint so there is no light/dark flash. Stored choice wins; otherwise follow the system.
-const themeScript = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=t}catch(e){}})()`;
+// Runs before paint so there is no light/dark flash. Dark unless the visitor picked light with the toggle: the landing is
+// always night, so following a light system setting made the workspace flip to paper right after it.
+const themeScript = `(function(){var t="dark";try{if(localStorage.getItem("theme")==="light")t="light"}catch(e){}document.documentElement.dataset.theme=t})()`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
