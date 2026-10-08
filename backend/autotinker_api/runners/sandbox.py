@@ -382,6 +382,7 @@ class SandboxRunner:
             days = settings.env_int("AUTOTINKER_SANDBOX_SNAPSHOT_DAYS", 30)
             snap = await box.snapshot(expiration=timedelta(days=days))
             await repo.set_setting(conn, key, snap.id)
+            await _quiet_stop(box)  # in case snapshotting left the build VM running; the run starts from the snapshot
             timings.update(snapshot_s=round(time.monotonic() - t, 2), snapshot_id=snap.id, snapshot_built=True)
             log.info("[run %s] built sandbox snapshot %s in %.1fs", run_id, snap.id, timings["snapshot_s"])
         except Exception as e:  # noqa: BLE001 - run without one; try again next time
