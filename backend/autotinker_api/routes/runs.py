@@ -1,4 +1,4 @@
-"""Runs: start, read (events after a seq), stream (SSE), cancel, and the sandbox's event ingest."""
+"""Runs: start, read (events after a seq), stream (SSE), cancel, the run's files, and the sandbox's event ingest."""
 
 from __future__ import annotations
 
@@ -14,10 +14,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from starlette.datastructures import UploadFile
 
-from autotinker_api import background, db, ratelimit, repo, settings, urlguard, validation, watchdog
+from autotinker_api import assets, background, blob, db, ratelimit, repo, settings, urlguard, validation, watchdog
 from autotinker_api.events import parse_lines
 from autotinker_api.http import ApiError, json_ok, owner_of, public_base, read_json
 from autotinker_api.preview.service import PreviewError, check_url
@@ -301,6 +301,54 @@ async def cancel(run_id: str, request: Request) -> JSONResponse:
         return json_ok({"meta": repo.public_meta({**run, **(updated or {})}), "cancelled": True})
 
 
+# ------------------------------------------------------------------------------------------------------- files
+
+NO_FILE = "No such file."
+
+
+@router.get("/api/runs/{run_id}/assets")
+async def list_assets(run_id: str, request: Request) -> JSONResponse:
+    """The files the run produced (empty until the engine has announced them)."""
+    from autotinker_api.runners.local import data_root
+
+    async with db.connection() as conn:
+        await _owned(conn, run_id, request)
+        rows = await repo.list_assets(conn, run_id)
+    root = data_root()
+    return json_ok({"files": [assets.public_asset(run_id, r, root) for r in rows]})
+
+
+@router.get("/api/runs/{run_id}/assets/{name}", response_model=None)
+async def download_asset(run_id: str, name: str, request: Request) -> Response:
+    """Blob: 302 to a presigned GET URL valid for a few minutes (the store is private; bytes never pass through this
+    function). Local: the file itself, as an attachment."""
+    from autotinker_api.runners.local import data_root
+
+    async with db.connection() as conn:
+        await _owned(conn, run_id, request)
+        row = await repo.get_asset(conn, run_id, name) if assets.valid_name(name) else None
+    if row is None:
+        raise ApiError(404, NO_FILE)
+    if row["storage"] == "skipped":
+        raise ApiError(404, row["note"] or NO_FILE)
+    if row["storage"] == "local":
+        path = assets.local_file(data_root(), row)
+        if path is None:
+            raise ApiError(404, "That file is no longer on this server.")
+        return FileResponse(
+            path,
+            media_type=row["content_type"],
+            filename=name,
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+        )
+    try:
+        url = await assets.download_url(row)
+    except blob.BlobError as e:
+        log.error("[run %s] download link for %s failed: %s", run_id, name, e)
+        raise ApiError(503, "The download link couldn't be created. Try again in a minute.") from None
+    return RedirectResponse(url, status_code=302, headers={"Cache-Control": "no-store"})
+
+
 # ------------------------------------------------------------------------------------------------------ ingest
 
 
@@ -308,7 +356,11 @@ async def cancel(run_id: str, request: Request) -> JSONResponse:
 async def ingest(run_id: str, request: Request) -> JSONResponse:
     """The sandbox's forward.py posts here with `X-Ingest-Token: <per-run token>` (only its sha256 is stored).
     Body: {"kind": "events", "lines": [...]} | {"kind": "heartbeat"} | {"kind": "record", "record": {...}}
-        | {"kind": "exit", "exit_code": n, "stderr_tail": "..."}"""
+        | {"kind": "exit", "exit_code": n, "stderr_tail": "..."}
+        | {"kind": "asset_upload_url", "name", "bytes", "assetKind", "contentType"}
+              → {"upload": {method, url, headers}, "pathname"} (a presigned Blob PUT) | {"skip": reason}
+        | {"kind": "asset", "name", "bytes", "assetKind", "contentType", "status": "uploaded"|"skipped",
+           "pathname"?, "url"?, "note"?}"""
     if int(request.headers.get("content-length") or 0) > MAX_INGEST_BYTES:
         raise ApiError(413, "Too large.")
     token = request.headers.get("x-ingest-token") or ""
@@ -352,4 +404,8 @@ async def ingest(run_id: str, request: Request) -> JSONResponse:
                 await get_runner("sandbox").cancel(run)
                 await repo.update_run(conn, run_id, timings={"sandbox_stopped_at": datetime.now(UTC).isoformat()})
             return json_ok({"ok": True})
+        if kind == "asset_upload_url":
+            return json_ok(await assets.upload_url(conn, run_id, body))
+        if kind == "asset":
+            return json_ok(await assets.register_uploaded(conn, run_id, body))
     raise ApiError(400, "Unknown kind.")
