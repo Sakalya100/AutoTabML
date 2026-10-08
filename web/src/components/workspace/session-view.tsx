@@ -9,7 +9,7 @@ import { buildChat, type ChatMessageInput } from "@/lib/chat";
 import { isStopCommand, MAX_STEER_CHARS, splitLink } from "@/lib/chat-input";
 import { coerceEvent, type AnyEvent } from "@/lib/events";
 import { activeAgentStep, roleDoing } from "@/lib/feed";
-import { fmtCost, fmtInt } from "@/lib/format";
+import { EQUIV_NOTE, equivCost, fmtCost, fmtInt } from "@/lib/format";
 import { EXAMPLES } from "@/lib/ingest/examples";
 import { formatScore, metricInfo } from "@/lib/metrics";
 import { buildView } from "@/lib/run-state";
@@ -411,9 +411,9 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
                 <dt>tokens</dt>
                 <dd>{fmtInt(view.totalInputTokens + view.totalOutputTokens)}</dd>
               </div>
-              <div>
-                <dt>cost</dt>
-                <dd>{fmtCost(view.totalCostUsd)}</dd>
+              <div title={EQUIV_NOTE}>
+                <dt>cost ≈</dt>
+                <dd>{fmtCost(equivCost(view.totalInputTokens, view.totalOutputTokens))}</dd>
               </div>
             </dl>
           )}

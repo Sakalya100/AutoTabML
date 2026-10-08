@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { chatSignature, type ChatExperiment, type ChatItem, type ChatStep, type ChatTask } from "@/lib/chat";
 import { roleDoing, roleLabel } from "@/lib/feed";
-import { fmtCost, fmtDuration, fmtInt } from "@/lib/format";
+import { EQUIV_NOTE, equivCost, fmtCost, fmtDuration, fmtInt } from "@/lib/format";
 import { describeGap, formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import type { Metric } from "@/lib/schema";
 import { answerKind, plainIdea, stopPhrase } from "@/lib/story";
@@ -258,7 +258,7 @@ function Item({ it, metric, selected, onSelect }: { it: ChatItem; metric: Metric
             <Fact k="best" v={it.bestId} />
             <Fact k="experiments" v={String(it.nExperiments)} />
             <Fact k="time" v={fmtDuration(it.wallTimeS)} />
-            <Fact k="cost" v={fmtCost(it.costUsd)} />
+            <Fact k="cost ≈" v={fmtCost(equivCost(it.tokensIn, it.tokensOut))} title={EQUIV_NOTE} />
           </dl>
         </Enter>
       );
@@ -289,9 +289,9 @@ function Item({ it, metric, selected, onSelect }: { it: ChatItem; metric: Metric
   }
 }
 
-function Fact({ k, v }: { k: string; v: string }) {
+function Fact({ k, v, title }: { k: string; v: string; title?: string }) {
   return (
-    <div>
+    <div title={title}>
       <dt>{k}</dt>
       <dd>{v}</dd>
     </div>
@@ -629,7 +629,9 @@ function GateTab({ steps, x, metric }: { steps: ChatStep[]; x?: ChatExperiment; 
                   <td className="text-right" title={s.tokensCached ? `${fmtInt(s.tokensCached)} cached` : undefined}>
                     {s.tokensIn || s.tokensOut ? `${fmtInt(s.tokensIn)} / ${fmtInt(s.tokensOut)}` : "—"}
                   </td>
-                  <td className="text-right">{s.model ? fmtCost(s.costUsd) : "—"}</td>
+                  <td className="text-right" title={s.model ? EQUIV_NOTE : undefined}>
+                    {s.model ? `≈ ${fmtCost(equivCost(s.tokensIn, s.tokensOut))}` : "—"}
+                  </td>
                   <td className="text-right">{s.durationS > 0 ? fmtDuration(s.durationS) : "—"}</td>
                 </tr>
               ))}
