@@ -2,15 +2,34 @@
 
 /**
  * The paste-a-link flow (Phase 2) as a chat turn: the composer hands a link (or a CSV file) and an optional sentence
- * to `useRunDraft`, which previews it and proposes target / problem type / metric. `DraftCard` renders the result as
- * the agent's reply: the run as one editable sentence, a peek at the table, and Start.
+ * to `useRunDraft`, which previews it and proposes target / problem type / metric. `SetupPane` renders the result in
+ * the chat pane before the chat starts: the choices as custom controls, a peek at the table, and Start.
  */
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useRef, useState } from "react";
-import { parseTable, type ColumnKind, type ColumnStats } from "@/lib/ingest/csv";
+import {
+  parseTable,
+  type ColumnKind,
+  type ColumnStats,
+} from "@/lib/ingest/csv";
 import type { Preview } from "@/lib/api-types";
-import { METRIC_LABEL, PROBLEM_LABEL, suggest, suggestionFor, VALID_METRICS, type MetricId, type ProblemType, type Suggestion } from "@/lib/ingest/suggest";
-import { DEFAULT_EXPERIMENTS, MAX_UPLOAD_BYTES, validateRunRequest, validateUrlRunRequest } from "@/lib/upload";
+import {
+  METRIC_LABEL,
+  PROBLEM_LABEL,
+  suggest,
+  suggestionFor,
+  VALID_METRICS,
+  type MetricId,
+  type ProblemType,
+  type Suggestion,
+} from "@/lib/ingest/suggest";
+import {
+  DEFAULT_EXPERIMENTS,
+  MAX_UPLOAD_BYTES,
+  validateRunRequest,
+  validateUrlRunRequest,
+} from "@/lib/upload";
+import { Listbox } from "./listbox";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const HEAD_BYTES = 2 * 1024 * 1024;
@@ -36,7 +55,10 @@ export type DraftStatus = "idle" | "loading" | "ready" | "error";
 
 export interface DraftState {
   status: DraftStatus;
-  source: { kind: "link"; url: string } | { kind: "file"; file: File; head: string } | null;
+  source:
+    | { kind: "link"; url: string }
+    | { kind: "file"; file: File; head: string }
+    | null;
   goal: string;
   table: DraftTable | null;
   chips: Chips | null;
@@ -63,7 +85,9 @@ const KIND_LABEL: Record<ColumnKind, string> = {
 /** "titanic.csv" for a link to a file, else the host. */
 const fileOf = (u: string) => {
   try {
-    const last = decodeURIComponent(new URL(u).pathname.split("/").filter(Boolean).at(-1) ?? "");
+    const last = decodeURIComponent(
+      new URL(u).pathname.split("/").filter(Boolean).at(-1) ?? "",
+    );
     return /\.(csv|tsv|txt|parquet)$/i.test(last) ? last : hostOf(u);
   } catch {
     return hostOf(u);
@@ -79,7 +103,11 @@ const hostOf = (u: string) => {
 };
 
 /** "Predict Survived (yes / no), scored by ROC AUC, over at most 8 experiments." — the run as the user confirmed it. */
-export function runSentence(chips: Chips, experiments: number, label: string): string {
+export function runSentence(
+  chips: Chips,
+  experiments: number,
+  label: string,
+): string {
   return `Predict ${chips.target} (${PROBLEM_LABEL[chips.problemType]}) in ${label}, scored by ${METRIC_LABEL[chips.metric]}, over at most ${experiments} experiments.`;
 }
 
@@ -109,7 +137,14 @@ export function useRunDraft(maxExperiments: number) {
       ...p,
       why: { text: sug.why, source: sug.source },
       goalPlain: sug.goalPlain,
-      chips: touched.current && p.chips ? p.chips : { target: sug.target, problemType: sug.problemType, metric: sug.metric },
+      chips:
+        touched.current && p.chips
+          ? p.chips
+          : {
+              target: sug.target,
+              problemType: sug.problemType,
+              metric: sug.metric,
+            },
     }));
   }, []);
 
@@ -141,10 +176,18 @@ export function useRunDraft(maxExperiments: number) {
           body: JSON.stringify({ url, goal }),
           signal: ac.signal,
         });
-        const body = (await res.json()) as { preview?: Preview; suggestion?: Suggestion | null; error?: string };
+        const body = (await res.json()) as {
+          preview?: Preview;
+          suggestion?: Suggestion | null;
+          error?: string;
+        };
         if (id !== reqId.current) return;
         if (!res.ok || !body.preview) {
-          setS((p) => ({ ...p, status: "error", error: body.error ?? "Couldn't read that link." }));
+          setS((p) => ({
+            ...p,
+            status: "error",
+            error: body.error ?? "Couldn't read that link.",
+          }));
           return;
         }
         const pv = body.preview;
@@ -164,7 +207,12 @@ export function useRunDraft(maxExperiments: number) {
         apply(body.suggestion ?? suggest(pv.stats, goal));
       } catch (e) {
         if ((e as Error).name === "AbortError" || id !== reqId.current) return;
-        setS((p) => ({ ...p, status: "error", error: "Couldn't reach the server. Check your connection and try again." }));
+        setS((p) => ({
+          ...p,
+          status: "error",
+          error:
+            "Couldn't reach the server. Check your connection and try again.",
+        }));
       }
     },
     [apply],
@@ -197,7 +245,8 @@ export function useRunDraft(maxExperiments: number) {
           source: null,
           table: null,
           chips: null,
-          error: "We couldn't find at least two columns. Is this a CSV with a header row?",
+          error:
+            "We couldn't find at least two columns. Is this a CSV with a header row?",
         }));
         return;
       }
@@ -228,27 +277,76 @@ export function useRunDraft(maxExperiments: number) {
     if (!s.table) return;
     const sug = suggestionFor(s.table.stats, target, "your pick");
     touched.current = true;
-    setS((p) => ({ ...p, touched: true, chips: { target, problemType: sug.problemType, metric: sug.metric }, goalPlain: sug.goalPlain, why: null }));
+    setS((p) => ({
+      ...p,
+      touched: true,
+      chips: { target, problemType: sug.problemType, metric: sug.metric },
+      goalPlain: sug.goalPlain,
+      why: null,
+    }));
   };
   const setMetric = (metric: MetricId) => {
     touched.current = true;
-    setS((p) => ({ ...p, touched: true, chips: p.chips ? { ...p.chips, metric } : p.chips }));
+    setS((p) => ({
+      ...p,
+      touched: true,
+      chips: p.chips ? { ...p.chips, metric } : p.chips,
+    }));
   };
   const setExperiments = (n: number) => setS((p) => ({ ...p, experiments: n }));
+  /** The optional "what to predict" note: re-suggests locally (no refetch) unless the user already picked. */
+  const setGoal = (goal: string) => {
+    setS((p) => {
+      if (touched.current || !p.table) return { ...p, goal };
+      const sug = suggest(p.table.stats, goal);
+      if (!sug) return { ...p, goal };
+      return {
+        ...p,
+        goal,
+        why: { text: sug.why, source: sug.source },
+        goalPlain: sug.goalPlain,
+        chips: {
+          target: sug.target,
+          problemType: sug.problemType,
+          metric: sug.metric,
+        },
+      };
+    });
+  };
   const clear = () => {
     ++reqId.current;
     ctrl.current?.abort();
-    setS((p) => ({ ...p, status: "idle", source: null, table: null, chips: null, error: null, startError: null }));
+    setS((p) => ({
+      ...p,
+      status: "idle",
+      source: null,
+      table: null,
+      chips: null,
+      error: null,
+      startError: null,
+    }));
   };
 
   /** POST /api/runs; resolves to {id, sessionId} or null (the error is on the state). */
-  const start = async (sessionId: string | null): Promise<{ id: string; sessionId: string | null } | null> => {
-    if (s.status !== "ready" || !s.chips || !s.table || !s.source || s.starting) return null;
+  const start = async (
+    sessionId: string | null,
+  ): Promise<{ id: string; sessionId: string | null } | null> => {
+    if (s.status !== "ready" || !s.chips || !s.table || !s.source || s.starting)
+      return null;
     const { chips, experiments, goal } = s;
     const sentence = runSentence(chips, experiments, s.table.label);
     let init: RequestInit;
     if (s.source.kind === "link") {
-      const v = validateUrlRunRequest({ url: s.source.url, target: chips.target, metric: chips.metric, goal, maxExperiments: experiments }, { maxExperiments });
+      const v = validateUrlRunRequest(
+        {
+          url: s.source.url,
+          target: chips.target,
+          metric: chips.metric,
+          goal,
+          maxExperiments: experiments,
+        },
+        { maxExperiments },
+      );
       if (!v.ok) {
         setS((p) => ({ ...p, startError: v.error }));
         return null;
@@ -298,117 +396,275 @@ export function useRunDraft(maxExperiments: number) {
     setS((p) => ({ ...p, starting: true, startError: null }));
     try {
       const res = await fetch("/api/runs", init);
-      const body = (await res.json()) as { id?: string; sessionId?: string | null; error?: string };
+      const body = (await res.json()) as {
+        id?: string;
+        sessionId?: string | null;
+        error?: string;
+      };
       if (!res.ok || !body.id) {
-        setS((p) => ({ ...p, starting: false, startError: body.error ?? "Something went wrong starting the run." }));
+        setS((p) => ({
+          ...p,
+          starting: false,
+          startError: body.error ?? "Something went wrong starting the run.",
+        }));
         return null;
       }
       return { id: body.id, sessionId: body.sessionId ?? null };
     } catch {
-      setS((p) => ({ ...p, starting: false, startError: "Couldn't reach the server. Check your connection and try again." }));
+      setS((p) => ({
+        ...p,
+        starting: false,
+        startError:
+          "Couldn't reach the server. Check your connection and try again.",
+      }));
       return null;
     }
   };
 
   const done = () => {
     ++reqId.current;
-    setS((p) => ({ ...p, status: "idle", source: null, table: null, chips: null, starting: false }));
+    setS((p) => ({
+      ...p,
+      status: "idle",
+      source: null,
+      table: null,
+      chips: null,
+      starting: false,
+    }));
   };
 
-  return { state: s, previewLink, previewFile, setTarget, setMetric, setExperiments, clear, start, done, reduced, maxExperiments };
+  return {
+    state: s,
+    previewLink,
+    previewFile,
+    setTarget,
+    setMetric,
+    setExperiments,
+    setGoal,
+    clear,
+    start,
+    done,
+    reduced,
+    maxExperiments,
+  };
 }
 
 export type RunDraft = ReturnType<typeof useRunDraft>;
 
-/** The agent's reply to a pasted link: what it read, the run as one editable sentence, and Start. */
-export function DraftCard({ draft, onStart }: { draft: RunDraft; onStart: () => void }) {
+const METRIC_HINT: Record<MetricId, string> = {
+  roc_auc: "ranks yes / no fairly, even when one is rare",
+  log_loss: "rewards confident, correct probabilities",
+  accuracy: "share of rows predicted right",
+  f1_macro: "weighs every class equally, rare ones too",
+  rmse: "typical error; big misses cost more",
+  mae: "average error; robust to outliers",
+  r2: "share of the variation explained",
+};
+
+/**
+ * Setting up a run, in the chat pane itself (before any chat exists): what it read, the three choices as custom
+ * controls, a peek at the table, and Start. Start hands over to the chat; "Use different data" goes back.
+ */
+export function SetupPane({
+  draft,
+  onStart,
+}: {
+  draft: RunDraft;
+  onStart: () => void;
+}) {
   const { state: s, reduced } = draft;
+  const [goal, setGoalText] = useState(s.goal);
   if (s.status === "idle") return null;
+  const from =
+    s.source?.kind === "link"
+      ? hostOf(s.source.url) || "the link"
+      : "your file";
+
   if (s.status === "loading")
     return (
-      <div className="ws-agent" aria-live="polite">
-        <p className="ws-role">Intake</p>
-        <p className="ws-plain text-[var(--lp-ink-2)]">Reading {s.source?.kind === "link" ? hostOf(s.source.url) || "the link" : "your file"}…</p>
-        <div className="nr-scan mt-3 max-w-[18rem]" aria-hidden />
+      <div className="su-pane" aria-live="polite">
+        <p className="ws-kicker">New run · reading the data</p>
+        <p className="su-title">Reading {from}…</p>
+        <p className="su-sub">
+          Checking the header, the column types and a sample of rows.
+        </p>
+        <div className="nr-scan mt-5 max-w-[22rem]" aria-hidden />
+        <button
+          type="button"
+          onClick={draft.clear}
+          className="ws-link mt-8 text-[14px]"
+        >
+          Cancel
+        </button>
       </div>
     );
   if (s.status === "error")
     return (
-      <div className="ws-agent" role="alert">
-        <p className="ws-role ws-role-crash">Intake</p>
-        <p className="ws-plain text-[var(--crash)]">{s.error}</p>
-        <p className="mt-1 text-[13px] text-[var(--lp-ink-3)]">Paste another link, or attach a CSV instead.</p>
+      <div className="su-pane" role="alert">
+        <p className="ws-kicker text-[var(--crash)]">
+          New run · couldn’t read it
+        </p>
+        <p className="su-title">That link didn’t work.</p>
+        <p className="su-sub text-[var(--lp-ink-2)]">{s.error}</p>
+        <button type="button" onClick={draft.clear} className="ws-start mt-7">
+          <span aria-hidden>←</span> Try another link
+        </button>
       </div>
     );
+
   const { table, chips } = s;
   if (!table || !chips) return null;
   const statBy = new Map(table.stats.map((x) => [x.name, x]));
+  const targets = table.columns.map((c) => ({
+    value: c,
+    label: c,
+    hint: KIND_LABEL[statBy.get(c)?.kind ?? "text"],
+    badge: !s.touched && c === chips.target ? "suggested" : undefined,
+  }));
+  const metrics = VALID_METRICS[chips.problemType].map((m) => ({
+    value: m,
+    label: METRIC_LABEL[m],
+    hint: METRIC_HINT[m],
+  }));
+  const counts = Array.from({ length: draft.maxExperiments }, (_, i) => i + 1);
+  const commitGoal = () => {
+    if (goal.trim() !== s.goal.trim()) draft.setGoal(goal.trim());
+  };
+
   return (
     <motion.div
-      className="ws-agent"
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      className="su-pane"
+      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: EASE }}
     >
-      <p className="ws-role">Intake</p>
-      <p className="font-mono text-[11.5px] text-[var(--lp-ink-3)] tabular-nums">
-        <span className="text-[var(--lp-ink-2)]">{table.label}</span> ·{" "}
-        {table.rows == null ? "rows: unknown" : `${table.rowsExact ? "" : "≈ "}${table.rows.toLocaleString("en-US")} rows`} · {table.columns.length} columns
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="ws-kicker">New run · set it up</p>
+        <button
+          type="button"
+          onClick={draft.clear}
+          disabled={s.starting}
+          className="ws-link text-[13px]"
+        >
+          <span aria-hidden>←</span> Use different data
+        </button>
+      </div>
+      <p className="su-title">{table.label}</p>
+      <p className="su-meta">
+        {table.rows == null
+          ? "rows: unknown"
+          : `${table.rowsExact ? "" : "≈ "}${table.rows.toLocaleString("en-US")} rows`}{" "}
+        · {table.columns.length} columns
+        {s.source?.kind === "link" && ` · from ${from}`}
         {table.rewritten && " · share link → direct download"}
       </p>
-      <div className="ws-sentence mt-3">
-        Predict{" "}
-        <span className="nr-chip">
-          <select aria-label="Column to predict" value={chips.target} onChange={(e) => draft.setTarget(e.target.value)}>
-            {table.columns.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </span>
-        , as <span className="text-[var(--lp-ink-2)] italic">{PROBLEM_LABEL[chips.problemType]}</span>, scored by{" "}
-        <span className="nr-chip">
-          <select aria-label="Metric" value={chips.metric} onChange={(e) => draft.setMetric(e.target.value as MetricId)}>
-            {VALID_METRICS[chips.problemType].map((m) => (
-              <option key={m} value={m}>
-                {METRIC_LABEL[m]}
-              </option>
-            ))}
-          </select>
-        </span>
-        , over at most{" "}
-        <span className="nr-chip">
-          <select
-            aria-label="Experiments"
-            value={s.experiments}
-            onChange={(e) => draft.setExperiments(Number(e.target.value))}
-            className="font-mono tabular-nums"
-          >
-            {Array.from({ length: draft.maxExperiments }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </span>{" "}
-        experiments.
+
+      <div className="su-form">
+        <div className="su-field">
+          <span className="su-label" id="su-target">
+            What to predict
+          </span>
+          <div className="su-control">
+            <Listbox
+              label="Column to predict"
+              value={chips.target}
+              options={targets}
+              onChange={draft.setTarget}
+              disabled={s.starting}
+            />
+            <span className="su-aside">
+              as <em>{PROBLEM_LABEL[chips.problemType]}</em>
+            </span>
+          </div>
+        </div>
+        <div className="su-field">
+          <span className="su-label">Score by</span>
+          <div className="su-control">
+            <Listbox
+              label="Metric"
+              value={chips.metric}
+              options={metrics}
+              onChange={(m) => draft.setMetric(m)}
+              disabled={s.starting}
+            />
+            <span className="su-aside">{METRIC_HINT[chips.metric]}</span>
+          </div>
+        </div>
+        <div className="su-field">
+          <span className="su-label" id="su-exps">
+            Experiments
+          </span>
+          <div className="su-control">
+            <div className="su-seg" role="radiogroup" aria-labelledby="su-exps">
+              {counts.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={s.experiments === n}
+                  className="su-seg-btn"
+                  disabled={s.starting}
+                  onClick={() => draft.setExperiments(n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <span className="su-aside">
+              at most; it stops early once gains are noise
+            </span>
+          </div>
+        </div>
+        <div className="su-field">
+          <label className="su-label" htmlFor="su-goal">
+            Goal <span className="text-[var(--lp-ink-3)]">(optional)</span>
+          </label>
+          <div className="su-control">
+            <input
+              id="su-goal"
+              className="su-input"
+              value={goal}
+              maxLength={300}
+              disabled={s.starting}
+              placeholder="e.g. who survived, in plain words"
+              onChange={(e) => setGoalText(e.target.value)}
+              onBlur={commitGoal}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitGoal();
+              }}
+            />
+          </div>
+        </div>
       </div>
-      <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-[var(--lp-ink-3)]">
+
+      <p className="su-why">
         {s.goalPlain}
-        {!s.touched && s.why && <> Why: {s.why.text.replace(/\.$/, "")}.</>}{" "}
-        <span className="font-mono text-[10.5px]">
-          {s.touched ? "· your pick" : s.why?.source === "llm" ? "· suggested by gpt-oss" : "· suggested by rules of thumb"}
+        {!s.touched && s.why && (
+          <> Why: {s.why.text.replace(/\.$/, "")}.</>
+        )}{" "}
+        <span className="font-mono text-[12px] text-[var(--lp-ink-3)]">
+          {s.touched
+            ? "· your pick"
+            : s.why?.source === "llm"
+              ? "· suggested by gpt-oss"
+              : "· suggested by rules of thumb"}
         </span>
       </p>
-      <div className="mt-4 overflow-x-auto [mask-image:linear-gradient(to_right,#000_80%,transparent)]">
-        <table className="nr-table font-mono text-[11.5px] text-[var(--lp-ink-2)] tabular-nums">
+
+      <div className="su-table-wrap">
+        <table className="nr-table su-table font-mono tabular-nums">
           <thead>
             <tr>
               {table.columns.map((c) => (
-                <th key={c} data-target={c === chips.target ? "" : undefined} className="align-bottom font-normal">
+                <th
+                  key={c}
+                  data-target={c === chips.target ? "" : undefined}
+                  className="align-bottom font-normal"
+                >
                   <span className="block">{c}</span>
-                  <span className="block text-[10px] text-[var(--lp-ink-3)]">{KIND_LABEL[statBy.get(c)?.kind ?? "text"]}</span>
+                  <span className="block text-[11px] text-[var(--lp-ink-3)]">
+                    {KIND_LABEL[statBy.get(c)?.kind ?? "text"]}
+                  </span>
                 </th>
               ))}
             </tr>
@@ -417,8 +673,16 @@ export function DraftCard({ draft, onStart }: { draft: RunDraft; onStart: () => 
             {table.sample.slice(0, SHOWN_ROWS).map((r, i) => (
               <tr key={i}>
                 {table.columns.map((c, j) => (
-                  <td key={c} data-target={c === chips.target ? "" : undefined} title={r[j]}>
-                    {r[j] === "" ? <span className="text-[var(--lp-ink-3)]">·</span> : r[j]}
+                  <td
+                    key={c}
+                    data-target={c === chips.target ? "" : undefined}
+                    title={r[j]}
+                  >
+                    {r[j] === "" ? (
+                      <span className="text-[var(--lp-ink-3)]">·</span>
+                    ) : (
+                      r[j]
+                    )}
                   </td>
                 ))}
               </tr>
@@ -426,20 +690,33 @@ export function DraftCard({ draft, onStart }: { draft: RunDraft; onStart: () => 
           </tbody>
         </table>
       </div>
-      <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
-        <button type="button" onClick={onStart} disabled={s.starting} className="ws-start">
-          {s.starting ? "Starting…" : "Start"} <span aria-hidden>→</span>
+
+      <p className="mt-5 text-[13px] text-[var(--lp-ink-3)]">
+        Runs on free Groq and Gemini models; data rows are never sent to Gemini.
+      </p>
+      <div className="su-actions">
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={s.starting}
+          className="ws-start"
+        >
+          {s.starting ? "Starting…" : "Start the run"}{" "}
+          <span aria-hidden>→</span>
         </button>
-        <button type="button" onClick={draft.clear} disabled={s.starting} className="ws-link">
-          Use different data
-        </button>
-      </div>
-      {s.startError && (
-        <p role="alert" className="mt-3 text-[14px] text-[var(--crash)]">
-          {s.startError}
+        <p className="text-[13.5px] leading-snug text-[var(--lp-ink-3)]">
+          {s.startError ? (
+            <span role="alert" className="text-[var(--crash)]">
+              {s.startError}
+            </span>
+          ) : (
+            runSentence(chips, s.experiments, table.label).replace(
+              ` in ${table.label}`,
+              "",
+            )
+          )}
         </p>
-      )}
-      <p className="mt-4 text-[12px] text-[var(--lp-ink-3)]">Runs on free Groq and Gemini models; data rows are never sent to Gemini.</p>
+      </div>
     </motion.div>
   );
 }

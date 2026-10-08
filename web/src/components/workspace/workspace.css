@@ -7,7 +7,7 @@
 .ws-root {
   --ws-head: 57px;
   --ws-tabs: 0px;
-  --ws-step-label: 5.75rem;
+  --ws-step-label: 6.5rem;
   display: grid;
   grid-template-columns: 15.5rem minmax(0, 1fr);
   height: calc(100dvh - var(--ws-head));
@@ -36,7 +36,7 @@
 
 .ws-kicker {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--lp-ink-3);
@@ -58,7 +58,7 @@
 }
 .ws-new {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lp-ink-2);
   border: 1px solid oklch(88% 0.02 85 / 0.18);
   border-radius: 999px;
@@ -148,7 +148,7 @@
   align-items: center;
   gap: 0.45rem;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--lp-ink-3);
   font-variant-numeric: tabular-nums;
 }
@@ -194,7 +194,13 @@
   inset: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  mask-image: linear-gradient(to bottom, transparent, #000 18px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 18px,
+    #000 calc(100% - 28px),
+    transparent
+  );
 }
 .ws-thread {
   max-width: 44rem;
@@ -207,7 +213,7 @@
   gap: 0.75rem;
   margin: 1.6rem 0 0.4rem;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11.5px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--lp-ink-3);
@@ -257,7 +263,7 @@
 }
 .ws-role {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--lp-ink-3);
@@ -273,7 +279,7 @@
   color: var(--crash);
 }
 .ws-plain {
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.45;
   color: var(--lp-ink-2);
   min-width: 0;
@@ -295,14 +301,6 @@
 }
 .ws-step-d > summary:hover .ws-plain {
   color: var(--lp-ink);
-}
-.ws-step-d > summary .ws-plain::after {
-  content: " ›";
-  color: var(--lp-ink-3);
-  transition: color 0.2s;
-}
-.ws-step-d[open] > summary .ws-plain::after {
-  content: " ⌄";
 }
 .ws-step-body {
   margin: 0.25rem 0 0.75rem calc(var(--ws-step-label) + 0.6rem);
@@ -359,27 +357,109 @@
   margin-top: 0.3rem;
   padding-top: 0.35rem;
   border-top: 1px solid var(--lp-hair);
-  font-size: 13.5px;
+  font-size: 14.5px;
 }
 .ws-sub {
   margin: 0.2rem 0 0 calc(var(--ws-step-label) + 0.6rem);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--lp-ink-3);
 }
 .ws-details > summary {
   cursor: pointer;
   list-style: none;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--lp-ink-3);
-  text-decoration: underline;
-  text-decoration-color: var(--lp-hair);
-  text-underline-offset: 4px;
+  display: inline-block;
+  margin-top: 0.35rem;
 }
 .ws-details > summary::-webkit-details-marker {
   display: none;
 }
+.ws-pre.whitespace-pre-wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The "open me" pill on every disclosure: names what's inside, chevron turns when open. */
+.ws-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.5rem;
+  padding: 0.08rem 0.5rem 0.08rem 0.6rem;
+  border: 1px solid rgb(236 231 220 / 0.18);
+  border-radius: 999px;
+  background: rgb(236 231 220 / 0.04);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-style: normal;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--lp-ink-2);
+  white-space: nowrap;
+  vertical-align: 0.08em;
+  transition:
+    border-color 0.2s,
+    color 0.2s,
+    background-color 0.2s;
+}
+.ws-details > summary .ws-more {
+  margin-left: 0;
+}
+.ws-more-chev {
+  width: 0.75rem;
+  height: 0.75rem;
+  transition: transform 0.2s var(--ease-out-quart);
+}
+.ws-step-d > summary:hover .ws-more,
+.ws-details > summary:hover .ws-more,
+.ws-step-d > summary:focus-visible .ws-more,
+.ws-details > summary:focus-visible .ws-more {
+  border-color: rgb(236 231 220 / 0.45);
+  background: rgb(236 231 220 / 0.08);
+  color: var(--lp-ink);
+}
+.ws-step-d[open] > summary .ws-more,
+.ws-details[open] > summary .ws-more {
+  color: var(--lp-ink);
+  border-color: rgb(236 231 220 / 0.35);
+}
+.ws-step-d[open] > summary .ws-more-chev,
+.ws-details[open] > summary .ws-more-chev {
+  transform: rotate(90deg);
+}
+.ws-step-d > summary:focus-visible,
+.ws-details > summary:focus-visible {
+  outline: none;
+}
+
+/* Experiment header: says it is clickable (it selects the ball on the map). */
+.ws-onmap {
+  flex: none;
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--lp-ink-3);
+  opacity: 0.55;
+  transition:
+    opacity 0.2s,
+    color 0.2s;
+}
+.ws-onmap::after {
+  content: " ↗";
+}
+.ws-exp-head:hover .ws-onmap,
+.ws-exp-head:focus-visible .ws-onmap {
+  opacity: 1;
+  color: var(--lp-ink-2);
+}
+.ws-exp-selected .ws-onmap {
+  opacity: 1;
+  color: var(--lp-signal);
+}
+.ws-exp-selected .ws-onmap::after {
+  content: " ●";
+}
+
 .ws-pre {
   margin-top: 0.35rem;
   max-height: 15rem;
@@ -389,7 +469,7 @@
   background: #0a0d12;
   box-shadow: inset 0 0 0 1px var(--lp-hair);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.55;
   color: var(--lp-ink-2);
   white-space: pre;
@@ -450,7 +530,7 @@
   border-radius: 999px;
   background: var(--lp-ink);
   color: #05070a;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.6);
 }
@@ -564,7 +644,7 @@
   max-width: 44rem;
   margin-top: 0.45rem;
   padding: 0 0.2rem;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--lp-ink-3);
 }
@@ -750,5 +830,326 @@
   .ws-role-run,
   .ws-dot-run {
     animation: none;
+  }
+}
+
+/* ---- run setup (takes over the chat pane between "paste a link" and Start) ----------------------------------- */
+
+.su-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.su-pane {
+  max-width: 44rem;
+  padding: clamp(1.25rem, 5vh, 3rem) 1.5rem 0;
+}
+.su-title {
+  margin-top: 0.9rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--lp-ink);
+  overflow-wrap: anywhere;
+}
+.su-sub {
+  margin-top: 0.6rem;
+  max-width: 52ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--lp-ink-3);
+}
+.su-meta {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--lp-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.su-form {
+  margin-top: 1.75rem;
+  border-top: 1px solid var(--lp-hair);
+}
+.su-field {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  align-items: center;
+  column-gap: 1rem;
+  row-gap: 0.4rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--lp-hair);
+}
+.su-label {
+  font-size: 14px;
+  color: var(--lp-ink-2);
+}
+.su-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  min-width: 0;
+}
+.su-aside {
+  font-size: 14px;
+  color: var(--lp-ink-3);
+}
+.su-aside em {
+  color: var(--lp-ink-2);
+}
+.su-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.su-seg-btn {
+  min-width: 2.15rem;
+  height: 2.15rem;
+  padding: 0 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--lp-hair);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--lp-ink-2);
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background-color 0.15s;
+}
+.su-seg-btn:hover:not(:disabled) {
+  border-color: rgb(236 231 220 / 0.4);
+  color: var(--lp-ink);
+}
+.su-seg-btn[aria-checked="true"] {
+  border-color: var(--lp-signal);
+  background: rgb(255 181 71 / 0.12);
+  color: var(--lp-signal);
+}
+.su-seg-btn:focus-visible {
+  outline: 2px solid var(--lp-signal);
+  outline-offset: 2px;
+}
+.su-input {
+  width: 100%;
+  max-width: 26rem;
+  height: 2.4rem;
+  padding: 0 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--lp-hair);
+  background: rgb(236 231 220 / 0.03);
+  font-size: 14.5px;
+  color: var(--lp-ink);
+  transition: border-color 0.15s;
+}
+.su-input::placeholder {
+  color: var(--lp-ink-3);
+}
+.su-input:hover {
+  border-color: rgb(236 231 220 / 0.3);
+}
+.su-input:focus {
+  outline: none;
+  border-color: var(--lp-signal);
+}
+.su-why {
+  margin-top: 1rem;
+  max-width: 62ch;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--lp-ink-3);
+}
+.su-table-wrap {
+  margin-top: 1.4rem;
+  overflow-x: auto;
+  mask-image: linear-gradient(to right, #000 85%, transparent);
+}
+.su-table {
+  font-size: 13px;
+  color: var(--lp-ink-2);
+}
+/* Start stays in view at the bottom of the pane (where the composer sits once the chat starts). */
+.su-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.25rem;
+  margin: 1.5rem -1.5rem 0;
+  padding: 0.85rem 1.5rem 1rem;
+  border-top: 1px solid var(--lp-hair);
+  background: var(--lp-void);
+}
+.su-actions p {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+/* ---- custom dropdown (listbox.tsx) ------------------------------------------------------------------------ */
+
+.lb {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+}
+.lb-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: 100%;
+  height: 2.4rem;
+  padding: 0 0.7rem 0 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgb(255 181 71 / 0.45);
+  background: rgb(255 181 71 / 0.06);
+  font-size: 15px;
+  color: var(--lp-signal);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.lb-button:hover:not(:disabled),
+.lb[data-open] .lb-button {
+  border-color: var(--lp-signal);
+  background: rgb(255 181 71 / 0.1);
+}
+.lb-button:focus-visible {
+  outline: 2px solid var(--lp-signal);
+  outline-offset: 2px;
+}
+.lb-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-chev {
+  flex: none;
+  width: 0.8rem;
+  height: 0.8rem;
+  transition: transform 0.2s var(--ease-out-quart);
+}
+.lb[data-open] .lb-chev {
+  transform: rotate(180deg);
+}
+.lb-badge {
+  flex: none;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgb(255 181 71 / 0.14);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--lp-signal);
+}
+.lb-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  min-width: max(100%, 15rem);
+  max-width: min(26rem, 80vw);
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: 0.3rem;
+  border-radius: 10px;
+  border: 1px solid rgb(236 231 220 / 0.14);
+  background: #0d1117;
+  box-shadow:
+    0 18px 40px -12px rgb(0 0 0 / 0.7),
+    0 0 0 1px rgb(0 0 0 / 0.4);
+  outline: none;
+  animation: lb-in 0.14s var(--ease-out-quart);
+}
+.lb-option {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  font-size: 14.5px;
+  color: var(--lp-ink-2);
+  cursor: pointer;
+}
+.lb-option[data-active] {
+  background: rgb(236 231 220 / 0.07);
+  color: var(--lp-ink);
+}
+.lb-option[aria-selected="true"] {
+  color: var(--lp-signal);
+}
+.lb-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-hint {
+  margin-left: auto;
+  padding-left: 0.75rem;
+  font-size: 12.5px;
+  color: var(--lp-ink-3);
+  text-align: right;
+}
+.lb-check {
+  flex: none;
+  align-self: center;
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.lb-list[data-stacked] {
+  min-width: max(100%, 19rem);
+}
+.lb-list[data-stacked] .lb-option {
+  flex-wrap: wrap;
+  row-gap: 0.1rem;
+}
+.lb-list[data-stacked] .lb-option-label {
+  flex: 1 1 auto;
+}
+.lb-list[data-stacked] .lb-hint {
+  order: 3;
+  flex-basis: 100%;
+  margin-left: 0;
+  padding-left: 0;
+  text-align: left;
+}
+@keyframes lb-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-list {
+    animation: none;
+  }
+}
+@media (max-width: 640px) {
+  .su-pane {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .su-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .su-seg-btn {
+    min-width: 1.95rem;
+    height: 1.95rem;
+    padding: 0 0.35rem;
+    font-size: 13.5px;
+  }
+  .su-seg {
+    gap: 0.25rem;
+  }
+  .su-actions {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
