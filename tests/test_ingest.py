@@ -392,3 +392,11 @@ def test_load_source_rejects_http() -> None:
 )
 def test_source_stem(spec: str | Path, expected: str) -> None:
     assert source_stem(spec) == expected
+
+
+def test_dropbox_share_link_downloads_the_file() -> None:
+    assert (
+        rewrite_share_link("https://www.dropbox.com/s/abc/data.csv?dl=0")
+        == "https://www.dropbox.com/s/abc/data.csv?dl=1"
+    )
+    assert rewrite_share_link("https://www.dropbox.com/s/abc/data.csv?dl=1").endswith("?dl=1")
