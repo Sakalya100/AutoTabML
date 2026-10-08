@@ -18,7 +18,8 @@ import type { Metric } from "@/lib/schema";
 import { plainIdea } from "@/lib/story";
 import { SurveyPanel } from "../survey-panel";
 import { ChatLog } from "./chat";
-import { DraftCard, useRunDraft } from "./draft";
+import { SetupPane, useRunDraft } from "./draft";
+import { SignInPrompt, useSignedIn } from "../auth";
 import { useShell } from "./shell";
 
 const TERMINAL = new Set<string>(TERMINAL_STATUSES);
@@ -33,7 +34,13 @@ interface Props {
 
 type Sel = { runId: string; expId: string } | null;
 
-const toInput = (m: MessageRow): ChatMessageInput => ({ id: m.id, role: m.role, text: m.text, kind: m.kind, created_at: m.created_at });
+const toInput = (m: MessageRow): ChatMessageInput => ({
+  id: m.id,
+  role: m.role,
+  text: m.text,
+  kind: m.kind,
+  created_at: m.created_at,
+});
 
 export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
   const router = useRouter();
@@ -48,14 +55,16 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
   const [connected, setConnected] = useState(false);
   const lastSeq = useRef<Record<string, number>>({});
   const draft = useRunDraft(maxExperiments);
-  /** The pasted link as the user's bubble, before a run (and its stored message) exists. */
-  const [localNote, setLocalNote] = useState<ChatMessageInput | null>(null);
+  const auth = useSignedIn();
+  const signedOut = auth.loaded && !auth.signedIn;
 
   /* ---- load (and reload) the whole session from Postgres ---------------------------------------------- */
   const load = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !auth.loaded || !auth.signedIn) return;
     try {
-      const res = await fetch(`/api/sessions/${sessionId}`, { cache: "no-store" });
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        cache: "no-store",
+      });
       const body = (await res.json()) as SessionPayload & { error?: string };
       if (!res.ok) {
         setLoadError(body.error ?? "Couldn't load this session.");
@@ -85,12 +94,12 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
     } catch {
       setLoadError("Couldn't reach the server. Check your connection; this page retries when you reload it.");
     }
-  }, [sessionId]);
+  }, [sessionId, auth.loaded, auth.signedIn]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load of external data
     void load();
-  }, [load]);
+  }, [load, auth.userId]);
 
   const runs = payload?.runs ?? [];
   const statusOf = (id: string) => metas[id]?.status ?? runs.find((r) => r.row.id === id)?.row.status ?? null;
@@ -108,7 +117,10 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         const ev = coerceEvent(JSON.parse(msg.data));
         if (!ev || ev.seq <= (lastSeq.current[activeId] ?? -1)) return;
         lastSeq.current[activeId] = ev.seq;
-        setEvents((prev) => ({ ...prev, [activeId]: [...(prev[activeId] ?? []), ev] }));
+        setEvents((prev) => ({
+          ...prev,
+          [activeId]: [...(prev[activeId] ?? []), ev],
+        }));
       } catch {}
     };
     es.addEventListener("meta", (msg) => {
@@ -141,7 +153,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         finishedAt: m?.finishedAt ?? r.row.finished_at,
       };
     }),
-    localNote && !activeId ? [...messages, localNote] : messages,
+    messages,
   );
   const mapRunId = sel?.runId ?? runs.at(-1)?.row.id ?? null;
   const mapEvents = mapRunId ? (events[mapRunId] ?? []) : [];
@@ -184,11 +196,6 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
   const [composerError, setComposerError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const pushLocalUser = (t: string) => {
-    const m: ChatMessageInput = { id: `local-${Date.now()}`, role: "user", text: t, kind: "chat", created_at: new Date().toISOString(), pending: true };
-    setLocalNote(m);
-  };
-
   const send = async (raw: string, kind?: "stop") => {
     const t = raw.trim();
     setComposerError(null);
@@ -197,17 +204,9 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
     if (!activeId && !kind) {
       const { url, rest } = splitLink(t);
       if (url) {
-        pushLocalUser(t);
+        // Setting up the run takes over the chat pane until Start (or "Use different data").
         setText("");
         void draft.previewLink(url, rest);
-        return;
-      }
-      if (draft.state.status === "ready" && draft.state.source) {
-        // A sentence after the preview: read it as "what to predict" and ask again.
-        pushLocalUser(t);
-        setText("");
-        if (draft.state.source.kind === "link") void draft.previewLink(draft.state.source.url, t);
-        else void draft.previewFile(draft.state.source.file, t);
         return;
       }
       if (!sessionId) {
@@ -234,7 +233,10 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(stop && !t ? { kind: "stop" } : stop ? { kind: "stop", text: t } : { text: t }),
       });
-      const body = (await res.json()) as { messages?: MessageRow[]; error?: string };
+      const body = (await res.json()) as {
+        messages?: MessageRow[];
+        error?: string;
+      };
       if (!res.ok || !body.messages) {
         setMessages((m) => m.filter((x) => x.id !== pending.id));
         setText(t);
@@ -266,13 +268,15 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
       return;
     }
     refreshSessions();
-    setLocalNote(null);
     if (res.sessionId !== sessionId) router.replace(`/s/${res.sessionId}`);
     else {
       draft.done();
       await load();
     }
   };
+
+  /** A link or file is being read or set up: the setup form takes over the chat pane until Start. */
+  const settingUp = !activeId && draft.state.status !== "idle";
 
   /* ---- render ---------------------------------------------------------------------------------------- */
   const title = payload?.session.title ?? (sessionId ? "" : "New session");
@@ -287,7 +291,9 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         <div className="ws-empty">
           <p className="ws-kicker">Session</p>
           <p className="mt-3 font-display text-[2rem] leading-tight">This session isn’t here.</p>
-          <p className="mt-2 max-w-[46ch] text-[14px] text-[var(--lp-ink-2)]">{loadError} Sessions belong to the browser that started them.</p>
+          <p className="mt-2 max-w-[46ch] text-[14px] text-[var(--lp-ink-2)]">
+            {loadError} {auth.enabled ? "Sessions belong to the account that started them." : "Sessions belong to the browser that started them."}
+          </p>
           <Link href="/s/new" className="ws-start mt-6 inline-flex">
             Start a new session <span aria-hidden>→</span>
           </Link>
@@ -326,33 +332,45 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
             )}
           </p>
         </header>
-        <ChatLog
-          items={items}
-          metricOf={(runId) => {
-            const started = events[runId]?.find((e) => e.type === "run_started") as { profile?: { metric?: Metric } } | undefined;
-            return started?.profile?.metric ?? null;
-          }}
-          selected={selectedKey}
-          focusKey={focusKey}
-          onSelect={onChatSelect}
-          typing={typing}
-          tail={!activeId && draft.state.status !== "idle" ? <DraftCard draft={draft} onStart={startRun} /> : null}
-          empty={sessionId ? null : <EmptyNew onExample={(u) => void send(u)} disabled={!liveEnabled} />}
-        />
-        <Composer
-          mode={activeId ? "run" : "draft"}
-          text={text}
-          setText={setText}
-          onSend={() => void send(text)}
-          onStop={() => void send("", "stop")}
-          onCancelNow={cancelNow}
-          onAttach={() => fileRef.current?.click()}
-          sending={sending}
-          stopRequested={stopRequested || finishing}
-          finishing={finishing}
-          disabled={!liveEnabled && !activeId}
-          error={composerError}
-        />
+        {signedOut ? (
+          <div className="su-scroll ws-thread">
+            <SignInPrompt title={sessionId ? "Sign in to see this session." : "Sign in to start a run."} />
+          </div>
+        ) : settingUp ? (
+          <div className="su-scroll">
+            <SetupPane key={draft.state.source?.kind === "link" ? draft.state.source.url : "file"} draft={draft} onStart={startRun} />
+          </div>
+        ) : (
+          <>
+            <ChatLog
+              items={items}
+              metricOf={(runId) => {
+                const started = events[runId]?.find((e) => e.type === "run_started") as { profile?: { metric?: Metric } } | undefined;
+                return started?.profile?.metric ?? null;
+              }}
+              selected={selectedKey}
+              focusKey={focusKey}
+              onSelect={onChatSelect}
+              typing={typing}
+              tail={null}
+              empty={sessionId ? null : <EmptyNew onExample={(u) => void send(u)} disabled={!liveEnabled} />}
+            />
+            <Composer
+              mode={activeId ? "run" : "draft"}
+              text={text}
+              setText={setText}
+              onSend={() => void send(text)}
+              onStop={() => void send("", "stop")}
+              onCancelNow={cancelNow}
+              onAttach={() => fileRef.current?.click()}
+              sending={sending}
+              stopRequested={stopRequested || finishing}
+              finishing={finishing}
+              disabled={!liveEnabled && !activeId}
+              error={composerError}
+            />
+          </>
+        )}
         <input
           ref={fileRef}
           type="file"
@@ -362,7 +380,6 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (f) {
-              pushLocalUser(`Attached ${f.name}${text.trim() ? ` · ${text.trim()}` : ""}`);
               void draft.previewFile(f, text.trim());
               setText("");
             }
@@ -424,7 +441,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
                   transition={{ duration: 0.22, ease: EASE }}
                   className="ws-map-pick"
                 >
-                  <p className="font-mono text-[10.5px] text-[var(--lp-ink-3)]">
+                  <p className="font-mono text-[12.5px] text-[var(--lp-ink-3)]">
                     {selectedExp.id} ·{" "}
                     {selectedExp.status === "keep" ? (
                       <span className="text-[var(--lp-signal)]">kept</span>
@@ -440,7 +457,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
                   <p className="mt-0.5 truncate text-[13.5px] text-[var(--lp-ink)]">{plainIdea(selectedExp.idea)}</p>
                   <button
                     type="button"
-                    className="ws-link mt-1 text-[12px]"
+                    className="ws-link mt-1 text-[13px]"
                     onClick={() => {
                       setTab("chat");
                       setFocusKey((k) => k + 1);
@@ -547,7 +564,7 @@ function TitleEditor({ sessionId, title, onRenamed }: { sessionId: string | null
           </svg>
         )}
       </button>
-      {error && <p className="text-[12px] text-[var(--crash)]">{error}</p>}
+      {error && <p className="text-[13px] text-[var(--crash)]">{error}</p>}
     </div>
   );
 }

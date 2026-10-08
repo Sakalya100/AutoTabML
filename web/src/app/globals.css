@@ -179,6 +179,10 @@ body:has([data-landing]) > footer {
   --lp-hair: oklch(88% 0.02 85 / 0.12);
   --lp-void: #05070a;
 }
+/* The landing is night in both themes, so the theme toggle has nothing to switch there. */
+body:has([data-landing]) .theme-toggle {
+  display: none;
+}
 body:has([data-landing]) > header {
   position: relative;
   z-index: 30;
@@ -300,13 +304,13 @@ body:has([data-landing]) > footer {
   width: 12px;
   height: 2px;
   border-radius: 2px;
-  background: oklch(88% 0.02 85 / 0.16);
+  background: oklch(var(--lp-line, 88% 0.02 85) / 0.16);
   transition:
     width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.32s;
 }
 .lp-ticks li[data-on] {
-  background: oklch(88% 0.02 85 / 0.45);
+  background: oklch(var(--lp-line, 88% 0.02 85) / 0.45);
 }
 .lp-ticks li[data-here] {
   width: 30px;
@@ -368,18 +372,18 @@ body:has([data-landing]) > footer {
     color 0.3s;
 }
 .lp-cta-primary {
-  background: var(--lp-signal);
+  background: var(--lp-signal-fill, var(--lp-signal));
   color: #140d02;
 }
 .lp-cta-primary:hover {
   background: #ffc979;
 }
 .lp-cta-ghost {
-  border: 1px solid oklch(88% 0.02 85 / 0.28);
+  border: 1px solid oklch(var(--lp-line, 88% 0.02 85) / 0.28);
   color: var(--lp-ink);
 }
 .lp-cta-ghost:hover {
-  border-color: oklch(88% 0.02 85 / 0.7);
+  border-color: oklch(var(--lp-line, 88% 0.02 85) / 0.7);
 }
 .lp-cta-arrow {
   transition: transform 0.35s var(--ease-out-quart);

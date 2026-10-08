@@ -4,9 +4,11 @@
  * Imported by components, so the stylesheet persists across client navigation: every rule is gated on a
  * [data-terra] marker being on the page, which only run pages and the gallery render.
  *
- * Always dark, in both site themes, like the landing: the page *is* the void the land sits in, so the world is never
- * a lit box on paper (one world, not a canvas in a frame). Bone type, amber only for kept/best, ember only on crashes.
- * The site's light theme still applies to the pages without a world (/new).
+ * Dark (the default, and the fallback before the theme script runs): the page *is* the void the land sits in. Bone type,
+ * amber only for kept/best, ember only on crashes. Light: the same night cartography printed on paper. Ink type,
+ * hairlines, a darker amber for text; the world itself stays night, framed on the page (see the night islands below).
+ *
+ * Alpha overlays are written against channel tokens (--lp-ink-rgb, --lp-line, ...) so each theme re-points them.
  */
 
 :root:has([data-terra]) {
@@ -17,6 +19,18 @@
   --lp-hair: oklch(88% 0.02 85 / 0.12);
   --lp-signal: #ffb547;
   --lp-void: #05070a;
+  --lp-page: #05070a; /* the page ground; --lp-void stays the night in both themes */
+  --lp-page-rgb: 5 7 10;
+  --lp-ink-rgb: 236 231 220; /* bone, for washes and hovers */
+  --lp-line: 88% 0.02 85; /* oklch channels of the hairline colour, for borders at any alpha */
+  --lp-mute: 60% 0.012 250;
+  --lp-signal-rgb: 255 181 71;
+  --lp-crash-rgb: 255 90 60;
+  --lp-signal-fill: #ffb547; /* amber as a surface (buttons, dots); --lp-signal is amber as text */
+  --lp-on-ink: #05070a;
+  --lp-panel: #0d1117;
+  --lp-code-bg: #0a0d12;
+  --lp-shadow: rgb(0 0 0 / 0.7);
   --paper: #05070a;
   --paper-2: #0d1117;
   --paper-3: #1b222b;
@@ -38,15 +52,102 @@
   --del-bg: rgb(255 90 60 / 0.1);
 }
 
+/* Light: paper and ink. Amber darkens for text on paper (AA), stays bright as a surface. */
+:root[data-theme="light"]:has([data-terra]) {
+  color-scheme: light;
+  --lp-ink: #1c1915;
+  --lp-ink-2: #46413a;
+  --lp-ink-3: #625d54;
+  --lp-hair: rgb(28 25 21 / 0.13);
+  --lp-signal: #8f5400;
+  --lp-page: #f4efe5;
+  --lp-page-rgb: 244 239 229;
+  --lp-ink-rgb: 28 25 21;
+  --lp-line: 22% 0.012 70;
+  --lp-mute: 32% 0.012 250;
+  --lp-signal-rgb: 214 128 12;
+  --lp-crash-rgb: 181 50 26;
+  --lp-signal-fill: #f2a640;
+  --lp-bar-on: #1c1915;
+  --lp-on-ink: #f4efe5;
+  --lp-panel: #fbf9f4;
+  --lp-code-bg: #ebe5d8;
+  --lp-shadow: rgb(60 45 20 / 0.22);
+  --paper: #f4efe5;
+  --paper-2: #ebe5d8;
+  --paper-3: #e1d9c8;
+  --ink: #1c1915;
+  --ink-2: #46413a;
+  --ink-3: #625d54;
+  --rule: #ddd5c4;
+  --rule-strong: #c2b8a3;
+  --best: #9a5a00;
+  --best-soft: rgb(214 128 12 / 0.12);
+  --keep: #9a5a00;
+  --discard: #8a8478;
+  --crash: #b5321a;
+  --select: #2a6f6a;
+  --test: #1c1915;
+  --focus: #9a5a00;
+  --code-bg: #ebe5d8;
+  --add-bg: rgb(214 128 12 / 0.12);
+  --del-bg: rgb(181 50 26 / 0.1);
+}
+
+/*
+ * Night islands: the world and the frames it sits in are night in both themes, so whatever is drawn over a canvas
+ * (map headers, picks, survey labels) keeps bone type. In the dark theme this re-states the values it inherits.
+ * The page tokens (--lp-page*) are not re-stated: scrims inside the world fade to the page around it.
+ */
+.ws-map,
+.terra-frame,
+.rp-world,
+.jn-stage,
+.at-tilt {
+  color-scheme: dark;
+  --lp-ink: oklch(91% 0.02 85);
+  --lp-ink-2: oklch(78% 0.016 85);
+  --lp-ink-3: oklch(60% 0.012 250);
+  --lp-hair: oklch(88% 0.02 85 / 0.12);
+  --lp-signal: #ffb547;
+  --lp-ink-rgb: 236 231 220;
+  --lp-line: 88% 0.02 85;
+  --lp-mute: 60% 0.012 250;
+  --lp-signal-rgb: 255 181 71;
+  --lp-crash-rgb: 255 90 60;
+  --lp-signal-fill: #ffb547;
+  --lp-on-ink: #05070a;
+  --lp-panel: #0d1117;
+  --lp-code-bg: #0a0d12;
+  --lp-shadow: rgb(0 0 0 / 0.7);
+  --paper: #05070a;
+  --paper-2: #0d1117;
+  --paper-3: #1b222b;
+  --ink: #ece7dc;
+  --ink-2: #c4beb0;
+  --ink-3: #8a8679;
+  --rule: #171d25;
+  --rule-strong: #2a323d;
+  --best: #ffb547;
+  --best-soft: rgb(255 181 71 / 0.1);
+  --keep: #ffb547;
+  --discard: #6b7079;
+  --crash: #ff5a3c;
+  --select: #7fd6d0;
+  --test: #eaf6ff;
+  --focus: #ffb547;
+  --code-bg: #0a0d12;
+}
+
 html:has([data-terra]),
 body:has([data-terra]) {
-  background: #05070a;
+  background: var(--lp-page);
 }
 body:has([data-terra]) > header {
   position: relative;
   z-index: 30;
   border-color: transparent;
-  background: #05070a;
+  background: var(--lp-page);
 }
 body:has([data-terra]) > footer {
   border-color: var(--lp-hair);
@@ -54,10 +155,15 @@ body:has([data-terra]) > footer {
 
 /* The canvas frame is the void in both themes; a hairline of bone keeps its edge on void paper. */
 .terra-frame {
-  background: #05070a;
+  background: var(--lp-void);
   box-shadow:
     0 0 0 1px rgb(217 211 196 / 0.09),
     0 40px 90px -50px rgb(5 7 10 / 0.7);
+}
+:root[data-theme="light"] .terra-frame {
+  box-shadow:
+    0 0 0 1px rgb(28 25 21 / 0.16),
+    0 30px 70px -40px rgb(60 45 20 / 0.45);
 }
 
 /* The gate's balance: the beam tips toward the new probe only on a keep. */

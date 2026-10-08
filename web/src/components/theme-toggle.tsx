@@ -23,7 +23,7 @@ export function ThemeToggle() {
           localStorage.setItem("theme", next);
         } catch {}
       }}
-      className="ml-1 grid size-8 place-items-center rounded-full border border-rule text-ink-2 transition-colors hover:border-rule-strong hover:text-ink"
+      className="theme-toggle ml-1 grid size-8 place-items-center rounded-full border border-rule text-ink-2 transition-colors hover:border-rule-strong hover:text-ink"
       aria-label={`Switch to ${next} theme`}
       title={`Switch to ${next} theme`}
     >

@@ -1,8 +1,12 @@
 """Configuration from the environment.
 
 Locally (not on Vercel) the backend also reads the repo-root `.env` (provider keys, DATABASE_URL*) and
-`web/.env.local` (AUTOTINKER_SESSION_SECRET, kept there so the old Next.js backend's cookies stay valid), without
-overriding anything already set in the process environment. Values are never logged.
+`web/.env.local` (AUTOTINKER_SESSION_SECRET, kept there so the old Next.js backend's cookies stay valid, and the
+frontend's Clerk publishable key, so both halves agree on the auth mode), without overriding anything already set in
+the process environment. Values are never logged.
+
+Auth: CLERK_PUBLISHABLE_KEY (or NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) switches from anonymous cookies to Clerk sign-in;
+CLERK_JWT_KEY and CLERK_AUTHORIZED_PARTIES are optional. See auth.py.
 
 Secrets this process holds (provider keys, DATABASE_URL*, AUTOTINKER_SESSION_SECRET, the protection-bypass secret)
 never reach the engine: the local runner builds the engine's environment from an allow-list (`engine_env`), and the
@@ -37,7 +41,16 @@ _ENV_ALLOW = re.compile(
     r"|SYSTEMROOT|OMP_NUM_THREADS)$"
 )
 # What the dotenv loader may take from web/.env.local (the rest of that file belongs to the frontend).
-_WEB_ENV_NAMES = {"AUTOTINKER_SESSION_SECRET", "DATABASE_URL", "DATABASE_URL_POOLED", "DATABASE_URL_UNPOOLED"}
+_WEB_ENV_NAMES = {
+    "AUTOTINKER_SESSION_SECRET",
+    "DATABASE_URL",
+    "DATABASE_URL_POOLED",
+    "DATABASE_URL_UNPOOLED",
+    "CLERK_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "CLERK_JWT_KEY",
+    "CLERK_AUTHORIZED_PARTIES",
+}
 
 _loaded = False
 

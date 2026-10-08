@@ -26,7 +26,18 @@ sys.path.insert(0, str(BACKEND))
 os.environ["AUTOTINKER_NO_DOTENV"] = "1"
 os.environ["AUTOTINKER_SESSION_SECRET"] = "test-secret-0123456789abcdefghijklmnopqrstuvwxyz"
 os.environ["AUTOTINKER_RUNNER"] = "local"
-for _k in ("GROQ_API_KEY", "GEMINI_API_KEY", "CEREBRAS_API_KEY", "DATABASE_URL_POOLED", "VERCEL"):
+for _k in (
+    "GROQ_API_KEY",
+    "GEMINI_API_KEY",
+    "CEREBRAS_API_KEY",
+    "DATABASE_URL_POOLED",
+    "VERCEL",
+    "CLERK_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "CLERK_JWT_KEY",
+    "CLERK_AUTHORIZED_PARTIES",
+    "AUTOTINKER_PUBLIC_URL",
+):
     os.environ.pop(_k, None)
 
 from fastapi.testclient import TestClient  # noqa: E402
