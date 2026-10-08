@@ -25,6 +25,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   "sandbox_log",
   "hpo_trial",
   "report_ready",
+  "steer_applied",
 ] as const;
 
 const REQUIRED: Record<EventType, readonly string[]> = {
@@ -43,6 +44,7 @@ const REQUIRED: Record<EventType, readonly string[]> = {
   sandbox_log: ["exp_id", "lines"],
   hpo_trial: ["exp_id", "trial"],
   report_ready: ["report"],
+  steer_applied: ["text"],
 };
 
 export function isEventType(t: unknown): t is EventType {
@@ -65,6 +67,7 @@ export function coerceEvent(obj: unknown): AnyEvent | null {
   }
   if (o.type === "sandbox_log" && !Array.isArray(o.lines)) return null;
   if (o.type === "report_ready" && (!o.report || typeof o.report !== "object")) return null;
+  if (o.type === "steer_applied" && typeof o.text !== "string") return null;
   return { ...o, ts: typeof o.ts === "string" ? o.ts : new Date().toISOString() } as unknown as AnyEvent;
 }
 

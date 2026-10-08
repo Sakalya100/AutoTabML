@@ -272,9 +272,11 @@ def planner_input(
     families_tried: list[str],
     ablation: str = "",
     instruction: str = "",
+    constraints: list[str] | None = None,
 ) -> str:
     parts = [
         f"Goal: {goal or '(not stated)'}",
+        *([constraints_text(constraints)] if constraints else []),
         profile_text(profile, rows=False),
         "Known risks: " + ("; ".join(risks)[:800] if risks else "none noted"),
         "Columns that must not be used: " + (", ".join(drop_columns) or "none"),
@@ -340,9 +342,18 @@ def critic_input(
     )
 
 
-def tuner_input(*, profile: DataProfile, code: str, cv: str, budget_s: float) -> str:
+def constraints_text(constraints: list[str]) -> str:
+    """The steering messages of the person watching the run, as a prompt block."""
+    lines = "\n".join(f"- {c}" for c in constraints)
+    return f"User constraints (from the person watching the run; follow them):\n{lines}"
+
+
+def tuner_input(
+    *, profile: DataProfile, code: str, cv: str, budget_s: float, constraints: list[str] | None = None
+) -> str:
     return "\n\n".join(
         [
+            *([constraints_text(constraints)] if constraints else []),
             profile_text(profile, rows=False, max_cols=25),
             f"Best solution ({cv}):\n```python\n{excerpt(code)}\n```",
             f"Time budget for the whole search: about {budget_s:.0f} s; each trial runs a few CV folds.",

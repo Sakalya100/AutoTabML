@@ -678,6 +678,18 @@
         },
         "idea": {
           "$ref": "#/$defs/Idea"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
         }
       },
       "required": [
@@ -1208,6 +1220,52 @@
       "title": "SandboxLog",
       "type": "object"
     },
+    "SteerApplied": {
+      "description": "A steering message from the person watching was accepted: it is included in every later Planner and\nTuner prompt, starting with experiment `at_exp`.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "steer_applied",
+          "default": "steer_applied",
+          "title": "Type",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "at_exp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At Exp"
+        }
+      },
+      "required": [
+        "run_id",
+        "text"
+      ],
+      "title": "SteerApplied",
+      "type": "object"
+    },
     "Stopped": {
       "properties": {
         "run_id": {
@@ -1352,6 +1410,7 @@
       "run_started": "#/$defs/RunStarted",
       "sandbox_finished": "#/$defs/SandboxFinished",
       "sandbox_log": "#/$defs/SandboxLog",
+      "steer_applied": "#/$defs/SteerApplied",
       "stopped": "#/$defs/Stopped"
     },
     "propertyName": "type"
@@ -1398,6 +1457,9 @@
     },
     {
       "$ref": "#/$defs/ReportReady"
+    },
+    {
+      "$ref": "#/$defs/SteerApplied"
     }
   ]
 }

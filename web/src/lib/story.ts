@@ -67,7 +67,7 @@ export function stopPhrase(reason: string | null | undefined, maxExperiments?: n
     case "max_time":
       return "stopped at its time budget";
     case "user":
-      return "stopped by hand";
+      return "stopped on request";
     default:
       return `stopped (${reason.replace(/_/g, " ")})`;
   }

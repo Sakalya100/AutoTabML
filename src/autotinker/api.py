@@ -413,11 +413,13 @@ def agentic_run(
     events_stdout: bool = False,
     run_id: str | None = None,
     config: Any = None,
+    control: Any = None,
     **task_kwargs: Any,
 ) -> Run:
     """The agentic loop: intake, profile, baseline, drafts, improve/tune, ensemble, locked test, report.
 
-    `backend` is any ChatBackend (default: the provider Router over the keys in the environment)."""
+    `backend` is any ChatBackend (default: the provider Router over the keys in the environment).
+    `control` is an optional evolve.control.ControlChannel (live steering / graceful stop)."""
     from autotinker.agent.router import Router
     from autotinker.data.sources import load_dataframe, load_source, source_stem
     from autotinker.evolve.agentic import AgenticConfig, run_agentic, run_intake
@@ -464,6 +466,7 @@ def agentic_run(
         task=harness.task,
         on_event=on_event,
         events_stdout=events_stdout,
+        control=control,
         config={
             "env": {"python": platform.python_version(), "seed": seed},
             "source": str(source) if not isinstance(source, pd.DataFrame) else "dataframe",

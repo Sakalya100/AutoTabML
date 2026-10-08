@@ -87,7 +87,7 @@ export function LiveRun({ id }: { id: string }) {
         <h1 className="font-display text-4xl">Run not found</h1>
         <p className="mt-3 text-ink-2">{error}</p>
         <p className="mt-6 flex gap-4 text-sm">
-          <Link href="/new" className="underline underline-offset-4">
+          <Link href="/s/new" className="underline underline-offset-4">
             Start a new run
           </Link>
           <Link href="/replays" className="underline underline-offset-4">

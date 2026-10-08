@@ -17,7 +17,8 @@ export type RunEvent =
   | AgentStepFinished
   | SandboxLog
   | HpoTrialEvent
-  | ReportReady;
+  | ReportReady
+  | SteerApplied;
 export type RunId = string;
 export type Seq = number;
 export type Ts = string;
@@ -89,6 +90,7 @@ export type IdeaCategory =
   | "simplification"
   | "repair";
 export type Radical = boolean;
+export type Phase = string | null;
 export type RunId2 = string;
 export type Seq2 = number;
 export type Ts2 = string;
@@ -237,8 +239,14 @@ export type RunId13 = string;
 export type Seq13 = number;
 export type Ts13 = string;
 export type Type13 = "report_ready";
-export type Version = number;
 export type RunId14 = string;
+export type Seq14 = number;
+export type Ts14 = string;
+export type Type14 = "steer_applied";
+export type Text1 = string;
+export type AtExp = string | null;
+export type Version = number;
+export type RunId15 = string;
 export type CreatedAt = string;
 export type Mode = string;
 export type Proposer1 = string;
@@ -257,7 +265,7 @@ export type LlmCalls = LLMUsage[];
 export type CostUsd2 = number;
 export type DurationS3 = number;
 export type StartedAt1 = string;
-export type Phase = string | null;
+export type Phase1 = string | null;
 export type Steps = AgentStep[];
 export type Trials = HpoTrial[];
 export type Experiments = ExperimentRecord[];
@@ -362,6 +370,7 @@ export interface ExperimentStarted {
   exp_id: ExpId;
   parent_id: ParentId;
   idea: Idea;
+  phase?: Phase;
 }
 /**
  * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
@@ -616,12 +625,27 @@ export interface Report1 {
   [k: string]: unknown;
 }
 /**
+ * A steering message from the person watching was accepted: it is included in every later Planner and
+ * Tuner prompt, starting with experiment `at_exp`.
+ *
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "SteerApplied".
+ */
+export interface SteerApplied {
+  run_id: RunId14;
+  seq?: Seq14;
+  ts?: Ts14;
+  type?: Type14;
+  text: Text1;
+  at_exp?: AtExp;
+}
+/**
  * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
  * via the `definition` "RunRecord".
  */
 export interface RunRecord {
   version?: Version;
-  run_id: RunId14;
+  run_id: RunId15;
   created_at: CreatedAt;
   mode: Mode;
   proposer: Proposer1;
@@ -666,7 +690,7 @@ export interface ExperimentRecord {
   cost_usd?: CostUsd2;
   duration_s?: DurationS3;
   started_at?: StartedAt1;
-  phase?: Phase;
+  phase?: Phase1;
   steps?: Steps;
   trials?: Trials;
 }

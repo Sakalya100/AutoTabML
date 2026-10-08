@@ -46,6 +46,7 @@ class ExperimentStarted(_Base):
     exp_id: str
     parent_id: str | None
     idea: Idea
+    phase: str | None = None  # agentic: baseline | draft | improve | tune | ensemble (None in legacy runs)
 
 
 class LLMCall(_Base):
@@ -143,6 +144,15 @@ class HpoTrialEvent(_Base):
     trial: HpoTrial
 
 
+class SteerApplied(_Base):
+    """A steering message from the person watching was accepted: it is included in every later Planner and
+    Tuner prompt, starting with experiment `at_exp`."""
+
+    type: Literal["steer_applied"] = "steer_applied"
+    text: str
+    at_exp: str | None = None
+
+
 class ReportReady(_Base):
     type: Literal["report_ready"] = "report_ready"
     report: dict[str, Any]
@@ -162,7 +172,8 @@ Event = Annotated[
     | AgentStepFinished
     | SandboxLog
     | HpoTrialEvent
-    | ReportReady,
+    | ReportReady
+    | SteerApplied,
     Field(discriminator="type"),
 ]
 

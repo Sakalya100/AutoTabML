@@ -65,7 +65,8 @@ export function engineEnv(): Record<string, string> {
 
 /** Every secret value we know of, for redacting logs. */
 export function knownSecrets(): string[] {
-  return PROVIDER_KEYS.map((k) => serverEnv(k)).filter((v): v is string => !!v);
+  const own = ["AUTOTINKER_SESSION_SECRET", "DATABASE_URL", "DATABASE_URL_POOLED", "DATABASE_URL_UNPOOLED"].map((k) => process.env[k]);
+  return [...PROVIDER_KEYS.map((k) => serverEnv(k)), ...own].filter((v): v is string => !!v);
 }
 
 export const _test = { parseDotenv };

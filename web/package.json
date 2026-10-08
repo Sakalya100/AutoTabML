@@ -10,9 +10,11 @@
     "gen:types": "node scripts/gen-types.mjs",
     "validate:replays": "node scripts/validate-replays.mjs",
     "test": "vitest run",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/db-migrate.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
     "@react-three/postprocessing": "^3.1.3",

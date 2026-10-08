@@ -29,7 +29,7 @@ import { sha256 } from "../api";
 import { serverEnv } from "../server-env";
 import { getStore } from "../store";
 import type { RunMeta } from "../store/types";
-import { engineArgs, type Runner, type StartOptions } from "./types";
+import { engineArgs, type ControlCommand, type Runner, type StartOptions } from "./types";
 
 const WORKDIR = "/vercel/sandbox";
 const DEFAULT_PACKAGE = "autotinker @ git+https://github.com/Sakalya100/AutoTabML@v2";
@@ -150,6 +150,18 @@ code=$?
       await store.updateMeta(meta.id, { status: "failed", error: e.message || "Could not start the sandbox.", errorTail: e.tail, finishedAt: new Date().toISOString() });
       await sandbox?.stop().catch(() => undefined);
     }
+  }
+
+  /**
+   * TODO(phase 3, sandbox): steering/stop for sandbox runs. The engine runs detached inside the VM, so there is no
+   * stdin to write to. Plan: store queued commands with the run (Redis list run:<id>:control), add
+   * GET /api/runs/[id]/control?after=<n> authenticated with the same per-run ingest token, and have forward.py poll it
+   * every few seconds and pipe new lines into a FIFO the engine reads with `--control-fifo`. Until then the session
+   * UI says the engine couldn't be reached, and Stop falls back to cancel().
+   */
+  async control(meta: RunMeta, cmd: ControlCommand): Promise<boolean> {
+    console.info(`[run ${meta.id}] control "${cmd.type}" not delivered: the sandbox runner has no control channel yet`);
+    return false;
   }
 
   async cancel(meta: RunMeta): Promise<boolean> {

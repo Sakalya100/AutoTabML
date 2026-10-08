@@ -452,7 +452,7 @@ function Message({ id, store, view, J, name, kicker, note, action, others, onDet
           note={note}
           action={action}
           secondary={
-            <MagneticLink href="/new" variant="ghost">
+            <MagneticLink href="/s/new" variant="ghost">
               Try your own data
             </MagneticLink>
           }
@@ -533,7 +533,7 @@ function Message({ id, store, view, J, name, kicker, note, action, others, onDet
           </p>
           <div className="lp-ctas">
             {action}
-            <MagneticLink href="/new" variant="ghost">
+            <MagneticLink href="/s/new" variant="ghost">
               Try your own data
             </MagneticLink>
           </div>

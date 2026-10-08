@@ -58,6 +58,7 @@ from autotinker.contracts import (
     TaskSpec,
 )
 from autotinker.evolve import codegen
+from autotinker.evolve.control import ControlChannel
 from autotinker.evolve.gate import Candidate, Gate, StatGate
 from autotinker.evolve.loop import _Best, _Runner, count_loc, unified_diff
 from autotinker.evolve.stopping import HistoryPoint, StopDecision, StopRule
@@ -71,6 +72,7 @@ from autotinker.obs.events import (
     HpoTrialEvent,
     ReportReady,
     SandboxLog,
+    SteerApplied,
 )
 from autotinker.obs.record import ExperimentRecord, RunRecord
 
@@ -252,6 +254,7 @@ class AgenticRunner(_Runner):
         on_event: Callable[[Any], None] | None = None,
         events_stdout: bool = False,
         config: dict[str, Any] | None = None,
+        control: ControlChannel | None = None,
     ) -> None:
         self.cfg = cfg or AgenticConfig()
         self.backend = backend
@@ -313,6 +316,9 @@ class AgenticRunner(_Runner):
         self._usages: list[LLMUsage] = []
         self._t_exp = time.perf_counter()
         self._started_at = ""
+        self.control = control
+        self.user_constraints: list[str] = []
+        self._user_stop = False
 
     # -------------------------------------------------- observer + accounting
 
@@ -324,6 +330,7 @@ class AgenticRunner(_Runner):
         return self._pending.setdefault(exp_id, [])  # e.g. an ablation that precedes its experiment
 
     def step_started(self, exp_id: str | None, step: AgentStep) -> None:
+        self._poll_control()
         self.emitter.emit(
             AgentStepStarted(
                 run_id=self.run_id,
@@ -386,6 +393,32 @@ class AgenticRunner(_Runner):
                     lines=lines[i : i + 40],
                 )
             )
+
+    # -------------------------------------------------- live control (steer / stop)
+
+    MAX_CONSTRAINTS = 10
+
+    def _next_planned_exp(self) -> str:
+        n = len(self.record.experiments)
+        return f"e{n + (1 if self._cur is not None else 0):03d}"
+
+    def _poll_control(self) -> None:
+        """Apply queued steering/stop commands. Main thread only (it emits events)."""
+        if self.control is None:
+            return
+        for cmd in self.control.drain():
+            if cmd.type == "stop":
+                self._user_stop = True
+                continue
+            text = cmd.text.strip()
+            if not text:
+                continue
+            self.user_constraints.append(text)
+            del self.user_constraints[: -self.MAX_CONSTRAINTS]
+            self.notes.append(f"User asked: {text}")
+            self.emitter.emit(SteerApplied(run_id=self.run_id, text=text, at_exp=self._next_planned_exp()))
+        if self.control.stop_requested:
+            self._user_stop = True
 
     @property
     def total_tokens(self) -> int:
@@ -477,7 +510,9 @@ class AgenticRunner(_Runner):
         parent = self.best
         parent_id = parent.exp_id if parent else None
         self.emitter.emit(
-            ExperimentStarted(run_id=self.run_id, exp_id=exp.exp_id, parent_id=parent_id, idea=idea)
+            ExperimentStarted(
+                run_id=self.run_id, exp_id=exp.exp_id, parent_id=parent_id, idea=idea, phase=exp.phase
+            )
         )
         res = self._execute(exp, code, 0)
         attempts = 0
@@ -684,7 +719,11 @@ class AgenticRunner(_Runner):
         idea = Idea(title="(agent failed)", rationale=str(exc)[:500], category=IdeaCategory.repair)
         self.emitter.emit(
             ExperimentStarted(
-                run_id=self.run_id, exp_id=exp.exp_id, parent_id=parent.exp_id if parent else None, idea=idea
+                run_id=self.run_id,
+                exp_id=exp.exp_id,
+                parent_id=parent.exp_id if parent else None,
+                idea=idea,
+                phase=exp.phase,
             )
         )
         res = ExecResult(ok=False, error_kind="runtime", error_tail=str(exc)[-2000:])
@@ -772,6 +811,7 @@ class AgenticRunner(_Runner):
                 families_tried=self._families_tried(),
                 ablation=self.ablation_text if phase == "improve" else "",
                 instruction=instruction,
+                constraints=self.user_constraints,
             ),
             exp.exp_id,
             input_summary=f"{phase}: {len(self.record.experiments)} done, {self._best_cv_text()}",
@@ -882,7 +922,11 @@ class AgenticRunner(_Runner):
             call = self._role(
                 specs.TUNER,
                 specs.tuner_input(
-                    profile=self.h.profile, code=best.code, cv=self._best_cv_text(), budget_s=budget
+                    profile=self.h.profile,
+                    code=best.code,
+                    cv=self._best_cv_text(),
+                    budget_s=budget,
+                    constraints=self.user_constraints,
                 ),
                 exp_id,
                 input_summary=f"search space for {best.exp_id} ({family})",
@@ -992,6 +1036,11 @@ class AgenticRunner(_Runner):
 
     def _stop(self) -> StopDecision:
         n = len(self.record.experiments)
+        if self._user_stop:
+            last = self.record.experiments[-1].id if self.record.experiments else "the profile"
+            return StopDecision(
+                True, "user", self.stop_rule.signals(self.history), f"stopped by the user after {last}"
+            )
         d = self.stop_rule.check(self.history, n_experiments=n, cost_usd=self.cost, elapsed_s=self.elapsed)
         if not d.stop and self.total_tokens >= self.cfg.max_tokens:
             return StopDecision(
@@ -1030,6 +1079,7 @@ class AgenticRunner(_Runner):
             self.profile_stage()
             self.baseline()
             while True:
+                self._poll_control()
                 decision = self._stop()
                 if decision.stop:
                     if (
@@ -1188,6 +1238,7 @@ def run_agentic(
     on_event: Callable[[Any], None] | None = None,
     events_stdout: bool = False,
     config: dict[str, Any] | None = None,
+    control: ControlChannel | None = None,
 ) -> RunRecord:
     return AgenticRunner(
         harness,
@@ -1203,4 +1254,5 @@ def run_agentic(
         on_event=on_event,
         events_stdout=events_stdout,
         config=config,
+        control=control,
     ).run()

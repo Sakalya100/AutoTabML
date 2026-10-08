@@ -182,6 +182,16 @@ def run(
     cheap_llm: Annotated[str | None, typer.Option("--cheap-llm", help="legacy single-shot mode only")] = None,
     description: Annotated[str, typer.Option("--description", "-d", help="legacy alias of --goal")] = "",
     max_repairs: Annotated[int, typer.Option("--max-repairs", help="legacy single-shot mode only")] = 3,
+    control_stdin: Annotated[
+        bool,
+        typer.Option(
+            "--control-stdin",
+            help='read JSONL control commands on stdin: {"type":"steer","text":…} / {"type":"stop"}',
+        ),
+    ] = False,
+    control_fifo: Annotated[
+        Path | None, typer.Option("--control-fifo", help="read JSONL control commands from this FIFO")
+    ] = None,
 ) -> None:
     """The agentic AutoML loop: agents profile, plan, code, debug, tune and ensemble until the ceiling.
 
@@ -203,6 +213,13 @@ def run(
         return
     load_env_file()
     from autotinker.api import agentic_run
+    from autotinker.evolve.control import ControlChannel
+
+    control: ControlChannel | None = None
+    if control_fifo is not None:
+        control = ControlChannel.from_fifo(control_fifo)
+    elif control_stdin:
+        control = ControlChannel.from_stdin()
 
     try:
         res = _go(
@@ -218,6 +235,7 @@ def run(
                 seed=seed,
                 on_event=cb,
                 events_stdout=events_stdout,
+                control=control,
             ),
             events_stdout,
             f"autotinker run {source}",

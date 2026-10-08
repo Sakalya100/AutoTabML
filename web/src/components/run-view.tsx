@@ -61,6 +61,7 @@ const PACE: Record<EventType, number> = {
   sandbox_log: 30,
   hpo_trial: 30,
   report_ready: 900,
+  steer_applied: 300,
 };
 const FIRST_STEP_DELAY = 1500; // let the reader take in the "run started" message
 const SPEEDS = [1, 2, 4] as const;
@@ -245,7 +246,7 @@ export function RunView({ mode, events, record, title, kicker, note, active, liv
                     onDetails={() => setReveal((r) => r + 1)}
                     action={events.length > 0 ? <SimulateLink onClick={startSimulation}>{live ? "Replay it" : "Watch it run"}</SimulateLink> : null}
                     secondary={
-                      <MagneticLink href="/new" variant="ghost">
+                      <MagneticLink href="/s/new" variant="ghost">
                         {live ? "Start another run" : "Try your own data"}
                       </MagneticLink>
                     }

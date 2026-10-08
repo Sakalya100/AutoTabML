@@ -35,8 +35,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/replays" className="rounded px-2 py-1.5 text-ink-2 hover:text-ink">
                 Replays
               </Link>
-              <Link href="/new" className="rounded px-2 py-1.5 text-ink-2 hover:text-ink">
-                New run
+              <Link href="/s" className="rounded px-2 py-1.5 text-ink-2 hover:text-ink">
+                Sessions
               </Link>
               <a href={GITHUB_URL} className="hidden rounded px-2 py-1.5 text-ink-2 hover:text-ink sm:inline">
                 GitHub
