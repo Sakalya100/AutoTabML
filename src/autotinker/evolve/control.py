@@ -123,13 +123,15 @@ class ControlChannel:
     def from_file(cls, path: str | Path, poll_s: float = 0.5) -> ControlChannel:
         """Poll an append-only JSONL file for new complete lines (a missing file is simply empty).
 
-        The writer may rewrite the whole file if it keeps the earlier lines (read, append, write back);
-        if the file shrinks it is treated as replaced and read from the start."""
+        The writer may rewrite the whole file if it keeps the earlier lines (read, append, write back). A
+        rewrite briefly exposes a truncated file (empty, or a prefix of what was already read); that is
+        waited out, never treated as a replacement, so no command is delivered twice. A file whose content
+        no longer starts with what was read is a real replacement and is read from the start."""
         ch = cls()
         p = Path(path)
 
         def run() -> None:
-            offset = 0
+            seen = b""  # the complete lines already delivered, exactly as read
             while True:
                 try:
                     data = p.read_bytes()
@@ -138,13 +140,18 @@ class ControlChannel:
                 except OSError as exc:
                     print(f"[autotinker] control file unreadable: {exc}", file=sys.stderr)
                     data = b""
-                if len(data) < offset:
-                    offset = 0
                 end = data.rfind(b"\n") + 1  # only complete lines; a partial write is picked up next poll
-                if end > offset:
-                    for line in data[offset:end].decode("utf-8", errors="replace").splitlines():
+                complete = data[:end]
+                if complete.startswith(seen):
+                    fresh = complete[len(seen) :]
+                elif seen.startswith(data):
+                    fresh = b""  # mid-rewrite: a truncated copy of what was already read
+                else:
+                    seen, fresh = b"", complete  # replaced by different content
+                if fresh:
+                    for line in fresh.decode("utf-8", errors="replace").splitlines():
                         ch.feed_line(line)
-                    offset = end
+                    seen += fresh
                 time.sleep(poll_s)
 
         return ch._start(run, "autotinker-control-file")

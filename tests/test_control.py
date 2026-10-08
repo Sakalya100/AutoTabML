@@ -182,6 +182,22 @@ def test_control_file_is_polled_for_appended_lines(tmp_path: Path) -> None:
     assert ch.stop_requested
 
 
+def test_control_file_mid_rewrite_truncation_never_duplicates_commands(tmp_path: Path) -> None:
+    """A writer that rewrites the file (truncate, then write) must not make a command arrive twice."""
+    path = tmp_path / "control.jsonl"
+    first = '{"type":"steer","text":"prefer trees"}\n'
+    path.write_text(first)
+    ch = ControlChannel.from_file(path, poll_s=0.01)
+    assert _drain_until(ch, 1) == [ControlCommand("steer", "prefer trees")]
+    path.write_text("")  # the truncation step of a rewrite, held long enough for several polls
+    time.sleep(0.08)
+    path.write_text(first[:12])  # a partially rewritten prefix
+    time.sleep(0.08)
+    path.write_text(first + '{"type":"stop"}\n')
+    assert _drain_until(ch, 2, timeout=1.0) == [ControlCommand("stop")]
+    assert ch.drain() == []
+
+
 def test_control_file_replaced_by_a_shorter_one_is_reread(tmp_path: Path) -> None:
     path = tmp_path / "control.jsonl"
     path.write_text('{"type":"steer","text":"a fairly long first steering message"}\n')
