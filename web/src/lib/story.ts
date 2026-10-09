@@ -299,7 +299,9 @@ export function plainStopSignals(view: RunView): PlainSignal[] {
     } else if (s.key === "saturation" && v != null) {
       text = `Its own trend says at most ${fmtNum(Math.abs(v), d)} more was left to gain${th != null ? `, less than the wobble of ± ${fmtNum(th, d)}` : ""}.`;
     } else if (s.key === "exploration" && v != null) {
-      text = `Since its last win, ${v} bold, very different ideas were tried, and none held up.`;
+      // A run that kept only its starting model never had a "win" to count from.
+      const since = view.experiments.filter((x) => x.status === "keep").length > 1 ? "Since its last win" : "After the starting model";
+      text = `${since}, ${v} bold, very different ideas were tried, and none held up.`;
     } else text = s.detail || s.key.replace(/_/g, " ");
     out.push({ key: s.key, fired: s.fired, text });
   }

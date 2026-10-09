@@ -15,6 +15,8 @@ export interface ReplayInfo {
   blurb?: string;
   /** Agentic runs: the models that served agent calls, most-used first ("gpt-oss-120b on Groq"). */
   models?: string[];
+  /** When this run was picked from several recordings of the same dataset: how, in one plain sentence. */
+  selection?: string;
 }
 
 const dir = () => path.join(process.cwd(), "public", "replays");

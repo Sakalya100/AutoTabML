@@ -67,9 +67,10 @@ describe("layoutSurvey (breast_cancer replay)", () => {
     expect(byId.get("e012")!.isBest).toBe(true);
   });
 
-  it("mist = best SE; clouds only after the stop, at bestMean + saturation", () => {
+  it("mist = best SE; clouds only after the stop, at bestMean + max(saturation, SE)", () => {
     expect(L.mist).toBeCloseTo(0.00191750429270086 * L.unitsPerScore, 8);
-    expect(L.cloudY).toBeCloseTo(L.heightOf(0.9959471264367815 + 3.321275108270072e-6), 8);
+    // the fitted curve predicts only 3.3e-6 more, less than the noise floor, so the ceiling sits one SE above the best
+    expect(L.cloudY).toBeCloseTo(L.heightOf(0.9959471264367815 + Math.max(3.321275108270072e-6, 0.00191750429270086)), 8);
     const before = layoutSurvey(buildView(bc.events.slice(0, stoppedAt - 1)), bc.full);
     expect(before.cloudY).toBeNull();
     const at = layoutSurvey(buildView(bc.events.slice(0, stoppedAt)), bc.full);
@@ -124,8 +125,8 @@ describe("layoutSurvey (other replays)", () => {
       expect(L.probes).toHaveLength(r.full.experiments.length);
       for (const p of L.probes) for (const n of p.pos) expect(Number.isFinite(n)).toBe(true);
       expect(L.cloudY).not.toBeNull();
-      // at or above the best: a flat fitted curve predicts no more gain (wine), so the clouds sit on the summit
-      expect(L.cloudY!).toBeGreaterThanOrEqual(L.bestY!);
+      // above the best by at least the noise floor, even when the fitted curve predicts no more gain (wine)
+      expect(L.cloudY!).toBeGreaterThan(L.bestY!);
       expect(Number.isFinite(L.testY!)).toBe(true);
       const empty = layoutSurvey(buildView(r.events.slice(0, 1)), r.full);
       expect(empty.bead).toBeNull();

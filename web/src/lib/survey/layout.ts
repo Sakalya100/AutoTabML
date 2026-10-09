@@ -216,8 +216,10 @@ export function layoutSurvey(view: RunView, domainView?: RunView | null): Survey
   // The ceiling: only once the stop rule has fired.
   let cloudY: number | null = null;
   if ((view.phase === "stopped" || view.phase === "finished") && view.stop && bestMean != null) {
+    // Best + the gain the fitted curve still predicts, but never closer than the noise floor: a run whose ideas never
+    // beat the start predicts no gain, and the ceiling then sat exactly on the ball.
     const sat = num(view.stop.signals.find((s) => s.key === "saturation")?.value);
-    const add = sat ?? bestSe ?? 0;
+    const add = Math.max(sat ?? 0, bestSe ?? 0);
     cloudY = heightOf(bestMean + add);
   }
 

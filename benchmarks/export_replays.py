@@ -81,7 +81,10 @@ def main(args: list[str]) -> None:
         dst.mkdir(parents=True, exist_ok=True)
         for f in ("run.json", "events.jsonl"):
             (dst / f).write_text(scrub((src / f).read_text()))
-        by_name[name] = entry(name, rec)
+        keep = {
+            k: by_name[name][k] for k in ("selection",) if k in by_name.get(name, {})
+        }  # editorial, set by hand
+        by_name[name] = {**entry(name, rec), **keep}
         print(f"exported {src} -> {dst}")
     index_path.write_text(json.dumps({"replays": list(by_name.values())}, indent=2) + "\n")
     print(f"index: {', '.join(by_name)}")

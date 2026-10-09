@@ -39,6 +39,8 @@ export interface GalleryItem {
   nExperiments: number;
   /** Shown only when it differs from the page's note. */
   note: string | null;
+  /** How this run was picked from several recordings, when it was. */
+  selection?: string | null;
 }
 
 /** The page head: the title's lines rise out of a mask on arrival, the lines under it settle after. */
@@ -172,6 +174,11 @@ function AtlasEntry({ it, i, n }: { it: GalleryItem; i: number; n: number }) {
             Watch it run
           </MagneticLink>
         </div>
+        {it.selection && (
+          <p className="rp-note at-seq" data-pre="">
+            {it.selection}
+          </p>
+        )}
         {it.note && (
           <p className="rp-note at-seq" data-pre="">
             {it.note}
