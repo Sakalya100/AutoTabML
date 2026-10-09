@@ -22,6 +22,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" data-theme="dark" style={{ colorScheme: "dark" }} className={`${display.variable} ${body.variable} ${code.variable} h-full antialiased`}>
+      <head>
+        {/* Without JavaScript (crawlers, link checkers, reader modes) there is no 3D world to wait for: drop the loader and
+            show the hero copy, so the page reads as a page instead of a stuck "Mapping the run…". */}
+        <noscript>
+          <style>{`.lp-loader{display:none!important}.lp-hero[data-intro]{visibility:visible!important}`}</style>
+        </noscript>
+      </head>
       <body className="flex min-h-full flex-col">
         <AuthProvider>
           <SmoothScroll>
