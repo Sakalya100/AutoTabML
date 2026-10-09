@@ -1,11 +1,12 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { formatScore } from "@/lib/metrics";
 import { useSignedIn } from "../auth";
+import { spotlight } from "./fx/motion";
 import type { SessionListItem } from "@/lib/session-types";
 
 export type MobileTab = "chat" | "map" | "sessions";
@@ -22,6 +23,7 @@ const Ctx = createContext<ShellCtx>({ tab: "chat", setTab: () => {}, refreshSess
 export const useShell = () => useContext(Ctx);
 
 const RUNNING = new Set(["queued", "starting", "running"]);
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 /** The workspace frame: sessions on the left (a tab on phones), the page (chat + map) beside it. */
 export function WorkspaceShell({ children }: { children: ReactNode }) {
@@ -60,69 +62,88 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     return () => clearInterval(t);
   }, [anyRunning, refresh]);
 
+  // The first list to arrive appears as is; only sessions added after it (a run just started) rise in.
+  const [seeded, setSeeded] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-way latch after the first list
+    if (sessions && !seeded) setSeeded(true);
+  }, [sessions, seeded]);
+
   const setTab = useCallback((t: MobileTab) => setTabState(t), []);
   const renameLocal = useCallback((id: string, title: string) => setSessions((xs) => xs?.map((s) => (s.id === id ? { ...s, title } : s)) ?? xs), []);
 
   return (
     <Ctx.Provider value={{ tab, setTab, refreshSessions: refresh, renameLocal }}>
-      <div data-terra className="ws-root" data-tab={tab}>
-        <MobileTabs />
-        <aside className="ws-sessions" aria-label="Sessions">
-          <div className="ws-sessions-head">
-            <h2 className="ws-kicker">Sessions</h2>
-            <Link href="/s/new" className="ws-new" onClick={() => setTabState("chat")}>
-              <span aria-hidden>+</span> New
-            </Link>
-          </div>
-          <nav className="ws-sessions-list">
-            {signedOut && <p className="px-4 pt-3 text-[13.5px] leading-relaxed text-[var(--lp-ink-3)]">Sign in to see your sessions.</p>}
-            {!signedOut && sessions === null && !unavailable && (
-              <div className="space-y-3 px-4 pt-2" aria-hidden>
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-9 animate-pulse rounded bg-[rgb(var(--lp-ink-rgb,236_231_220)/0.04)]" />
-                ))}
-              </div>
-            )}
-            {!signedOut && unavailable && (
-              <p className="px-4 pt-3 text-[13.5px] leading-relaxed text-[var(--lp-ink-3)]">Saved sessions are unavailable right now. Runs still work.</p>
-            )}
-            {!signedOut && sessions?.length === 0 && !unavailable && (
-              <p className="px-4 pt-3 text-[13.5px] leading-relaxed text-[var(--lp-ink-3)]">
-                Your runs will be listed here. {auth.enabled ? "They're saved to your account." : "They stay in this browser."}
-              </p>
-            )}
-            <ul>
-              <AnimatePresence initial={false}>
-                {(signedOut ? [] : (sessions ?? [])).map((s) => (
-                  <motion.li
-                    key={s.id}
-                    layout="position"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <Link href={`/s/${s.id}`} onClick={() => setTabState("chat")} aria-current={s.id === current ? "page" : undefined} className="ws-session">
-                      <span className={`ws-sdot ws-sdot-${s.status ?? "none"}`} aria-label={s.status ?? "no run"} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[14px] text-[var(--lp-ink)]">{s.title}</span>
-                        <span className="mt-0.5 flex items-baseline gap-2 font-mono text-[12px] text-[var(--lp-ink-3)] tabular-nums">
-                          {s.best != null && <span className="text-[var(--lp-ink-2)]">{formatScore(s.metric, s.best)}</span>}
-                          <span className="truncate">{s.fileName}</span>
+      {/* Reduced motion: motion skips transform / layout animation (the sliding indicators) everywhere in the workspace. */}
+      <MotionConfig reducedMotion="user">
+        <div data-terra className="ws-root" data-tab={tab}>
+          <MobileTabs />
+          <aside className="ws-sessions" aria-label="Sessions">
+            <div className="ws-sessions-head">
+              <h2 className="ws-kicker">Sessions</h2>
+              <Link href="/s/new" className="ws-new" onClick={() => setTabState("chat")}>
+                <span aria-hidden>+</span> New
+              </Link>
+            </div>
+            <nav className="ws-sessions-list" data-lenis-prevent onPointerMove={spotlight}>
+              {signedOut && <p className="px-4 pt-3 text-[13.5px] leading-relaxed text-[var(--lp-ink-3)]">Sign in to see your sessions.</p>}
+              {!signedOut && sessions === null && !unavailable && (
+                <div className="space-y-3 px-4 pt-2" aria-hidden>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-9 animate-pulse rounded bg-[rgb(var(--lp-ink-rgb,236_231_220)/0.04)]" />
+                  ))}
+                </div>
+              )}
+              {!signedOut && unavailable && (
+                <p className="px-4 pt-3 text-[13.5px] leading-relaxed text-[var(--lp-ink-3)]">Saved sessions are unavailable right now. Runs still work.</p>
+              )}
+              {!signedOut && sessions?.length === 0 && !unavailable && (
+                <p className="px-4 pt-3 text-[13.5px] leading-relaxed text-[var(--lp-ink-3)]">
+                  Your runs will be listed here. {auth.enabled ? "They're saved to your account." : "They stay in this browser."}
+                </p>
+              )}
+              <ul>
+                <AnimatePresence initial={false}>
+                  {(signedOut ? [] : (sessions ?? [])).map((s) => (
+                    <motion.li
+                      key={s.id}
+                      layout="position"
+                      initial={seeded ? { opacity: 0, y: -8, filter: "blur(4px)" } : false}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter: "none" } }}
+                      exit={{ opacity: 0, transition: { duration: 0.18 } }}
+                      transition={{ duration: 0.6, ease: EASE }}
+                    >
+                      <Link
+                        href={`/s/${s.id}`}
+                        onClick={() => setTabState("chat")}
+                        aria-current={s.id === current ? "page" : undefined}
+                        className="ws-session"
+                        data-spot
+                      >
+                        {s.id === current && (
+                          <motion.span layoutId="ws-session-active" className="ws-session-ind" aria-hidden transition={{ duration: 0.55, ease: EASE }} />
+                        )}
+                        <span className={`ws-sdot ws-sdot-${s.status ?? "none"}`} aria-label={s.status ?? "no run"} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[14px] text-[var(--lp-ink)]">{s.title}</span>
+                          <span className="mt-0.5 flex items-baseline gap-2 font-mono text-[12px] text-[var(--lp-ink-3)] tabular-nums">
+                            {s.best != null && <span className="text-[var(--lp-ink-2)]">{formatScore(s.metric, s.best)}</span>}
+                            <span className="truncate">{s.fileName}</span>
+                          </span>
                         </span>
-                      </span>
-                      <time className="shrink-0 font-mono text-[11.5px] text-[var(--lp-ink-3)]" dateTime={s.updatedAt}>
-                        {relTime(s.updatedAt)}
-                      </time>
-                    </Link>
-                  </motion.li>
-                ))}
-              </AnimatePresence>
-            </ul>
-          </nav>
-        </aside>
-        <div className="ws-page">{children}</div>
-      </div>
+                        <time className="shrink-0 font-mono text-[11.5px] text-[var(--lp-ink-3)]" dateTime={s.updatedAt}>
+                          {relTime(s.updatedAt)}
+                        </time>
+                      </Link>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </nav>
+          </aside>
+          <div className="ws-page">{children}</div>
+        </div>
+      </MotionConfig>
     </Ctx.Provider>
   );
 }
@@ -151,7 +172,7 @@ export function MobileTabs() {
       {tabs.map(([k, label]) => (
         <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className="ws-tab">
           {label}
-          {tab === k && <motion.span layoutId="ws-tab-ink" className="ws-tab-ink" transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} />}
+          {tab === k && <motion.span layoutId="ws-tab-ink" className="ws-tab-ink" transition={{ duration: 0.45, ease: EASE }} />}
         </button>
       ))}
     </div>

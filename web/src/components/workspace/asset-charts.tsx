@@ -5,13 +5,15 @@
  * experiment), in the night style: hairline axes, amber for the first series and what was kept, bone for the rest.
  * Each chart has a full render (axes, ticks, legend, hover readout) and a `mini` thumbnail for the tiles.
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { AssetChart, CurveChart, CvPoint, HistogramChart, MatrixChart, Point, ScatterChart } from "@/lib/assets";
 import { linear, niceTicks, padDomain } from "@/lib/chart";
 import { fmtNum, formatScore, metricInfo, toRaw } from "@/lib/metrics";
 import type { Metric } from "@/lib/schema";
 
 const SERIES = ["var(--lp-signal)", "var(--lp-ink-2)", "var(--lp-ink-3)"];
+/** Stagger index for the draw-in (workspace.css animates `.as-draw` children; static everywhere else). */
+const at = (i: number) => ({ "--i": i }) as CSSProperties;
 const M = { top: 14, right: 16, bottom: 44, left: 62 };
 const MINI = { w: 120, h: 56 };
 /** Plot margins (narrower left gutter on small widths); the hover maths uses the same numbers as the frame. */
@@ -214,10 +216,15 @@ function CurveView({ c, width }: { c: CurveChart; width: number }) {
       >
         {(x, y) => (
           <>
-            {c.diagonal && <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} stroke="var(--lp-ink-3)" strokeDasharray="4 4" strokeOpacity={0.7} />}
+            {c.diagonal && (
+              <line className="fx-fade" x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} stroke="var(--lp-ink-3)" strokeDasharray="4 4" strokeOpacity={0.7} />
+            )}
             {c.series.map((s, i) => (
               <path
                 key={s.name + i}
+                className="fx-stroke"
+                style={at(i)}
+                pathLength={1}
                 d={path(s.points, x, y)}
                 fill="none"
                 stroke={SERIES[i % SERIES.length]}
@@ -296,9 +303,11 @@ function ScatterView({ c, width }: { c: ScatterChart; width: number }) {
         {(x, y) => (
           <>
             {c.diagonal && <line x1={x(xDomain[0])} y1={y(xDomain[0])} x2={x(xDomain[1])} y2={y(xDomain[1])} stroke="var(--lp-ink-3)" strokeDasharray="4 4" />}
-            {c.points.map((p, i) => (
-              <circle key={i} cx={x(p[0])} cy={y(p[1])} r={r} fill="var(--lp-signal)" fillOpacity={0.55} />
-            ))}
+            <g className="fx-wipe">
+              {c.points.map((p, i) => (
+                <circle key={i} cx={x(p[0])} cy={y(p[1])} r={r} fill="var(--lp-signal)" fillOpacity={0.55} />
+              ))}
+            </g>
           </>
         )}
       </Frame>
@@ -342,6 +351,8 @@ function HistogramView({ c, width }: { c: HistogramChart; width: number }) {
             {c.bins.map((b, i) => (
               <rect
                 key={i}
+                className="fx-bar"
+                style={at(i)}
                 x={x(b.x0) + 0.5}
                 width={Math.max(0.5, x(b.x1) - x(b.x0) - 1)}
                 y={y(b.count)}
@@ -391,6 +402,8 @@ function MatrixView({ c, width }: { c: MatrixChart; width: number }) {
             return (
               <g key={`${i}-${j}`} onPointerEnter={() => setHover({ i, j })} onPointerLeave={() => setHover(null)}>
                 <rect
+                  className="fx-cell"
+                  style={at(i + j)}
                   x={left + j * cell + 1}
                   y={top + i * cell + 1}
                   width={cell - 2}
@@ -495,7 +508,7 @@ export function CvView({ points, metric, width }: { points: CvPoint[]; metric: M
               const kept = p.verdict === "keep";
               const color = kept ? "var(--lp-signal)" : p.verdict === "crash" ? "var(--crash)" : "var(--lp-ink-2)";
               return (
-                <g key={p.id}>
+                <g key={p.id} className="fx-pt" style={at(i)}>
                   <line x1={x(i)} x2={x(i)} y1={y(p.mean - p.se)} y2={y(p.mean + p.se)} stroke={color} strokeOpacity={0.5} />
                   <circle cx={x(i)} cy={y(p.mean)} r={p.best ? 5 : 3.75} fill={kept ? color : "var(--lp-page)"} stroke={color} strokeWidth={1.4} />
                 </g>
@@ -519,7 +532,7 @@ export function CvView({ points, metric, width }: { points: CvPoint[]; metric: M
 export function ChartView({ chart, cv, metric }: { chart: AssetChart | "cv"; cv?: CvPoint[]; metric?: Metric | null }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   return (
-    <div ref={ref} className="w-full">
+    <div ref={ref} className="as-draw w-full">
       {chart === "cv" ? (
         <CvView points={cv ?? []} metric={metric ?? null} width={width} />
       ) : chart.kind === "curve" ? (

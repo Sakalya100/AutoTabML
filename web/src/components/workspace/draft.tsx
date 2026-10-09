@@ -6,14 +6,15 @@
  * the chat pane before the chat starts: the choices as custom controls, a peek at the table, and Start.
  */
 import { motion, useReducedMotion } from "motion/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { parseTable, type ColumnKind, type ColumnStats } from "@/lib/ingest/csv";
 import type { Preview } from "@/lib/api-types";
 import { METRIC_LABEL, PROBLEM_LABEL, suggest, suggestionFor, VALID_METRICS, type MetricId, type ProblemType, type Suggestion } from "@/lib/ingest/suggest";
 import { DEFAULT_EXPERIMENTS, MAX_UPLOAD_BYTES, validateRunRequest, validateUrlRunRequest } from "@/lib/upload";
 import { Listbox } from "./listbox";
+import { ScrambleIn, useMagnet } from "./fx/motion";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
+const EASE = [0.16, 1, 0.3, 1] as const;
 const HEAD_BYTES = 2 * 1024 * 1024;
 const SHOWN_ROWS = 5;
 
@@ -433,14 +434,16 @@ const METRIC_HINT: Record<MetricId, string> = {
  * controls, a peek at the table, and Start. Start hands over to the chat; "Use different data" goes back.
  */
 export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => void }) {
-  const { state: s, reduced } = draft;
+  const { state: s } = draft;
   const [goal, setGoalText] = useState(s.goal);
+  const startRef = useRef<HTMLButtonElement>(null);
+  useMagnet(startRef, { disabled: s.status !== "ready" || s.starting });
   if (s.status === "idle") return null;
   const from = s.source?.kind === "link" ? hostOf(s.source.url) || "the link" : "your file";
 
   if (s.status === "loading")
     return (
-      <div className="su-pane" aria-live="polite">
+      <div className="su-pane su-loading" aria-live="polite">
         <p className="ws-kicker">New run · reading the data</p>
         <p className="su-title">Reading {from}…</p>
         <p className="su-sub">Checking the header, the column types and a sample of rows.</p>
@@ -452,7 +455,7 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
     );
   if (s.status === "error")
     return (
-      <div className="su-pane" role="alert">
+      <div className="su-pane su-error" role="alert">
         <p className="ws-kicker text-[var(--crash)]">New run · couldn’t read it</p>
         <p className="su-title">That link didn’t work.</p>
         <p className="su-sub text-[var(--lp-ink-2)]">{s.error}</p>
@@ -482,19 +485,16 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
   };
 
   return (
-    <motion.div
-      className="su-pane"
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: EASE }}
-    >
+    <div className="su-pane su-ready" data-starting={s.starting || undefined}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="ws-kicker">New run · set it up</p>
         <button type="button" onClick={draft.clear} disabled={s.starting} className="ws-link text-[13px]">
           <span aria-hidden>←</span> Use different data
         </button>
       </div>
-      <p className="su-title">{table.label}</p>
+      <p className="su-title">
+        <ScrambleIn text={table.label} chars="abcdefghijklmnopqrstuvwxyz0123456789._-" duration={1.1} />
+      </p>
       <p className="su-meta">
         {table.rows == null ? "rows: unknown" : `${table.rowsExact ? "" : "≈ "}${table.rows.toLocaleString("en-US")} rows`} · {table.columns.length} columns
         {s.source?.kind === "link" && ` · from ${from}`}
@@ -536,7 +536,8 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
                   disabled={s.starting}
                   onClick={() => draft.setExperiments(n)}
                 >
-                  {n}
+                  {s.experiments === n && <motion.span layoutId="su-seg-ink" className="su-seg-ink" aria-hidden transition={{ duration: 0.5, ease: EASE }} />}
+                  <span className="relative">{n}</span>
                 </button>
               ))}
             </div>
@@ -587,7 +588,7 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
           </thead>
           <tbody>
             {table.sample.slice(0, SHOWN_ROWS).map((r, i) => (
-              <tr key={i}>
+              <tr key={i} style={{ "--i": i } as CSSProperties}>
                 {table.columns.map((c, j) => (
                   <td key={c} data-target={c === chips.target ? "" : undefined} title={r[j]}>
                     {r[j] === "" ? <span className="text-[var(--lp-ink-3)]">·</span> : r[j]}
@@ -601,7 +602,7 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
 
       <p className="mt-5 text-[13px] text-[var(--lp-ink-3)]">Runs on free Groq and Gemini models; data rows are never sent to Gemini.</p>
       <div className="su-actions">
-        <button type="button" onClick={onStart} disabled={s.starting} className="ws-start">
+        <button ref={startRef} type="button" onClick={onStart} disabled={s.starting} className="ws-start su-start">
           {s.starting ? "Starting…" : "Start the run"} <span aria-hidden>→</span>
         </button>
         <p className="text-[13.5px] leading-snug text-[var(--lp-ink-3)]">
@@ -614,6 +615,6 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
           )}
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 }
