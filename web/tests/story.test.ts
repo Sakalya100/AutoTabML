@@ -5,6 +5,7 @@ import { parseEventsJsonl } from "@/lib/events";
 import { buildView } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
 import {
+  agentModels,
   answerKind,
   askedOf,
   beadAt,
@@ -35,15 +36,16 @@ describe("run summary", () => {
     expect(humanName("iris_with_missing")).toBe("Iris with missing");
   });
   it("describes what was asked from the recorded profile only", () => {
-    expect(askedOf(bc)).toEqual({ target: "malignant", kind: "yes or no", rows: 569, features: 30 });
+    expect(askedOf(bc)).toEqual({ target: "diagnosis", kind: "yes or no", rows: 569, features: 30 });
     expect(askedOf(wine).kind).toBe("one of 3 kinds");
     expect(askedOf(housing).kind).toBe("a number");
     expect(answerKind(null)).toBeNull();
   });
   it("counts what happened and says 'on its own' only for the ceiling", () => {
     const o = outcomeOf(bc);
-    expect(o).toMatchObject({ tried: 37, kept: 4, crashed: 0, stop: "stopped on its own" });
-    expect(outcomeLine(o)).toBe("37 ideas tried, 4 kept, stopped on its own");
+    expect(o).toMatchObject({ tried: 13, kept: 3, crashed: 0, stop: "stopped on its own" });
+    expect(outcomeLine(o)).toBe("13 ideas tried, 3 kept, stopped on its own");
+    expect(outcomeOf(housing).stop).toBe("stopped at its budget of 14 ideas");
     expect(stopPhrase("max_experiments", 10)).toBe("stopped at its budget of 10 ideas");
     expect(stopPhrase(null)).toBeNull();
   });
@@ -56,6 +58,11 @@ describe("run summary", () => {
   it("words the proposer note plainly", () => {
     expect(proposerNote("heuristic")).toBe("Recorded without an LLM: ideas come from a built-in search.");
     expect(proposerNote(null)).toBeNull();
+    expect(proposerNote("agentic:groq+gemini")).toBe(
+      "Recorded live: AI agents on free Groq and Gemini models planned, coded and checked every idea after the starting point.",
+    );
+    expect(proposerNote("agentic:groq+gemini", agentModels(bc))).toMatch(/^Recorded live: AI agents \(.*gpt-oss-120b.*\) planned, coded and checked/);
+    expect(agentModels(bc)).toContain("gpt-oss-120b");
   });
 });
 
@@ -82,12 +89,11 @@ describe("plainVerdict", () => {
   const byId = (id: string) => bc.experiments.find((x) => x.id === id)!;
   it("reads the gate's reason", () => {
     expect(plainVerdict(byId("e000"))).toMatchObject({ tone: "kept", text: "The starting point" });
-    expect(plainVerdict(byId("e003"))).toMatchObject({ tone: "kept", text: "Just as good, and simpler" });
-    expect(plainVerdict(byId("e012"))).toMatchObject({ tone: "kept", text: "Better by a clear margin" });
-    expect(plainVerdict(byId("e005"))).toMatchObject({ tone: "kept", text: "Better, and not just luck" });
-    expect(plainVerdict(byId("e001"))).toMatchObject({ tone: "dropped", text: "A little better, but it could be luck" });
-    expect(plainVerdict(byId("e016"))).toMatchObject({ tone: "dropped", text: "Clearly worse" });
-    expect(plainVerdict(byId("e006"))).toMatchObject({ tone: "dropped", text: "No better" });
+    expect(plainVerdict(byId("e001"))).toMatchObject({ tone: "kept", text: "Better by a clear margin" });
+    expect(plainVerdict(byId("e012"))).toMatchObject({ tone: "kept", text: "Better, and not just luck" });
+    expect(plainVerdict(byId("e007"))).toMatchObject({ tone: "dropped", text: "A little better, but it could be luck" });
+    expect(plainVerdict(byId("e002"))).toMatchObject({ tone: "dropped", text: "Slightly worse" });
+    expect(plainVerdict(byId("e009"))).toMatchObject({ tone: "dropped", text: "Clearly worse" });
   });
   it("handles crashes and running experiments", () => {
     expect(plainVerdict({ status: "crash", reason: "", index: 3 }).tone).toBe("broke");
@@ -97,15 +103,14 @@ describe("plainVerdict", () => {
 
 describe("beadAt", () => {
   const keeps = keptIndices(bc);
-  it("follows the recorded keeps", () => expect(keeps).toEqual([0, 3, 5, 12]));
+  it("follows the recorded keeps", () => expect(keeps).toEqual([0, 1, 12]));
   it("rests on the latest keep across discards and rolls only into the next keep", () => {
     expect(beadAt(keeps, 0)).toBe(0);
-    expect(beadAt(keeps, 1.5)).toBe(0);
-    expect(beadAt(keeps, 2.5)).toBeCloseTo(0.5); // rolling toward e003
-    expect(beadAt(keeps, 3)).toBe(1);
-    expect(beadAt(keeps, 11.25)).toBeCloseTo(2.25);
-    expect(beadAt(keeps, 12)).toBe(3);
-    expect(beadAt(keeps, 36)).toBe(3);
+    expect(beadAt(keeps, 0.5)).toBeCloseTo(0.5); // rolling toward e001
+    expect(beadAt(keeps, 1)).toBe(1);
+    expect(beadAt(keeps, 6)).toBe(1);
+    expect(beadAt(keeps, 11.25)).toBeCloseTo(1.25);
+    expect(beadAt(keeps, 12)).toBe(2);
   });
   it("is continuous and monotonic in t", () => {
     let prev = 0;

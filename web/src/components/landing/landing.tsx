@@ -523,8 +523,17 @@ function Message({
       return (
         <>
           <h2 className="lp-h2">It knows when to stop.</h2>
-          <p className="lp-sub">When progress levels off, it stops by itself. No wasted effort.</p>
-          <Stat v={String(facts.nExperiments)} k="ideas tried, then it stopped on its own" />
+          {facts.stop?.reason === "ceiling" ? (
+            <>
+              <p className="lp-sub">When progress levels off, it stops by itself. No wasted effort.</p>
+              <Stat v={String(facts.nExperiments)} k="ideas tried, then it stopped on its own" />
+            </>
+          ) : (
+            <>
+              <p className="lp-sub">When progress levels off, it stops by itself. This run reached its idea budget first.</p>
+              <Stat v={String(facts.nExperiments)} k="ideas tried, the whole budget" />
+            </>
+          )}
         </>
       );
     case "test":
@@ -556,7 +565,10 @@ function Message({
             <a href={GITHUB_URL}>GitHub</a>
             <a href={DOCS_URL}>Design notes</a>
           </nav>
-          <p className="lp-colophon">Every number on this page comes from one real run on a {facts.name.replace(/_/g, " ")} dataset.</p>
+          <p className="lp-colophon">
+            Every number on this page comes from one real run{facts.proposer.startsWith("agentic") ? " of the AI agents" : ""} on a{" "}
+            {facts.name.replace(/_/g, " ")} dataset.
+          </p>
         </>
       );
   }

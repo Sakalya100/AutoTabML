@@ -13,6 +13,8 @@ export interface ReplayInfo {
   stop_reason: string;
   fixture?: boolean;
   blurb?: string;
+  /** Agentic runs: the models that served agent calls, most-used first ("gpt-oss-120b on Groq"). */
+  models?: string[];
 }
 
 const dir = () => path.join(process.cwd(), "public", "replays");
@@ -32,10 +34,7 @@ export async function loadReplay(name: string): Promise<{ info: ReplayInfo; reco
   const info = (await listReplays()).find((r) => r.name === name);
   if (!info) return null;
   try {
-    const [rec, ev] = await Promise.all([
-      fs.readFile(path.join(dir(), name, "run.json"), "utf8"),
-      fs.readFile(path.join(dir(), name, "events.jsonl"), "utf8"),
-    ]);
+    const [rec, ev] = await Promise.all([fs.readFile(path.join(dir(), name, "run.json"), "utf8"), fs.readFile(path.join(dir(), name, "events.jsonl"), "utf8")]);
     return { info, record: JSON.parse(rec) as RunRecord, events: parseEventsJsonl(ev) };
   } catch {
     return null;

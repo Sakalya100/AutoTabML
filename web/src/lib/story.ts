@@ -234,10 +234,34 @@ export function scoreLine(view: RunView): string | null {
   return `${formatScore(view.metric, view.final.testScore)} ${metricInfo(view.metric).label}`;
 }
 
-/** Proposer note, worded plainly; null when it needs no note. */
-export function proposerNote(proposer: string | null | undefined): string | null {
+const PROVIDER_NAMES: Record<string, string> = { groq: "Groq", gemini: "Gemini", cerebras: "Cerebras", anthropic: "Anthropic", openai: "OpenAI" };
+
+/** The models the run's agents actually used, most-used first, without the vendor prefix ("gpt-oss-120b"). */
+export function agentModels(view: Pick<RunView, "experiments" | "runSteps">): string[] {
+  const counts = new Map<string, number>();
+  for (const s of [...view.runSteps, ...view.experiments.flatMap((x) => x.steps)]) {
+    if (!s.model) continue;
+    const m = s.model.split("/").pop()!;
+    counts.set(m, (counts.get(m) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m);
+}
+
+/**
+ * Proposer note, worded plainly; null when it needs no note. `models` (from agentModels) names the models a
+ * recorded agentic run really used; without it the note names the providers the run was configured with.
+ */
+export function proposerNote(proposer: string | null | undefined, models?: readonly string[]): string | null {
   if (!proposer) return null;
   if (proposer === "heuristic") return "Recorded without an LLM: ideas come from a built-in search.";
+  if (proposer === "agentic" || proposer.startsWith("agentic:")) {
+    const providers = (proposer.split(":")[1] ?? "")
+      .split("+")
+      .filter(Boolean)
+      .map((p) => PROVIDER_NAMES[p] ?? p);
+    const on = models?.length ? ` (${models.join(", ")})` : providers.length ? ` on free ${providers.join(" and ")} models` : "";
+    return `Recorded live: AI agents${on} planned, coded and checked every idea after the starting point.`;
+  }
   return `Ideas proposed by ${proposer}.`;
 }
 

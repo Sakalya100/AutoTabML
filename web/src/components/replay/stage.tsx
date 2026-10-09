@@ -18,7 +18,7 @@ import { SurveyCanvas } from "@/components/survey-source";
 import { useWebGLAvailable } from "@/lib/gl";
 import { metricInfo } from "@/lib/metrics";
 import type { RunView } from "@/lib/run-state";
-import { askedOf, beadAt, displayScore, keptIndices, outcomeOf, plainGap, plainIdea, plainVerdict, proposerNote } from "@/lib/story";
+import { agentModels, askedOf, beadAt, displayScore, keptIndices, outcomeOf, plainGap, plainIdea, plainVerdict, proposerNote } from "@/lib/story";
 import type { SurveyScrub } from "@/lib/survey/contract";
 import { RevealHeading, ScrambleNumber } from "./motion";
 import { Timeline } from "./timeline";
@@ -279,7 +279,7 @@ export function Summary({
   const best = view.experiments.find((x) => x.id === view.bestId);
   const label = metricInfo(view.metric).label;
   const stopped = view.stop?.reason === "ceiling" ? "It stopped on its own when progress levelled off." : o.stop ? `It ${o.stop}.` : null;
-  const proposer = proposerNote(view.proposer);
+  const proposer = proposerNote(view.proposer, agentModels(view));
   return (
     <>
       {kicker && <p className="rp-kicker">{kicker}</p>}

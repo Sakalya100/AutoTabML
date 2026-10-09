@@ -170,6 +170,7 @@ export function beadTFor(pose: SurveyPose, p: number, facts: LandingFacts, reduc
       const total = L.reduce((x, y) => x + y, 0);
       if (!(total > 0)) return n * paced((p - ROLL_FROM) / (ROLL_TO - ROLL_FROM));
       let s = total * paced((p - ROLL_FROM) / (ROLL_TO - ROLL_FROM));
+      if (s >= total) return n; // land exactly on the last keep (subtracting the rolls can leave n - 1e-16)
       for (let i = 0; i < n; i++) {
         if (s <= L[i]) return i + (L[i] > 0 ? s / L[i] : 1);
         s -= L[i];

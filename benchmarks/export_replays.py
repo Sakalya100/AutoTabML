@@ -4,12 +4,15 @@
 
 Each argument is <run dir>[:<replay name>]. Existing replays not named on the command line are kept,
 except hand-written fixtures, which are dropped from the index (they stay available to the fake engine).
+
+The copies are published on the web, so local paths (repo root, home directory) and provider org ids are
+scrubbed from them on the way out; nothing else is changed.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
+import re
 import sys
 from pathlib import Path
 
@@ -28,7 +31,13 @@ def entry(name: str, rec: RunRecord) -> dict[str, object]:
         shape += f", {n_classes} classes"
     kept = sum(1 for e in rec.experiments if e.status.value == "keep")
     stop = (rec.stop or {}).get("reason", "?")
-    who = "offline heuristic proposer (no LLM)" if rec.proposer == "heuristic" else rec.proposer
+    models = agent_models(rec)
+    if rec.proposer == "heuristic":
+        who = "offline heuristic proposer (no LLM)"
+    elif rec.mode == "agentic":
+        who = "AI agents" + (f" ({', '.join(models)})" if models else "")
+    else:
+        who = rec.proposer
     return {
         "name": name,
         "title": f"{name.replace('_', ' ').title()} — {who}",
@@ -39,7 +48,24 @@ def entry(name: str, rec: RunRecord) -> dict[str, object]:
         "stop_reason": stop,
         "fixture": False,
         "blurb": f"Real engine run: {len(rec.experiments)} experiments, {kept} kept, stopped by '{stop}'.",
+        **({"models": models} if models else {}),
     }
+
+
+def agent_models(rec: RunRecord) -> list[str]:
+    """Models that served at least one agent call, most-used first ("gpt-oss-120b on Groq")."""
+    by_model = (rec.usage or {}).get("by_model") or {}
+    used = [(v.get("calls", 0), v) for v in by_model.values() if v.get("calls", 0) > 0]
+    used.sort(key=lambda cv: -cv[0])
+    return [f"{v['model'].split('/')[-1]} on {v['provider'].capitalize()}" for _, v in used]
+
+
+def scrub(text: str) -> str:
+    """Drop machine-specific paths and provider org ids from a file about to be published."""
+    text = text.replace(str(ROOT) + "/", "").replace(str(ROOT), ".")
+    text = text.replace(str(Path.home()), "~")
+    text = re.sub(r"""/(?:private/)?(?:tmp|var/folders)/[^\s\\"']*""", "<tmp>", text)
+    return re.sub(r"org_[0-9A-Za-z]+", "org_…", text)
 
 
 def main(args: list[str]) -> None:
@@ -53,8 +79,8 @@ def main(args: list[str]) -> None:
         rec = RunRecord.model_validate_json((src / "run.json").read_text())
         dst = REPLAYS / name
         dst.mkdir(parents=True, exist_ok=True)
-        shutil.copy(src / "run.json", dst / "run.json")
-        shutil.copy(src / "events.jsonl", dst / "events.jsonl")
+        for f in ("run.json", "events.jsonl"):
+            (dst / f).write_text(scrub((src / f).read_text()))
         by_name[name] = entry(name, rec)
         print(f"exported {src} -> {dst}")
     index_path.write_text(json.dumps({"replays": list(by_name.values())}, indent=2) + "\n")
