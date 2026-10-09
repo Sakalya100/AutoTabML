@@ -1,4 +1,4 @@
-"""Keep/revert gates (ROADMAP §3.2).
+"""Keep/revert gates (BUILD_PLAN_v2 §3.2).
 
 `StatGate` (default): keep a candidate only if the improvement is statistically real on the dev CV folds
 (one-sided Nadeau-Bengio corrected paired t-test across identical folds, p < alpha) AND the mean
