@@ -34,7 +34,7 @@ class ProposalFailed(RuntimeError):
 
 
 class LLMProposer:
-    """Strong model proposes; optional cheap model implements and repairs (BUILD_PLAN_v2 §10 cost mitigation)."""
+    """Strong model proposes; optional cheap model implements and repairs (BUILD_PLAN_v2 §10)."""
 
     def __init__(self, llm: LLM, cheap_llm: LLM | None = None, *, max_tokens: int = 16000) -> None:
         self.llm = llm
