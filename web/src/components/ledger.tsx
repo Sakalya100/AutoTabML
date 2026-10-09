@@ -67,7 +67,10 @@ function LedgerTable({ view, selectedId, onSelect }: Props) {
             <th className="px-2 py-2 font-medium">idea</th>
             <th className="px-2 py-2 font-medium">status</th>
             <th className="px-2 py-2 text-right font-medium">cv mean ± se</th>
-            <th className="px-2 py-2 text-right font-medium whitespace-nowrap" title="Change in CV mean versus the parent experiment, in the metric's own units">
+            <th
+              className="px-2 py-2 text-right font-medium whitespace-nowrap"
+              title="Change in CV mean versus the parent experiment, in the metric's own units"
+            >
               Δ parent
             </th>
             <th className="px-2 py-2 text-right font-medium">cost</th>
@@ -90,7 +93,8 @@ function LedgerTable({ view, selectedId, onSelect }: Props) {
                 }}
                 tabIndex={0}
                 aria-selected={sel}
-                className={`cursor-pointer border-b border-rule align-top transition-colors last:border-b-0 ${sel ? "bg-best-soft" : "hover:bg-paper-2"}`}
+                style={{ "--i": e.index } as React.CSSProperties}
+                className={`ledger-row cursor-pointer border-b border-rule align-top transition-colors last:border-b-0 ${sel ? "bg-best-soft" : "hover:bg-paper-2"}`}
               >
                 <td className="py-2.5 pr-2 pl-3 font-mono text-xs whitespace-nowrap">
                   <span className={isBest ? "font-semibold text-best" : "text-ink-2"}>{e.id}</span>
@@ -141,7 +145,10 @@ function Tree({ view, selectedId, onSelect }: Props) {
     const dot =
       e.status === "keep" ? "bg-keep" : e.status === "crash" ? "bg-crash" : e.status === "running" ? "bg-best animate-pulse" : "border border-discard bg-paper";
     return (
-      <li key={e.id} className="relative pl-5 before:absolute before:top-0 before:left-0 before:h-full before:border-l before:border-rule-strong last:before:h-[1.05rem] after:absolute after:top-[1.05rem] after:left-0 after:w-3.5 after:border-t after:border-rule-strong">
+      <li
+        key={e.id}
+        className="relative pl-5 before:absolute before:top-0 before:left-0 before:h-full before:border-l before:border-rule-strong last:before:h-[1.05rem] after:absolute after:top-[1.05rem] after:left-0 after:w-3.5 after:border-t after:border-rule-strong"
+      >
         <button
           onClick={() => onSelect(e.id)}
           className={`my-0.5 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm transition-colors ${
@@ -152,7 +159,9 @@ function Tree({ view, selectedId, onSelect }: Props) {
           <span className={`font-mono text-xs ${e.id === view.bestId ? "font-semibold text-best" : "text-ink-3"}`}>{e.id}</span>
           <span className={`truncate ${e.status === "discard" ? "text-ink-2" : "text-ink"}`}>{e.idea.title}</span>
           {e.idea.radical && <RadicalBadge />}
-          <span className="ml-auto shrink-0 font-mono text-xs text-ink-3 tabular">{e.cv ? formatScore(view.metric, e.cv.mean) : e.status === "crash" ? "crash" : ""}</span>
+          <span className="ml-auto shrink-0 font-mono text-xs text-ink-3 tabular">
+            {e.cv ? formatScore(view.metric, e.cv.mean) : e.status === "crash" ? "crash" : ""}
+          </span>
         </button>
         {children.length > 0 && <ul>{children.map(node)}</ul>}
       </li>

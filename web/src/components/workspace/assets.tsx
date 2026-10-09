@@ -5,13 +5,16 @@
  * A tile opens a preview over the workspace: the chart in full, or for the model how to load it plus its pipeline code.
  * Downloads come from GET /api/runs/{id}/assets; until a file is listed as available it reads "preparing…".
  */
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useReducedMotion } from "motion/react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { fmtBytes, mergeFiles, parseAssetsListing, type AssetChart, type AssetFile } from "@/lib/assets";
 import type { ChatAssets } from "@/lib/chat";
 import type { Metric } from "@/lib/schema";
 import { CodeView } from "../code-view";
 import { ChartThumb, ChartView } from "./asset-charts";
+import { spotlight } from "./fx/motion";
+import { gsap } from "@/lib/motion/gsap";
 
 type Preview = { kind: "chart"; chart: AssetChart } | { kind: "cv" } | { kind: "file"; name: string };
 
@@ -49,9 +52,15 @@ function useAssetFiles(runId: string, fromEvent: AssetFile[], ready: boolean): A
   return mergeFiles(fromEvent, listing);
 }
 
-export function AssetsCard({ it, metric }: { it: ChatAssets; metric: Metric | null }) {
+export function AssetsCard({ it, metric, enter = false }: { it: ChatAssets; metric: Metric | null; enter?: boolean }) {
   const files = useAssetFiles(it.runId, it.files, it.ready);
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [preview, setPreviewState] = useState<Preview | null>(null);
+  /** The tile a preview was opened from: the sheet grows out of it and settles back into it. */
+  const origin = useRef<DOMRect | null>(null);
+  const setPreview = (p: Preview | null, e?: MouseEvent<HTMLElement>) => {
+    if (e) origin.current = (e.currentTarget.closest(".as-tile") ?? e.currentTarget).getBoundingClientRect();
+    setPreviewState(p);
+  };
   const pipeline = files.find((f) => f.kind === "code" || /\.py$/i.test(f.name)) ?? null;
   // Looked up by name on every render, so a preview opened while "preparing…" turns into a download when ready.
   const previewFile = preview?.kind === "file" ? (files.find((f) => f.name === preview.name) ?? null) : null;
@@ -66,33 +75,34 @@ export function AssetsCard({ it, metric }: { it: ChatAssets; metric: Metric | nu
           {!it.ready && " · charts and files appear when the engine publishes them"}
         </p>
       </header>
-      <ul className="as-grid">
+      <ul className="as-grid" data-enter={enter || undefined} onPointerMove={spotlight}>
         {it.cv.length > 0 && (
-          <li>
+          <li style={at(0)}>
             <ChartTile
               title="CV score per experiment"
               sub={`${it.cv.length} experiment${it.cv.length === 1 ? "" : "s"}`}
-              onOpen={() => setPreview({ kind: "cv" })}
+              onOpen={(e) => setPreview({ kind: "cv" }, e)}
             >
               <ChartThumb chart="cv" cv={it.cv} />
             </ChartTile>
           </li>
         )}
-        {it.charts.map((c) => (
-          <li key={c.id}>
-            <ChartTile title={c.title} sub={chartSub(c)} onOpen={() => setPreview({ kind: "chart", chart: c })}>
+        {it.charts.map((c, i) => (
+          <li key={c.id} style={at(i + 1)}>
+            <ChartTile title={c.title} sub={chartSub(c)} onOpen={(e) => setPreview({ kind: "chart", chart: c }, e)}>
               <ChartThumb chart={c} />
             </ChartTile>
           </li>
         ))}
-        {files.map((f) => (
-          <li key={f.name}>
-            <FileTile file={f} onOpen={() => setPreview({ kind: "file", name: f.name })} />
+        {files.map((f, i) => (
+          <li key={f.name} style={at(it.charts.length + 1 + i)}>
+            <FileTile file={f} onOpen={(e) => setPreview({ kind: "file", name: f.name }, e)} />
           </li>
         ))}
       </ul>
       <PreviewDialog
         open={!!preview}
+        origin={origin}
         onClose={() => setPreview(null)}
         title={!preview ? "" : preview.kind === "cv" ? "CV score per experiment" : preview.kind === "chart" ? preview.chart.title : preview.name}
         sub={
@@ -114,6 +124,8 @@ export function AssetsCard({ it, metric }: { it: ChatAssets; metric: Metric | nu
   );
 }
 
+const at = (i: number) => ({ "--i": i }) as CSSProperties;
+
 function chartSub(c: AssetChart): string {
   switch (c.kind) {
     case "curve":
@@ -133,9 +145,9 @@ function fileBlurb(f: AssetFile): string {
   return f.note ?? "";
 }
 
-function ChartTile({ title, sub, onOpen, children }: { title: string; sub: string; onOpen: () => void; children: ReactNode }) {
+function ChartTile({ title, sub, onOpen, children }: { title: string; sub: string; onOpen: (e: MouseEvent<HTMLElement>) => void; children: ReactNode }) {
   return (
-    <button type="button" className="as-tile" onClick={onOpen} aria-haspopup="dialog">
+    <button type="button" className="as-tile" data-spot onClick={onOpen} aria-haspopup="dialog">
       <span className="as-tile-art">{children}</span>
       <span className="as-tile-title">{title}</span>
       <span className="as-tile-sub" title={sub}>
@@ -145,9 +157,9 @@ function ChartTile({ title, sub, onOpen, children }: { title: string; sub: strin
   );
 }
 
-function FileTile({ file, onOpen }: { file: AssetFile; onOpen: () => void }) {
+function FileTile({ file, onOpen }: { file: AssetFile; onOpen: (e: MouseEvent<HTMLElement>) => void }) {
   return (
-    <div className="as-tile as-file">
+    <div className="as-tile as-file" data-spot>
       <button type="button" className="as-tile-hit" onClick={onOpen} aria-haspopup="dialog" aria-label={`Preview ${file.name}`} />
       <span className="as-tile-art as-file-art">
         <FileIcon kind={file.kind} />
@@ -268,6 +280,7 @@ function useFileText(file: AssetFile | null): { state: "idle" | "loading" | "ok"
  */
 function PreviewDialog({
   open,
+  origin,
   onClose,
   title,
   sub,
@@ -275,6 +288,7 @@ function PreviewDialog({
   children,
 }: {
   open: boolean;
+  origin: { current: DOMRect | null };
   onClose: () => void;
   title: string;
   sub?: string | null;
@@ -283,15 +297,51 @@ function PreviewDialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const reduced = useReducedMotion();
+  const closing = useRef(false);
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- portal target exists only after mount
   useEffect(() => setMounted(true), []);
+
+  /** Where the tile sits relative to the open sheet: the offset and scale that put the sheet over the tile. */
+  const fromTile = (d: HTMLDialogElement) => {
+    const o = origin.current;
+    const r = d.getBoundingClientRect();
+    if (!o || !r.width) return { x: 0, y: 12, scale: 0.97 };
+    return {
+      x: o.left + o.width / 2 - (r.left + r.width / 2),
+      y: o.top + o.height / 2 - (r.top + r.height / 2),
+      scale: Math.max(0.2, Math.min(0.9, o.width / r.width)),
+    };
+  };
+
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
+    if (open && !d.open) {
+      closing.current = false;
+      d.showModal();
+      if (!reduced) {
+        const f = fromTile(d);
+        gsap.fromTo(
+          d,
+          { ...f, opacity: 0, filter: "blur(12px)" },
+          { x: 0, y: 0, scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.7, ease: "expo.out", clearProps: "transform,filter,opacity" },
+        );
+      }
+    }
     if (!open && d.open) d.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, mounted]);
+
+  /** Settle back into the tile, then close (Escape, the close button and the backdrop all come through here). */
+  const requestClose = () => {
+    const d = ref.current;
+    if (!d || closing.current) return;
+    closing.current = true;
+    if (reduced) return onClose();
+    gsap.to(d, { ...fromTile(d), opacity: 0, filter: "blur(8px)", duration: 0.32, ease: "power3.in", onComplete: onClose });
+  };
   if (!mounted) return null;
   return createPortal(
     <dialog
@@ -302,11 +352,11 @@ function PreviewDialog({
       onClose={onClose}
       onCancel={(e) => {
         e.preventDefault();
-        onClose();
+        requestClose();
       }}
       onClick={(e) => {
         // A click on the backdrop (the dialog box itself, outside the sheet) closes it.
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) requestClose();
       }}
     >
       {open && (
@@ -320,7 +370,7 @@ function PreviewDialog({
             </div>
             <div className="flex flex-none items-center gap-2">
               {action}
-              <button type="button" className="as-close" onClick={onClose} aria-label="Close preview">
+              <button type="button" className="as-close" onClick={requestClose} aria-label="Close preview">
                 <svg viewBox="0 0 12 12" className="size-3" aria-hidden>
                   <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                 </svg>

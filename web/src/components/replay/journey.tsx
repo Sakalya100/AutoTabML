@@ -9,11 +9,26 @@
  *     and the section moments (mist, cloud deck, truth gauge — gated by their own sections).
  * Beats: summary → the climb, idea by idea → why it stopped (mist, then the cloud deck) → the final test → the map →
  * the full record (the world stays behind it, dimmed, seen from above).
+ * Smoothing: when Lenis is driving the page (components/smooth-scroll) scrollY is already eased, so the journey follows
+ * it directly instead of easing it a second time; without Lenis it eases scrollY on its own.
  */
 
+import { useLenis } from "lenis/react";
 import Link from "next/link";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { EvolutionChart } from "@/components/evolution-chart";
 import { gatesAt, ramp } from "@/components/landing/gates";
 import { EASE, MagneticLink } from "@/components/landing/primitives";
@@ -23,7 +38,20 @@ import { formatSe, metricInfo } from "@/lib/metrics";
 import type { RunView } from "@/lib/run-state";
 import { displayScore, humanName, outcomeOf, plainGap, plainIdea, plainStopSignals, plainVerdict, stopPhrase } from "@/lib/story";
 import type { SurveyPose, SurveyScrub } from "@/lib/survey/contract";
-import { beadTAt, beatsOf, climbAt, journeyOf, keptThrough, messageAt, poseProgress, progressForIdea, type BeatKind, type Journey as JourneyFacts, type JourneyMsg } from "./journey-facts";
+import {
+  beadTAt,
+  beatsOf,
+  climbAt,
+  journeyOf,
+  keptThrough,
+  messageAt,
+  poseProgress,
+  progressForIdea,
+  type BeatKind,
+  type Journey as JourneyFacts,
+  type JourneyMsg,
+} from "./journey-facts";
+import { RevealHeading, ScrambleNumber, scrollDocTo } from "./motion";
 import { Summary } from "./stage";
 
 const mq = (q: string) => ({
@@ -126,6 +154,11 @@ export function Journey({ view, name, kicker, note, action, others = [], onDetai
   const kick = useRef<() => void>(() => {});
   const goIdea = useRef<(i: number) => void>(() => {});
   const goBeat = useRef<(k: BeatKind) => void>(() => {});
+  const lenis = useLenis();
+  const lenisRef = useRef(lenis);
+  useEffect(() => {
+    lenisRef.current = lenis;
+  }, [lenis]);
 
   // Never block on the world: if WebGL is missing or slow, show the page anyway.
   useEffect(() => {
@@ -230,7 +263,10 @@ export function Journey({ view, name, kicker, note, action, others = [], onDetai
       const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 1 / 60);
       lastT = now;
       const target = window.scrollY;
-      smooth = reduced ? target : smooth + (target - smooth) * (1 - Math.exp(-SMOOTH * dt));
+      // Lenis already eases wheel and programmatic scrolls; easing them again here would make the world trail the page
+      // twice over. Native scrolling (touch, scrollbar drag; Lenis reports "native") keeps the journey's own easing.
+      const eased = !!lenisRef.current && lenisRef.current.isScrolling !== "native";
+      smooth = reduced || eased ? target : smooth + (target - smooth) * (1 - Math.exp(-SMOOTH * dt));
       if (Math.abs(target - smooth) < 0.25) smooth = target;
       const intro = apply(smooth, now);
       if (smooth !== target || (readyAt.current != null && intro < 1)) raf = requestAnimationFrame(frame);
@@ -240,9 +276,7 @@ export function Journey({ view, name, kicker, note, action, others = [], onDetai
       if (!raf) raf = requestAnimationFrame(frame);
     };
     kick.current = start;
-    const scrollToLine = (line: number) => {
-      window.scrollTo({ top: Math.max(0, line - vh * 0.5), behavior: reduced ? "auto" : "smooth" });
-    };
+    const scrollToLine = (line: number) => scrollDocTo(Math.max(0, line - vh * 0.5), lenisRef.current);
     goIdea.current = (k: number) => {
       const c = geo.find((x) => x.kind === "climb");
       if (!c || J.n === 0) return;
@@ -252,8 +286,8 @@ export function Journey({ view, name, kicker, note, action, others = [], onDetai
     goBeat.current = (kind: BeatKind) => {
       const c = geo.find((x) => x.kind === kind);
       if (!c) return;
-      if (kind === "summary") window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
-      else if (kind === "record") window.scrollTo({ top: Math.max(0, c.start - 24), behavior: reduced ? "auto" : "smooth" });
+      if (kind === "summary") scrollDocTo(0, lenisRef.current);
+      else if (kind === "record") scrollDocTo(Math.max(0, c.start - 24), lenisRef.current);
       else scrollToLine((c.start + Math.min(c.end, c.start + vh)) / 2);
     };
     const onResize = () => {
@@ -348,9 +382,29 @@ export function Journey({ view, name, kicker, note, action, others = [], onDetai
 
 /* ---- the world ---- */
 
-const World = memo(function World({ view, store, narrow, scrub, onReady }: { view: RunView; store: Store; narrow: boolean; scrub: RefObject<SurveyScrub | null>; onReady: () => void }) {
-  const pose = useSyncExternalStore(store.sub, () => store.get().pose, () => store.get().pose);
-  const idea = useSyncExternalStore(store.sub, () => store.get().idea, () => store.get().idea);
+const World = memo(function World({
+  view,
+  store,
+  narrow,
+  scrub,
+  onReady,
+}: {
+  view: RunView;
+  store: Store;
+  narrow: boolean;
+  scrub: RefObject<SurveyScrub | null>;
+  onReady: () => void;
+}) {
+  const pose = useSyncExternalStore(
+    store.sub,
+    () => store.get().pose,
+    () => store.get().pose,
+  );
+  const idea = useSyncExternalStore(
+    store.sub,
+    () => store.get().idea,
+    () => store.get().idea,
+  );
   const webgl = useWebGLAvailable();
   const selectedId = idea != null ? (view.experiments[idea]?.id ?? null) : null;
   if (webgl === false)
@@ -399,7 +453,11 @@ interface RailProps {
 
 function Rail(props: RailProps) {
   const { store, beats } = props;
-  const id = useSyncExternalStore(store.sub, () => store.get().msg, () => store.get().msg);
+  const id = useSyncExternalStore(
+    store.sub,
+    () => store.get().msg,
+    () => store.get().msg,
+  );
   // The rail's layout (centred copy vs the record's corner pill) follows the message on screen, not the one queued:
   // the outgoing message finishes its exit where it was.
   const [laid, setLaid] = useState<JourneyMsg>(id);
@@ -467,11 +525,11 @@ function Message({ id, store, view, J, name, kicker, note, action, others, onDet
     case "noise":
       return (
         <>
-          <h2 className="lp-h2">Then the gains got too small to trust.</h2>
+          <RevealHeading className="lp-h2">Then the gains got too small to trust.</RevealHeading>
           <p className="lp-sub">Scores wobble a little by chance. A gain smaller than that wobble, the mist on the map, doesn&apos;t count.</p>
           {best?.cv?.se != null && (
             <div className="lp-stat">
-              <span className="lp-stat-v">± {formatSe(best.cv.se, metricInfo(metric).digits)}</span>
+              <ScrambleNumber className="lp-stat-v" value={`± ${formatSe(best.cv.se, metricInfo(metric).digits)}`} delay={0.25} />
               <span className="lp-stat-k">how much the best score wobbles by chance</span>
             </div>
           )}
@@ -483,7 +541,7 @@ function Message({ id, store, view, J, name, kicker, note, action, others, onDet
       const o = outcomeOf(view);
       return (
         <>
-          <h2 className="lp-h2">{ceiling ? "So it stopped on its own." : `It ${stopPhrase(view.stop?.reason) ?? "stopped"}.`}</h2>
+          <RevealHeading className="lp-h2">{ceiling ? "So it stopped on its own." : `It ${stopPhrase(view.stop?.reason) ?? "stopped"}.`}</RevealHeading>
           <p className="lp-sub">{ceiling ? `After ${o.tried} ideas, every sign said progress had levelled off.` : `After ${o.tried} ideas.`}</p>
           {signals.length > 0 && (
             <ul className="jn-signals">
@@ -501,11 +559,11 @@ function Message({ id, store, view, J, name, kicker, note, action, others, onDet
     case "test":
       return (
         <>
-          <h2 className="lp-h2">Then one honest test.</h2>
+          <RevealHeading className="lp-h2">Then one honest test.</RevealHeading>
           <p className="lp-sub">Its best model, on data it had never seen, opened once at the very end.</p>
           {f && (
             <div className="lp-stat">
-              <span className="lp-stat-v">{displayScore(metric, f.testScore)}</span>
+              <ScrambleNumber className="lp-stat-v" value={displayScore(metric, f.testScore)} delay={0.25} duration={1.2} />
               <span className="lp-stat-k">{label} on data it never saw</span>
             </div>
           )}
@@ -517,9 +575,9 @@ function Message({ id, store, view, J, name, kicker, note, action, others, onDet
       const first = view.experiments[0]?.cv?.mean;
       return (
         <>
-          <h2 className="lp-h2">
+          <RevealHeading className="lp-h2">
             The whole <em>map.</em>
-          </h2>
+          </RevealHeading>
           <p className="lp-sub">
             {o.tried} ideas, <span className="lp-signal">{o.kept} kept</span>
             {first != null && best?.cv ? (
@@ -566,7 +624,13 @@ function Message({ id, store, view, J, name, kicker, note, action, others, onDet
 
 /** In-place crossfade of one changing part (the panel around it never dims). */
 function Swap({ k, children, inline }: { k: string | number; children: ReactNode; inline?: boolean }) {
-  const anim = { initial: { opacity: 0 }, animate: { opacity: 1, transition: { duration: 0.16, ease: EASE } }, exit: { opacity: 0, transition: { duration: 0.12 } } };
+  // a soft focus pull: the old lines lift and blur away while the new ones settle in from just below
+  const d = inline ? 4 : 10;
+  const anim = {
+    initial: { opacity: 0, y: d, filter: "blur(5px)" },
+    animate: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.34, ease: EASE, delay: 0.04 } },
+    exit: { opacity: 0, y: -d * 0.7, filter: "blur(5px)", transition: { duration: 0.15, ease: [0.4, 0, 1, 1] as const } },
+  };
   if (inline)
     return (
       <span className="jn-swap" data-inline="">
@@ -591,7 +655,11 @@ function Swap({ k, children, inline }: { k: string | number; children: ReactNode
 type CardProps = { store: Store; view: RunView; J: JourneyFacts; onDetails: (id: string) => void };
 
 function useIdea(store: Store, lo: number, hi: number) {
-  const idea = useSyncExternalStore(store.sub, () => store.get().idea, () => store.get().idea);
+  const idea = useSyncExternalStore(
+    store.sub,
+    () => store.get().idea,
+    () => store.get().idea,
+  );
   return Math.min(hi, Math.max(lo, idea ?? lo));
 }
 
@@ -621,7 +689,7 @@ function IdeaCard({ store, view, J, onDetails }: CardProps) {
         </p>
         <div className="rp-pair">
           <div className="lp-stat">
-            <span className="lp-stat-v">{x.cv ? displayScore(metric, x.cv.mean) : "—"}</span>
+            <ScrambleNumber className="lp-stat-v" value={x.cv ? displayScore(metric, x.cv.mean) : "—"} duration={0.5} />
             <span className="lp-stat-k">its score in testing</span>
           </div>
           <div className="lp-stat">
@@ -655,7 +723,7 @@ function TailCard({ store, view, J, onDetails }: CardProps) {
       <p className="rp-kicker">
         Ideas {first + 1}–{J.n} <span className="jn-of">of {J.n}</span>
       </p>
-      <h2 className="lp-h2 jn-tail-h">It kept searching.</h2>
+      <RevealHeading className="lp-h2 jn-tail-h">It kept searching.</RevealHeading>
       <p className="lp-sub">
         {J.tailN} more idea{J.tailN === 1 ? "" : "s"} after its last win. None was good enough to keep.
       </p>
@@ -695,7 +763,11 @@ function TailCard({ store, view, J, onDetails }: CardProps) {
 /* ---- the progress strip: every idea, bar height = score, amber = kept ---- */
 
 function IdeaStrip({ view, store, goIdea, on }: RailProps & { on: boolean }) {
-  const idea = useSyncExternalStore(store.sub, () => store.get().idea, () => store.get().idea);
+  const idea = useSyncExternalStore(
+    store.sub,
+    () => store.get().idea,
+    () => store.get().idea,
+  );
   const exps = view.experiments;
   const n = exps.length;
   const track = useRef<HTMLDivElement>(null);
@@ -742,7 +814,9 @@ function IdeaStrip({ view, store, goIdea, on }: RailProps & { on: boolean }) {
         aria-valuemin={1}
         aria-valuemax={n}
         aria-valuenow={cur + 1}
-        aria-valuetext={x ? `Idea ${cur + 1} of ${n}: ${plainIdea(x.idea)}, ${x.status === "keep" ? "kept" : x.status === "crash" ? "crashed" : "dropped"}` : undefined}
+        aria-valuetext={
+          x ? `Idea ${cur + 1} of ${n}: ${plainIdea(x.idea)}, ${x.status === "keep" ? "kept" : x.status === "crash" ? "crashed" : "dropped"}` : undefined
+        }
         onPointerMove={(e: PointerEvent<HTMLDivElement>) => e.pointerType === "mouse" && setHover(at(e.clientX))}
         onPointerLeave={() => setHover(null)}
         onClick={(e) => goIdea.current(at(e.clientX))}

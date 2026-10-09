@@ -1,9 +1,9 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { TERMINAL as TERMINAL_STATUSES, type PublicRunMeta } from "@/lib/api-types";
 import { buildChat, type ChatMessageInput } from "@/lib/chat";
 import { isStopCommand, MAX_STEER_CHARS, splitLink } from "@/lib/chat-input";
@@ -21,9 +21,12 @@ import { ChatLog } from "./chat";
 import { SetupPane, useRunDraft } from "./draft";
 import { SignInPrompt, useSignedIn } from "../auth";
 import { useShell } from "./shell";
+import { ContourField, RevealTitle } from "./fx/hero";
+import { Num, ScrambleIn, spotlight } from "./fx/motion";
+import { gsap } from "@/lib/motion/gsap";
 
 const TERMINAL = new Set<string>(TERMINAL_STATUSES);
-const EASE = [0.22, 1, 0.36, 1] as const;
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 interface Props {
   /** null = /s/new: an empty session that exists once its first run starts. */
@@ -260,6 +263,24 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
     void load();
   };
 
+  const setupRef = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
+  /** The hand-off: the setup pane folds up and away before the chat (and the run's first card) takes the pane. */
+  const foldSetup = () =>
+    new Promise<void>((resolve) => {
+      const parts = setupRef.current?.querySelectorAll<HTMLElement>(".su-pane > *");
+      if (reduced || !parts?.length) return resolve();
+      gsap.to([...parts].reverse(), {
+        y: -14,
+        opacity: 0,
+        filter: "blur(4px)",
+        duration: 0.42,
+        ease: "power2.in",
+        stagger: 0.035,
+        onComplete: () => resolve(),
+      });
+    });
+
   const startRun = async () => {
     const res = await draft.start(sessionId);
     if (!res) return;
@@ -267,6 +288,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
       router.push(`/runs/${res.id}`);
       return;
     }
+    await foldSetup();
     refreshSessions();
     if (res.sessionId !== sessionId) router.replace(`/s/${res.sessionId}`);
     else {
@@ -280,6 +302,8 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
 
   /* ---- render ---------------------------------------------------------------------------------------- */
   const title = payload?.session.title ?? (sessionId ? "" : "New session");
+  /** An existing session whose history hasn't arrived yet: say so instead of "No runs yet" / "Start a run". */
+  const loading = !!sessionId && !payload && !loadError && !signedOut;
   const activeStatus = activeId ? statusOf(activeId) : null;
   const decided = view.experiments.filter((x) => x.status !== "running").length;
   const best = view.experiments.find((x) => x.id === view.bestId);
@@ -325,6 +349,8 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
                 {stopRequested && " · stopping"}
                 {!connected && " · reconnecting…"}
               </>
+            ) : loading ? (
+              "Loading…"
             ) : runs.length ? (
               `${runs.length} run${runs.length === 1 ? "" : "s"}`
             ) : (
@@ -336,8 +362,18 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
           <div className="su-scroll ws-thread">
             <SignInPrompt title={sessionId ? "Sign in to see this session." : "Sign in to start a run."} />
           </div>
+        ) : loading ? (
+          <div className="ws-thread ws-loading" aria-busy="true" aria-label="Loading the session">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="ws-skel" style={{ animationDelay: `${i * 120}ms` }}>
+                <span className="ws-skel-line w-[42%]" />
+                <span className="ws-skel-line w-[88%]" />
+                <span className="ws-skel-line w-[64%]" />
+              </div>
+            ))}
+          </div>
         ) : settingUp ? (
-          <div className="su-scroll">
+          <div className="su-scroll" ref={setupRef} data-lenis-prevent>
             <SetupPane key={draft.state.source?.kind === "link" ? draft.state.source.url : "file"} draft={draft} onStart={startRun} />
           </div>
         ) : (
@@ -399,21 +435,27 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
               <div>
                 <dt>tried</dt>
                 <dd>
-                  {decided}
+                  <Num value={decided} format={(v) => String(Math.round(v))} animate={mapActive} duration={0.6} />
                   {planned ? <span className="text-[var(--lp-ink-3)]">/{planned}</span> : null}
                 </dd>
               </div>
               <div>
                 <dt>best {metricInfo(metric).label}</dt>
-                <dd className="text-[var(--lp-signal)]">{best?.cv ? formatScore(metric, best.cv.mean) : "—"}</dd>
+                <dd className="text-[var(--lp-signal)]">
+                  <Num value={best?.cv?.mean} format={(v) => formatScore(metric, v)} mode="scramble" animate={mapActive} className="ws-fact-best" />
+                </dd>
               </div>
               <div>
                 <dt>tokens</dt>
-                <dd>{fmtInt(view.totalInputTokens + view.totalOutputTokens)}</dd>
+                <dd>
+                  <Num value={view.totalInputTokens + view.totalOutputTokens} format={(v) => fmtInt(Math.round(v))} animate={mapActive} />
+                </dd>
               </div>
               <div title={EQUIV_NOTE}>
                 <dt>cost ≈</dt>
-                <dd>{fmtCost(equivCost(view.totalInputTokens, view.totalOutputTokens))}</dd>
+                <dd>
+                  <Num value={equivCost(view.totalInputTokens, view.totalOutputTokens)} format={fmtCost} animate={mapActive} />
+                </dd>
               </div>
             </dl>
           )}
@@ -422,11 +464,14 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
           {mapRunId && mapEvents.length > 0 ? (
             <SurveyPanel view={view} selectedId={sel?.expId ?? null} onSelect={onMapSelect} staging={mapActive} compact bare heightClass="h-full" />
           ) : (
-            <div className="ws-map-empty">
-              <p className="max-w-[30ch] text-[14px] leading-relaxed text-[var(--lp-ink-3)]">
-                {activeId
-                  ? "The land appears with the first experiment. One position per experiment; the ball climbs when a change is kept."
-                  : "Each experiment becomes one position on this map. Start a run to see it climb."}
+            <div className="ws-map-empty" data-waiting={activeId ? "" : undefined}>
+              <ContourField visibleOnPhone={tab === "map"} busy={settingUp || !!activeId} />
+              <p className="ws-map-empty-text max-w-[30ch] text-[14px] leading-relaxed text-[var(--lp-ink-3)]">
+                {loading
+                  ? "Loading the map…"
+                  : activeId
+                    ? "The land appears with the first experiment. One position per experiment; the ball climbs when a change is kept."
+                    : "Each experiment becomes one position on this map. Start a run to see it climb."}
               </p>
             </div>
           )}
@@ -477,26 +522,42 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
 
 /* ---- pieces ------------------------------------------------------------------------------------------- */
 
+const at = (i: number) => ({ "--i": i }) as CSSProperties;
+
 function EmptyNew({ onExample, disabled }: { onExample: (url: string) => void; disabled: boolean }) {
   return (
-    <div className="ws-empty">
-      <p className="ws-kicker">New session</p>
-      <h1 className="mt-4 font-display text-[clamp(2.2rem,4.4vw,3.4rem)] leading-[1.02] tracking-[-0.01em]">
+    <div className="ws-empty ws-hero">
+      <p className="ws-kicker fx-rise" style={at(0)}>
+        <ScrambleIn text="New session" chars="upperCase" duration={1} />
+      </p>
+      <RevealTitle className="ws-hero-title mt-4 font-display text-[clamp(2.2rem,4.4vw,3.4rem)] leading-[1.02] tracking-[-0.01em]">
         Paste a link.
         <br />
-        Press <span className="text-[var(--lp-signal)] italic">Start.</span>
-      </h1>
-      <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-ink-2)]">
+        Press <span className="ws-hero-start text-[var(--lp-signal)] italic">Start.</span>
+      </RevealTitle>
+      <p className="fx-rise mt-4 max-w-[46ch] text-[15px] leading-relaxed text-[var(--lp-ink-2)]" style={at(4)}>
         A team of agents plans, writes and tests models on your table, keeps only the gains that are real, and stops when the gains are noise. You can steer
         them while they work.
       </p>
       {disabled ? (
-        <p className="mt-6 text-[14px] text-[var(--lp-ink-3)]">Live runs are switched off on this deployment. Watch a replay instead.</p>
+        <p className="fx-rise mt-6 text-[14px] text-[var(--lp-ink-3)]" style={at(5)}>
+          Live runs are switched off on this deployment. Watch a replay instead.
+        </p>
       ) : (
-        <div className="mt-7 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[13px] text-[var(--lp-ink-3)]">No data at hand? Try</span>
-          {EXAMPLES.map((ex) => (
-            <button key={ex.url} type="button" className="nr-example" onClick={() => onExample(ex.url)} title={ex.url}>
+        <div className="mt-7 flex flex-wrap items-center gap-2" onPointerMove={spotlight}>
+          <span className="fx-rise mr-1 text-[13px] text-[var(--lp-ink-3)]" style={at(5)}>
+            No data at hand? Try
+          </span>
+          {EXAMPLES.map((ex, i) => (
+            <button
+              key={ex.url}
+              type="button"
+              className="nr-example ws-chip fx-rise"
+              data-spot
+              style={at(6 + i)}
+              onClick={() => onExample(ex.url)}
+              title={ex.url}
+            >
               {ex.name} <span className="text-[var(--lp-ink-3)]">· {ex.blurb}</span>
             </button>
           ))}

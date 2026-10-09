@@ -13,18 +13,20 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { EvolutionChart } from "@/components/evolution-chart";
 import type { AnyEvent } from "@/lib/events";
 import { DOCS_URL, GITHUB_URL } from "@/lib/links";
 import { formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import { buildView, type RunView } from "@/lib/run-state";
 import { useWebGLAvailable } from "@/lib/gl";
+import { gsap } from "@/lib/motion/gsap";
 import type { SurveyPose, SurveyScrub } from "@/lib/survey/contract";
 import { MESSAGES, messageAt, type MessageId } from "./captions";
 import { beadTFor, cursorFor, type LandingFacts } from "./facts";
 import { gatesAt } from "./gates";
-import { EASE, MagneticLink, Ticker } from "./primitives";
+import { Hero } from "./hero";
+import { EASE, MagneticLink, ScrambleIn, Ticker } from "./primitives";
 
 // three.js stays out of the server render and the first paint; the void + loader show until it streams in.
 const SurveyCanvas = dynamic(() => import("@/components/survey/survey-canvas"), { ssr: false, loading: () => null });
@@ -44,8 +46,13 @@ const reducedQ = mq("(prefers-reduced-motion: reduce)");
 const BLEND_VH = 0.32;
 /** The climb → mist boundary's blend, as a multiple of BLEND_VH (a slow descent from the summit orbit). */
 const BLEND_MIST = 1.9;
-/** Scroll smoothing rate (1/s): light, so the stage glides between wheel ticks without lagging behind. */
+/**
+ * Scroll smoothing rate (1/s): light, so the stage glides between wheel ticks without lagging behind. Only when the
+ * page scroll is raw: with Lenis running (html.lenis, see smooth-scroll.tsx) the scroll position is already eased, and
+ * easing it a second time made the camera trail the copy — so the stage follows Lenis' value directly.
+ */
 const SMOOTH = 14;
+const lenisSmoothing = () => document.documentElement.classList.contains("lenis");
 /** Intro dolly from the orbit shot after the loader (ms). */
 const INTRO_MS = 2200;
 
@@ -93,7 +100,11 @@ const Stage = memo(function Stage({
   scrub: RefObject<SurveyScrub | null>;
   onReady: () => void;
 }) {
-  const pose = useSyncExternalStore(store.sub, () => store.get().pose, () => store.get().pose);
+  const pose = useSyncExternalStore(
+    store.sub,
+    () => store.get().pose,
+    () => store.get().pose,
+  );
   const webgl = useWebGLAvailable();
   if (webgl === false)
     return (
@@ -241,7 +252,7 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
       const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 1 / 60);
       lastT = now;
       const target = window.scrollY;
-      smooth = reduced ? target : smooth + (target - smooth) * (1 - Math.exp(-SMOOTH * dt));
+      smooth = reduced || lenisSmoothing() ? target : smooth + (target - smooth) * (1 - Math.exp(-SMOOTH * dt));
       if (Math.abs(target - smooth) < 0.25) smooth = target;
       const intro = apply(smooth, now) ?? 1;
       if (smooth !== target || (readyAt.current != null && intro < 1)) raf = requestAnimationFrame(frame);
@@ -268,6 +279,26 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
     };
   }, [facts, reduced, narrow, store]);
 
+  // The site footer rises over the world at the very end: the copy rail lifts away ahead of it, so the two never share
+  // the screen. (On phones the landing has no footer: the closing message carries the links.)
+  useEffect(() => {
+    const foot = document.querySelector<HTMLElement>("body > footer");
+    const rail = root.current?.querySelector<HTMLElement>(".lp-rail-inner");
+    if (!foot || !rail || getComputedStyle(foot).display === "none") return;
+    const tween = gsap.fromTo(
+      rail,
+      { autoAlpha: 1, y: 0 },
+      reduced
+        ? { autoAlpha: 0, duration: 0.01, scrollTrigger: { trigger: foot, start: "top 80%", toggleActions: "play none none reverse" } }
+        : { autoAlpha: 0, y: -56, ease: "none", scrollTrigger: { trigger: foot, start: "top bottom", end: "top 58%", scrub: 0.4 } },
+    );
+    return () => {
+      tween.scrollTrigger?.kill();
+      tween.kill();
+      gsap.set(rail, { clearProps: "opacity,visibility,transform" });
+    };
+  }, [reduced, narrow]);
+
   return (
     <MotionConfig reducedMotion="user">
       <div ref={root} data-landing className="lp-root" data-theme="dark" data-ready={ready ? "" : undefined} data-webgl={webgl === false ? "off" : "on"}>
@@ -277,10 +308,16 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
           <div className="lp-scrim" aria-hidden />
         </div>
 
-        <Rail store={store} facts={facts} webgl={webgl !== false} />
+        <Rail store={store} facts={facts} webgl={webgl !== false} ready={ready} />
 
         {SECTIONS.map((s) => (
-          <section key={s.pose} className="lp-sec" data-pose={s.pose} style={{ height: s.pose === "approach" ? "calc(100svh - 57px)" : `${s.vh}svh` }} aria-hidden />
+          <section
+            key={s.pose}
+            className="lp-sec"
+            data-pose={s.pose}
+            style={{ height: s.pose === "approach" ? "calc(100svh - 57px)" : `${s.vh}svh` }}
+            aria-hidden
+          />
         ))}
       </div>
     </MotionConfig>
@@ -309,7 +346,10 @@ function Loader({ ready, reduced }: { ready: boolean; reduced: boolean }) {
   }, [ready]);
   return (
     <div className="lp-loader" data-done={ready ? "" : undefined} data-reduced={reduced ? "" : undefined} aria-hidden={ready} role="status">
-      <p className="lp-loader-word">Mapping…</p>
+      <p className="lp-loader-word">Mapping the run…</p>
+      <span className="lp-loader-bar" aria-hidden>
+        <span style={{ transform: `scaleX(${n / 100})` }} />
+      </span>
       <p className="lp-loader-n">{String(n).padStart(3, "0")}</p>
     </div>
   );
@@ -320,16 +360,20 @@ function Loader({ ready, reduced }: { ready: boolean; reduced: boolean }) {
 // A single-slot swap that is never empty: the outgoing message dims (it never fades to nothing), is replaced in the
 // same frame by the incoming one at that same dim level, which then brightens. One block on screen, always.
 const DIM = 0.32;
-const OUT = { opacity: DIM, y: -6, transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as const } };
-const IN = { opacity: 1, y: 0, transition: { duration: 0.26, ease: EASE } };
-const FROM = { opacity: DIM, y: 8 };
+const OUT = { opacity: DIM, y: -6, filter: "blur(3px)", transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as const } };
+const IN = { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.34, ease: EASE } };
+const FROM = { opacity: DIM, y: 10, filter: "blur(5px)" };
 
 /**
  * A single fixed slot. The message id comes from the store (a string, so React re-renders only when it changes —
  * never per scroll frame) and swaps out-then-in, so two messages can never share the screen.
  */
-function Rail({ store, facts, webgl }: { store: StageStore; facts: LandingFacts; webgl: boolean }) {
-  const id = useSyncExternalStore(store.sub, () => store.get().msg, () => store.get().msg);
+function Rail({ store, facts, webgl, ready }: { store: StageStore; facts: LandingFacts; webgl: boolean; ready: boolean }) {
+  const id = useSyncExternalStore(
+    store.sub,
+    () => store.get().msg,
+    () => store.get().msg,
+  );
   const idx = MESSAGES.indexOf(id);
   // The hero's staggered entrance plays once, behind the loader; coming back to it later is an ordinary swap.
   const [intro, setIntro] = useState(true);
@@ -344,7 +388,7 @@ function Rail({ store, facts, webgl }: { store: StageStore; facts: LandingFacts;
         </ol>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={id} className="lp-msg" initial={FROM} animate={IN} exit={OUT}>
-            <Message id={id} store={store} facts={facts} webgl={webgl} />
+            <Message id={id} store={store} facts={facts} webgl={webgl} intro={intro} ready={ready} />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -355,7 +399,7 @@ function Rail({ store, facts, webgl }: { store: StageStore; facts: LandingFacts;
 function Stat({ v, k }: { v: ReactNode; k: string }) {
   return (
     <div className="lp-stat">
-      <span className="lp-stat-v">{v}</span>
+      <span className="lp-stat-v">{typeof v === "string" ? <ScrambleIn text={v} /> : v}</span>
       <span className="lp-stat-k">{k}</span>
     </div>
   );
@@ -363,7 +407,11 @@ function Stat({ v, k }: { v: ReactNode; k: string }) {
 
 /** The climb's live numbers: their own subscriber (on the replay step), so the rail itself never re-renders for them. */
 function LiveStat({ store, facts, kind }: { store: StageStore; facts: LandingFacts; kind: "tried" | "kept" | "best" }) {
-  const step = useSyncExternalStore(store.sub, () => store.get().step, () => store.get().step);
+  const step = useSyncExternalStore(
+    store.sub,
+    () => store.get().step,
+    () => store.get().step,
+  );
   const at = facts.growth[Math.min(step, facts.growth.length - 1)];
   if (kind === "tried")
     return (
@@ -394,35 +442,27 @@ function LiveStat({ store, facts, kind }: { store: StageStore; facts: LandingFac
   return <Stat v={<Ticker value={at.best} format={(x) => formatScore(facts.metric, x)} />} k="best score so far" />;
 }
 
-function Message({ id, store, facts, webgl }: { id: MessageId; store: StageStore; facts: LandingFacts; webgl: boolean }) {
+function Message({
+  id,
+  store,
+  facts,
+  webgl,
+  intro,
+  ready,
+}: {
+  id: MessageId;
+  store: StageStore;
+  facts: LandingFacts;
+  webgl: boolean;
+  intro: boolean;
+  ready: boolean;
+}) {
   const label = metricInfo(facts.metric).label;
   const replayHref = `/replays/${facts.name}`;
   const sv = facts.survey;
   switch (id) {
     case "hero":
-      return (
-        <>
-          <h1 className="lp-h1 lp-in" style={{ "--d": "60ms" } as CSSProperties}>
-            Models that tinker <em>themselves.</em>
-          </h1>
-          <p className="lp-sub lp-in" style={{ "--d": "200ms" } as CSSProperties}>
-            Give it a table and a goal. It tries idea after idea, keeps what truly works, and stops when it&apos;s done.
-          </p>
-          <div className="lp-ctas lp-in" style={{ "--d": "320ms" } as CSSProperties}>
-            <MagneticLink href={replayHref}>Watch a run</MagneticLink>
-            <MagneticLink href="/s/new" variant="ghost" requireAuth>
-              Start a survey
-            </MagneticLink>
-          </div>
-          <p className="lp-hint lp-in" style={{ "--d": "520ms" } as CSSProperties}>
-            <span className="lp-hint-line" aria-hidden />
-            <span>
-              Scroll to watch one real run
-              {webgl && <span className="lp-hint-alt"> · press and hold to light up the map</span>}
-            </span>
-          </p>
-        </>
-      );
+      return <Hero facts={facts} replayHref={replayHref} webgl={webgl} intro={intro} play={ready} />;
     case "first":
       return (
         <>
@@ -489,7 +529,7 @@ function Message({ id, store, facts, webgl }: { id: MessageId; store: StageStore
           <p className="lp-sub">Every run leaves a map like this one.</p>
           <div className="lp-ctas">
             <MagneticLink href="/s/new" requireAuth>
-              Start a survey
+              Try it on your data
             </MagneticLink>
             <MagneticLink href={replayHref} variant="ghost">
               Watch a run

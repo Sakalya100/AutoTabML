@@ -1,0 +1,66 @@
+/* The run pages' motion vocabulary (./motion.tsx): masks, scroll reveals, hairlines that draw in. */
+
+/* SplitText line masks: a little slack so descenders, italics and accents are not clipped by the mask */
+.mr-line-mask {
+  padding: 0 0.1em 0.16em;
+  margin: 0 -0.1em -0.16em;
+}
+/* stop the last line's negative margin collapsing through the heading into the gap below it */
+:where(:has(> .mr-line-mask)) {
+  display: flow-root;
+}
+
+/* A heading that reveals on first paint hides until it is split (never longer than a moment). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-pre] {
+    visibility: hidden;
+    animation: mr-failsafe 0s linear 1.6s forwards;
+  }
+}
+@keyframes mr-failsafe {
+  to {
+    visibility: visible;
+  }
+}
+
+/* Scroll reveals: armed by JavaScript, so nothing is hidden without it (or under reduced motion). */
+[data-rv-armed] .rv:not([data-in]) {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+}
+[data-rv-armed] .rv[data-in] {
+  transition:
+    opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(min(var(--i, 0), 8) * 75ms);
+}
+
+/* A hairline that draws in from the left once its row is in. */
+.rv-hair {
+  position: relative;
+}
+.rv-hair::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 1px;
+  background: var(--lp-hair);
+  transform-origin: 0 50%;
+}
+[data-rv-armed] .rv-hair:not([data-in])::before {
+  transform: scaleX(0);
+}
+[data-rv-armed] .rv-hair[data-in]::before {
+  transition: transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(min(var(--i, 0), 8) * 75ms + 80ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-rv-armed] .rv:not([data-in]),
+  [data-rv-armed] .rv-hair:not([data-in])::before {
+    opacity: 1;
+    transform: none;
+  }
+}

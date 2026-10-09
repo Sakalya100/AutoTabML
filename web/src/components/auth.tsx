@@ -7,7 +7,8 @@
  */
 import { ClerkProvider, Show, SignInButton, UserButton, useAuth, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useMagnetic } from "@/components/chrome/magnetic";
 import { AUTH_ENABLED } from "@/lib/auth-flag";
 
 export { AUTH_ENABLED };
@@ -29,6 +30,15 @@ const appearance = {
   },
 };
 
+/** The account menu, drawn in the header's hairline language (classes styled in globals.css). */
+const userButtonAppearance = {
+  elements: {
+    userButtonTrigger: "site-avatar-trigger",
+    avatarBox: "site-avatar",
+    userButtonPopoverCard: "site-account-card",
+  },
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   if (!AUTH_ENABLED) return <>{children}</>;
   return <ClerkProvider appearance={appearance}>{children}</ClerkProvider>;
@@ -41,17 +51,26 @@ export function AuthControls() {
     <>
       <Show when="signed-out">
         <SignInButton mode="modal">
-          <button type="button" className="ml-1 rounded-full border border-rule px-3.5 py-1.5 text-ink transition-colors hover:border-rule-strong">
-            Sign in
-          </button>
+          <SignInPill />
         </SignInButton>
       </Show>
       <Show when="signed-in">
-        <span className="ml-1 grid size-8 place-items-center">
-          <UserButton />
+        <span className="site-account">
+          <UserButton appearance={userButtonAppearance} />
         </span>
       </Show>
     </>
+  );
+}
+
+/** The header's "Sign in": a hairline pill that leans toward the cursor. Clerk's SignInButton passes onClick in. */
+function SignInPill(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useMagnetic(ref, 0.22);
+  return (
+    <button ref={ref} type="button" className="site-signin" {...props}>
+      <span className="site-signin-label">Sign in</span>
+    </button>
   );
 }
 

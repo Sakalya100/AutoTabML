@@ -20,6 +20,7 @@ import { metricInfo } from "@/lib/metrics";
 import type { RunView } from "@/lib/run-state";
 import { askedOf, beadAt, displayScore, keptIndices, outcomeOf, plainGap, plainIdea, plainVerdict, proposerNote } from "@/lib/story";
 import type { SurveyScrub } from "@/lib/survey/contract";
+import { RevealHeading, ScrambleNumber } from "./motion";
 import { Timeline } from "./timeline";
 
 const mq = (q: string) => ({
@@ -205,7 +206,14 @@ export function RunStage({ view, name, action, secondary, focusId, onSelect, onD
       <div className="rp-world">
         {webgl === false ? (
           <div className="rp-fallback">
-            <EvolutionChart view={view} domainView={view} plannedExperiments={n} selectedId={mode === "explore" ? selected?.id : null} onSelect={onWorldSelect} compact />
+            <EvolutionChart
+              view={view}
+              domainView={view}
+              plannedExperiments={n}
+              selectedId={mode === "explore" ? selected?.id : null}
+              onSelect={onWorldSelect}
+              compact
+            />
           </div>
         ) : (
           <SurveyCanvas
@@ -275,7 +283,9 @@ export function Summary({
   return (
     <>
       {kicker && <p className="rp-kicker">{kicker}</p>}
-      <h1 className="rp-h1">{name}</h1>
+      <RevealHeading as="h1" className="rp-h1" pre delay={0.15}>
+        {name}
+      </RevealHeading>
       <dl className="rp-story">
         {asked.target && (
           <div>
@@ -305,7 +315,7 @@ export function Summary({
           <div>
             <dt>Result</dt>
             <dd>
-              <span className="rp-score">{displayScore(view.metric, f.testScore)}</span>
+              <ScrambleNumber className="rp-score" value={displayScore(view.metric, f.testScore)} delay={0.5} duration={1.2} />
               <span className="rp-score-k">{label} on data it never saw</span>
               <span className="rp-gap">{plainGap(view.metric, f.optimismGap, best?.cv?.se)}</span>
             </dd>
@@ -343,7 +353,7 @@ function ExperimentCard({ view, index, onBack, onDetails }: { view: RunView; ind
       </p>
       <div className="rp-pair">
         <div className="lp-stat">
-          <span className="lp-stat-v">{x.cv ? displayScore(metric, x.cv.mean) : "—"}</span>
+          <ScrambleNumber className="lp-stat-v" value={x.cv ? displayScore(metric, x.cv.mean) : "—"} duration={0.6} />
           <span className="lp-stat-k">its score in testing</span>
         </div>
         <div className="lp-stat">

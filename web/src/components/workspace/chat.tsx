@@ -10,8 +10,9 @@ import type { Metric } from "@/lib/schema";
 import { answerKind, plainIdea, stopPhrase } from "@/lib/story";
 import { CodeView, DiffView } from "../code-view";
 import { AssetsCard } from "./assets";
+import { Num, spotlight, useChangedAfterMount } from "./fx/motion";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 /** True once the chat has mounted: messages that arrive after that animate in; a loaded backlog does not. */
 const ReadyCtx = createContext(false);
@@ -27,9 +28,10 @@ function Enter({ children, className }: { children: ReactNode; className?: strin
   return (
     <motion.div
       className={className}
-      initial={animate ? { opacity: 0, y: 6 } : false}
+      data-enter={animate || undefined}
+      initial={animate ? { opacity: 0, y: 14 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.36, ease: EASE }}
+      transition={{ duration: 0.7, ease: EASE }}
     >
       {children}
     </motion.div>
@@ -61,10 +63,14 @@ export function ChatLog({ items, metricOf, selected, focusKey, onSelect, typing,
   const [unseen, setUnseen] = useState(false);
   const [ready, setReady] = useState(false);
   const reduced = useReducedMotion();
+  // "Ready" one frame after the first non-empty render: the backlog that loads with the page stays still; only what
+  // arrives after it (a streamed card, a sent message) animates in.
+  const hasItems = items.length > 0;
   useEffect(() => {
+    if (!hasItems || ready) return;
     const r = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(r);
-  }, []);
+  }, [hasItems, ready]);
 
   const sig = `${chatSignature(items)}|${typing ?? ""}|${tail ? "t" : ""}`;
   // Follow the newest message unless the reader scrolled up; then count it as unseen (the pill says "new").
@@ -121,8 +127,17 @@ export function ChatLog({ items, metricOf, selected, focusKey, onSelect, typing,
   return (
     <ReadyCtx.Provider value={ready}>
       <div className="relative min-h-0 flex-1">
-        <div ref={scroller} onScroll={onScroll} className="ws-scroll" role="log" aria-live="polite" aria-relevant="additions" aria-label="Agent chat">
-          <div className="ws-thread">
+        <div
+          ref={scroller}
+          onScroll={onScroll}
+          className="ws-scroll"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          aria-label="Agent chat"
+          data-lenis-prevent
+        >
+          <div className="ws-thread" onPointerMove={spotlight}>
             {items.length === 0 && !tail && empty}
             {items.map((it) => (
               <Item key={it.key} it={it} metric={"runId" in it ? metricOf(it.runId) : null} selected={selected} onSelect={onSelect} />
@@ -138,22 +153,19 @@ export function ChatLog({ items, metricOf, selected, focusKey, onSelect, typing,
                   transition={{ duration: 0.28, ease: EASE }}
                   className="ws-typing"
                 >
-                  <span className="flex gap-1" aria-hidden>
-                    {[0, 1, 2].map((i) => (
-                      <motion.span
-                        key={i}
-                        className="size-1 rounded-full bg-[var(--lp-ink-3)]"
-                        animate={reduced ? undefined : { opacity: [0.25, 1, 0.25] }}
-                        transition={{
-                          duration: 1.2,
-                          repeat: Infinity,
-                          delay: i * 0.18,
-                          ease: "easeInOut",
-                        }}
-                      />
-                    ))}
-                  </span>
-                  {typing}
+                  <span className="ws-typing-scan" aria-hidden />
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={typing}
+                      className="ws-typing-text"
+                      initial={{ opacity: 0, y: 5, filter: "blur(3px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter: "none" } }}
+                      exit={{ opacity: 0, y: -5, filter: "blur(3px)", transition: { duration: 0.18 } }}
+                      transition={{ duration: 0.45, ease: EASE }}
+                    >
+                      {typing}
+                    </motion.span>
+                  </AnimatePresence>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -242,10 +254,10 @@ function Item({ it, metric, selected, onSelect }: { it: ChatItem; metric: Metric
     }
     case "final":
       return (
-        <Enter className="ws-card">
+        <Enter className="ws-card ws-final">
           <p className="ws-label">Locked test</p>
           <p className="ws-card-title">
-            <span className="font-mono text-[1.35rem] tracking-tight text-[var(--lp-signal)] tabular-nums">{formatScore(metric, it.test)}</span>{" "}
+            <SeenNum className="ws-final-num font-mono text-[1.35rem] tracking-tight text-[var(--lp-signal)] tabular-nums" value={it.test} metric={metric} />{" "}
             <span className="text-[var(--lp-ink-2)]">on data it never saw.</span>
           </p>
           <p className="ws-card-text">
@@ -265,11 +277,7 @@ function Item({ it, metric, selected, onSelect }: { it: ChatItem; metric: Metric
     case "report":
       return <ReportCard it={it} />;
     case "assets":
-      return (
-        <Enter>
-          <AssetsCard it={it} metric={metric} />
-        </Enter>
-      );
+      return <AssetsItem it={it} metric={metric} />;
     case "run_end":
       return (
         <Enter className="ws-card">
@@ -287,6 +295,47 @@ function Item({ it, metric, selected, onSelect }: { it: ChatItem; metric: Metric
         </Enter>
       );
   }
+}
+
+function AssetsItem({ it, metric }: { it: Extract<ChatItem, { kind: "assets" }>; metric: Metric | null }) {
+  const enter = useEnterAnim();
+  return (
+    <Enter>
+      <AssetsCard it={it} metric={metric} enter={enter} />
+    </Enter>
+  );
+}
+
+/** Fires once, the first time the element is mostly on screen (a result read for the first time). */
+function useSeenOnce<T extends HTMLElement>(threshold = 0.6) {
+  const ref = useRef<T>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || seen) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setSeen(true);
+          io.disconnect();
+        }
+      },
+      { threshold },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [seen, threshold]);
+  return [ref, seen] as const;
+}
+
+/** The locked-test score: counts up from zero the first time it scrolls into view. */
+function SeenNum({ value, metric, className }: { value: number; metric: Metric | null; className?: string }) {
+  const [ref, seen] = useSeenOnce<HTMLSpanElement>(0.9);
+  return (
+    <span ref={ref} className={className}>
+      <Num key={seen ? "seen" : "idle"} value={value} format={(v) => formatScore(metric, v)} reveal={seen} duration={1.8} />
+    </span>
+  );
 }
 
 function Fact({ k, v, title }: { k: string; v: string; title?: string }) {
@@ -367,14 +416,20 @@ function ExperimentCard({
   const enter = useEnterAnim();
   const running = !x.decision;
   const v = x.decision ? VERDICT[x.decision.verdict] : null;
+  // The verdict arrived while this card was on screen: let it land (once). A loaded backlog stays still.
+  const landed = useChangedAfterMount(!!x.decision);
+  const crowned = landed && x.decision?.verdict === "keep" && x.decision.newBest && x.index > 0;
   const active = [...x.steps].reverse().find((s) => s.status === "running");
   const idea = x.idea ? cap(plainIdea(x.idea)) : null;
   return (
     <motion.article
       data-key={dataKey}
-      initial={enter ? { opacity: 0, y: 8 } : false}
+      data-enter={enter || undefined}
+      data-crowned={crowned || undefined}
+      data-spot
+      initial={enter ? { opacity: 0, y: 16 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: EASE }}
+      transition={{ duration: 0.75, ease: EASE }}
       aria-current={selected || undefined}
       className={`ws-card ws-x ${selected ? "ws-x-selected" : ""}`}
     >
@@ -393,7 +448,7 @@ function ExperimentCard({
           ) : (
             v && (
               <>
-                <span className={v.cls}>
+                <span className={`${v.cls} ${landed ? "ws-x-land" : ""}`}>
                   {v.word}
                   {x.decision!.newBest && x.index > 0 && (
                     <span aria-label=", new best" className="ml-1">
@@ -402,7 +457,14 @@ function ExperimentCard({
                   )}
                 </span>
                 {x.scored && (
-                  <span className={`ws-x-score ${x.decision!.verdict === "keep" ? "text-[var(--lp-ink)]" : ""}`}>{formatScore(metric, x.scored.cvMean)}</span>
+                  <Num
+                    className={`ws-x-score ${x.decision!.verdict === "keep" ? "text-[var(--lp-ink)]" : ""}`}
+                    value={x.scored.cvMean}
+                    format={(n) => formatScore(metric, n)}
+                    mode="scramble"
+                    reveal={landed}
+                    duration={0.9}
+                  />
                 )}
               </>
             )
@@ -449,6 +511,7 @@ function DetailsFooter({ steps, x, metric }: { steps: ChatStep[]; x?: ChatExperi
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId | null>(null);
   const uid = useId();
+  const reduced = useReducedMotion();
   const reasoning = steps.filter((s) => s.reasoning || s.inputSummary);
   const codeStep = [...steps].reverse().find((s) => s.diff) ?? [...steps].reverse().find((s) => s.code);
   const outputs = steps.filter((s) => s.stdoutTail || s.stderrTail || s.error);
@@ -489,7 +552,13 @@ function DetailsFooter({ steps, x, metric }: { steps: ChatStep[]; x?: ChatExperi
         <span className="ws-disc-list">{tabs.map((t) => t.label).join(" · ")}</span>
       </button>
       {open && (
-        <div id={`${uid}-details`} className="ws-dpanel">
+        <motion.div
+          id={`${uid}-details`}
+          className="ws-dpanel"
+          initial={reduced ? false : { opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: EASE }}
+        >
           {tabs.length > 1 && (
             <div role="tablist" aria-label="Details" className="ws-dtabs">
               {tabs.map((t) => (
@@ -506,6 +575,9 @@ function DetailsFooter({ steps, x, metric }: { steps: ChatStep[]; x?: ChatExperi
                   className="ws-dtab"
                 >
                   {t.label}
+                  {t.id === current.id && (
+                    <motion.span layoutId={`${uid}-ink`} className="ws-dtab-ink" aria-hidden transition={{ duration: 0.45, ease: EASE }} />
+                  )}
                 </button>
               ))}
             </div>
@@ -521,7 +593,7 @@ function DetailsFooter({ steps, x, metric }: { steps: ChatStep[]; x?: ChatExperi
             {current.id === "output" && <OutputTab steps={outputs} x={x} />}
             {current.id === "gate" && <GateTab steps={usage} x={x} metric={metric ?? null} />}
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );
@@ -661,7 +733,7 @@ function ReportCard({ it }: { it: Extract<ChatItem, { kind: "report" }> }) {
       </div>
     );
   return (
-    <Enter className="ws-card ws-report">
+    <ReportReveal>
       <p className="ws-label">Report</p>
       <p className="ws-card-title ws-report-title">{it.plain ?? "What it found"}</p>
       {it.summary && <p className="ws-card-text">{it.summary}</p>}
@@ -670,6 +742,18 @@ function ReportCard({ it }: { it: Extract<ChatItem, { kind: "report" }> }) {
       {list("Next steps", it.nextSteps)}
       {it.notes.length > 0 && list("Notes from the run", it.notes)}
       {it.faithful === false && <p className="ws-given mt-4">Some numbers the Reporter quoted were corrected against the run record.</p>}
+    </ReportReveal>
+  );
+}
+
+/** The report reads in once, block by block, the first time it scrolls into view. */
+function ReportReveal({ children }: { children: ReactNode }) {
+  const [ref, seen] = useSeenOnce<HTMLDivElement>(0.01);
+  return (
+    <Enter className="ws-card ws-report">
+      <div ref={ref} className="ws-report-body" data-seen={seen ? "" : undefined}>
+        {children}
+      </div>
     </Enter>
   );
 }

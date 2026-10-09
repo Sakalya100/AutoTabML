@@ -15,6 +15,8 @@ interface Props {
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   compact?: boolean;
+  /** Draw the best-so-far line and settle the dots in when the chart first mounts (the run pages' full record). */
+  drawIn?: boolean;
 }
 
 const M = { top: 18, right: 108, bottom: 34, left: 58 };
@@ -40,7 +42,7 @@ function domainOf(v: RunView): [number, number] | null {
   return [Math.min(...ys), Math.max(...ys)];
 }
 
-export function EvolutionChart({ view, domainView, plannedExperiments, selectedId, onSelect, compact }: Props) {
+export function EvolutionChart({ view, domainView, plannedExperiments, selectedId, onSelect, compact, drawIn }: Props) {
   const [wrapRef, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<ExpView | null>(null);
   const metric = view.metric ?? domainView?.metric ?? null;
@@ -51,12 +53,7 @@ export function EvolutionChart({ view, domainView, plannedExperiments, selectedI
   const plotW = width - m.left - m.right;
   const plotH = height - m.top - m.bottom;
 
-  const nMax = Math.max(
-    domainView?.experiments.length ?? 0,
-    view.experiments.length,
-    plannedExperiments ?? 0,
-    4,
-  );
+  const nMax = Math.max(domainView?.experiments.length ?? 0, view.experiments.length, plannedExperiments ?? 0, 4);
   const x = linear(-0.5, nMax - 0.5, m.left, m.left + plotW);
 
   const [lo, hi] = useMemo(() => {
@@ -104,7 +101,7 @@ export function EvolutionChart({ view, domainView, plannedExperiments, selectedI
         </span>
         <Legend />
       </div>
-      <div ref={wrapRef} className="graph-paper relative rounded-md border border-rule bg-paper">
+      <div ref={wrapRef} className="graph-paper relative rounded-md border border-rule bg-paper" data-draw={drawIn ? "" : undefined}>
         <svg width={width} height={height} role="img" aria-label={label} className="block max-w-full select-none">
           {/* y grid + labels */}
           {ticks.map((t) => (
@@ -143,8 +140,8 @@ export function EvolutionChart({ view, domainView, plannedExperiments, selectedI
             </text>
           )}
 
-          {band && <path d={band} fill="var(--best-soft)" />}
-          {line && <path d={line} fill="none" stroke="var(--best)" strokeWidth={2.5} strokeLinejoin="round" />}
+          {band && <path d={band} fill="var(--best-soft)" className="ec-band" />}
+          {line && <path d={line} fill="none" stroke="var(--best)" strokeWidth={2.5} strokeLinejoin="round" pathLength={1} className="ec-line" />}
 
           {/* per-experiment whiskers + dots */}
           {view.experiments.map((e) => {
@@ -165,7 +162,8 @@ export function EvolutionChart({ view, domainView, plannedExperiments, selectedI
                   onSelect?.(e.id);
                 }
               },
-              className: "cursor-pointer outline-none",
+              className: "ec-dot cursor-pointer outline-none",
+              style: { "--i": e.index } as React.CSSProperties,
             };
             if (e.status === "running") {
               const cy = best ? y(best.mean) : m.top + plotH / 2;
@@ -180,7 +178,11 @@ export function EvolutionChart({ view, domainView, plannedExperiments, selectedI
               return (
                 <g key={e.id} {...common}>
                   <rect x={cx - 9} y={railY - 9} width={18} height={18} fill="transparent" />
-                  <path d={`M${cx - 4},${railY - 4}L${cx + 4},${railY + 4}M${cx + 4},${railY - 4}L${cx - 4},${railY + 4}`} stroke="var(--crash)" strokeWidth={2} />
+                  <path
+                    d={`M${cx - 4},${railY - 4}L${cx + 4},${railY + 4}M${cx + 4},${railY - 4}L${cx - 4},${railY + 4}`}
+                    stroke="var(--crash)"
+                    strokeWidth={2}
+                  />
                   {sel && <circle cx={cx} cy={railY} r={9} fill="none" stroke="var(--ink)" strokeWidth={1.25} />}
                 </g>
               );
@@ -189,7 +191,14 @@ export function EvolutionChart({ view, domainView, plannedExperiments, selectedI
             const keep = e.status === "keep";
             return (
               <g key={e.id} {...common}>
-                <line x1={cx} x2={cx} y1={y(e.cv.mean + e.cv.se)} y2={y(e.cv.mean - e.cv.se)} stroke={keep ? "var(--keep)" : "var(--discard)"} strokeOpacity={0.45} />
+                <line
+                  x1={cx}
+                  x2={cx}
+                  y1={y(e.cv.mean + e.cv.se)}
+                  y2={y(e.cv.mean - e.cv.se)}
+                  stroke={keep ? "var(--keep)" : "var(--discard)"}
+                  strokeOpacity={0.45}
+                />
                 <circle cx={cx} cy={cy} r={12} fill="transparent" />
                 <circle
                   cx={cx}
@@ -215,7 +224,14 @@ export function EvolutionChart({ view, domainView, plannedExperiments, selectedI
                 fill="none"
               />
               <line x1={colX} x2={colX} y1={y(fin.selectScore)} y2={y(fin.testScore)} stroke="var(--ink-3)" strokeWidth={1} />
-              <rect x={colX - 4.5} y={y(fin.selectScore) - 4.5} width={9} height={9} transform={`rotate(45 ${colX} ${y(fin.selectScore)})`} fill="var(--select)" />
+              <rect
+                x={colX - 4.5}
+                y={y(fin.selectScore) - 4.5}
+                width={9}
+                height={9}
+                transform={`rotate(45 ${colX} ${y(fin.selectScore)})`}
+                fill="var(--select)"
+              />
               <rect x={colX - 4.5} y={y(fin.testScore) - 4.5} width={9} height={9} fill="var(--test)" />
               {!narrow && (
                 <>
