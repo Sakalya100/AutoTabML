@@ -184,7 +184,7 @@ _DECIMAL_POINT = re.compile(r"^[+-]?\d+\.\d+$", re.ASCII)
 
 
 def sniff_decimal(text: str, delimiter: str) -> str:
-    """"," when the first data rows hold unquoted numbers like 7,4 and none like 7.4 (only possible when the delimiter
+    """ "," when the first data rows hold unquoted numbers like 7,4 and none like 7.4 (only possible when the delimiter
     isn't a comma); else ".". The engine's rule (src/autotinker/data/csvformat.py sniff_decimal)."""
     if delimiter == ",":
         return "."
