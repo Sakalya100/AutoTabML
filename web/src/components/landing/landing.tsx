@@ -165,13 +165,15 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
   const readyAt = useRef<number | null>(null);
   const kick = useRef<() => void>(() => {});
 
-  // Loader gate: never block for long — if WebGL is missing or slow, open anyway.
+  // Loader gate: never block for long. No WebGL, or a software renderer (headless browsers, link checkers such as
+  // Google's OAuth homepage check, VMs) where the world takes ~9 s to build: open at once and let it fade in behind
+  // the copy. A real GPU gets at most 2.5 s of loader.
   useEffect(() => {
-    if (webgl === false) {
+    if (webgl === false || softwareRenderer()) {
       const t = setTimeout(() => setReady(true), 0);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => setReady(true), 7000);
+    const t = setTimeout(() => setReady(true), 2500);
     return () => clearTimeout(t);
   }, [webgl]);
   const [onReady] = useState(() => () => setReady(true));
@@ -325,6 +327,20 @@ export function Landing({ events, facts }: { events: AnyEvent[]; facts: LandingF
 }
 
 /* ---- loader: the first frame behind it IS the intro shot ---- */
+
+/** True when WebGL runs on the CPU (SwiftShader, llvmpipe, …): the 3D world is slow to appear there. */
+function softwareRenderer(): boolean {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2") ?? document.createElement("canvas").getContext("webgl");
+    if (!gl) return true;
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const name = String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+  } catch {
+    return false;
+  }
+}
 
 function Loader({ ready, reduced }: { ready: boolean; reduced: boolean }) {
   const [n, setN] = useState(0);

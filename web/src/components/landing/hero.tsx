@@ -7,6 +7,7 @@
  * numbers. Coming back to the hero later is an ordinary rail swap (no replay). Reduced motion: everything is simply
  * there.
  */
+import Link from "next/link";
 import { useRef, type CSSProperties } from "react";
 import { formatScore, metricInfo } from "@/lib/metrics";
 import { gsap, prefersReducedMotion, SplitText, useGSAP } from "@/lib/motion/gsap";
@@ -115,6 +116,11 @@ export function Hero({ facts, replayHref, webgl, intro, play }: { facts: Landing
           Scroll to watch that run
           {webgl && <span className="lp-hint-alt"> · press and hold to light up the map</span>}
         </span>
+      </p>
+      {/* Google's OAuth homepage rules: say why sign-in data is requested, and link the privacy policy, in plain view. */}
+      <p className="lp-data-note lp-hero-after">
+        Sign in with Google or an email code only to save your sessions: we keep your name and email, nothing else. <Link href="/privacy">Privacy policy</Link>{" "}
+        · <Link href="/about">About</Link>
       </p>
     </div>
   );

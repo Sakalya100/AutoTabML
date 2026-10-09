@@ -805,6 +805,26 @@ body:has([data-landing]) > footer {
     visibility: hidden;
   }
 }
+.lp-data-note {
+  margin-top: 1.1rem;
+  max-width: 34rem;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--lp-ink-3);
+}
+.lp-data-note a {
+  color: var(--lp-ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--lp-hair);
+  text-underline-offset: 3px;
+  transition:
+    color 0.2s,
+    text-decoration-color 0.2s;
+}
+.lp-data-note a:hover {
+  color: var(--lp-ink);
+  text-decoration-color: var(--lp-signal);
+}
 .lp-proof {
   margin-top: 2.1rem;
   display: flex;
