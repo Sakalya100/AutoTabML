@@ -10,6 +10,8 @@ import { parseAssetsEvent, type AssetChart, type AssetFile, type CvPoint } from 
 import { isAssetsReady, type AnyEvent, type EventOf } from "./events";
 import { parseGateReason, type GateSummary } from "./feed";
 import type { Decision, Idea, Metric } from "./schema";
+import { greaterIsBetter } from "./metrics";
+import { isNewBest } from "./verdict";
 
 export type Stage = "intake" | "profiling" | "baseline" | "drafts" | "improve" | "tuning" | "ensemble" | "stop" | "locked_test" | "report";
 
@@ -67,7 +69,19 @@ export interface ChatExperiment {
   hpoTrials: number;
   attempts: { attempt: number; ok: boolean; errorKind: string | null }[];
   scored: { cvMean: number; cvSe: number; select: number } | null;
-  decision: { verdict: Decision; reason: string; gate: GateSummary; newBest: boolean; bestId: string; bestMean: number } | null;
+  decision: {
+    verdict: Decision;
+    reason: string;
+    gate: GateSummary;
+    /** Kept because it was better (the gate's "improvement"); a simplification replaces the best without this. */
+    newBest: boolean;
+    /** The best after this decision. */
+    bestId: string;
+    bestMean: number;
+    /** The best this experiment was gated against (the best before it), null for the first. */
+    prevBestId: string | null;
+    prevBestMean: number | null;
+  } | null;
 }
 
 export interface ChatTask {
@@ -142,7 +156,17 @@ export type ChatItem =
       faithful: boolean | null;
     }
   | ChatAssets
-  | { kind: "run_end"; key: string; ts: string; runId: string; status: "failed" | "cancelled" | "timed_out"; error: string | null };
+  | {
+      kind: "run_end";
+      key: string;
+      ts: string;
+      runId: string;
+      status: "failed" | "cancelled" | "timed_out";
+      error: string | null;
+      /** Why it failed (a src/autotinker/failures.py code) and what to do, from the run meta. */
+      errorCode?: string | null;
+      hint?: string | null;
+    };
 
 export interface ChatRunInput {
   id: string;
@@ -150,6 +174,8 @@ export interface ChatRunInput {
   /** Run status from the API; failed/cancelled/timed_out adds a closing message. */
   status?: string | null;
   error?: string | null;
+  errorCode?: string | null;
+  hint?: string | null;
   finishedAt?: string | null;
 }
 
@@ -219,6 +245,7 @@ export function runItems(run: ChatRunInput): ChatItem[] {
   let lastTs = "";
   let task: ChatTask | null = null;
   let assets: { charts: AssetChart[]; files: AssetFile[]; ts: string } | null = null;
+  let curBest: { id: string; mean: number } | null = null;
   let terminal = run.status === "finished" || run.status === "failed" || run.status === "cancelled" || run.status === "timed_out";
 
   // The Task card appears with whichever comes first: run_started or the intake/profiler step.
@@ -378,10 +405,13 @@ export function runItems(run: ChatRunInput): ChatItem[] {
           verdict: e.decision,
           reason: e.reason ?? "",
           gate: parseGateReason(e.reason),
-          newBest: e.decision === "keep" && e.best_exp_id === e.exp_id,
+          newBest: e.best_exp_id === e.exp_id && isNewBest(e.decision, e.reason),
           bestId: e.best_exp_id,
           bestMean: e.best_cv_mean,
+          prevBestId: curBest?.id ?? null,
+          prevBestMean: curBest?.mean ?? null,
         };
+        if (e.decision === "keep") curBest = { id: e.best_exp_id, mean: e.best_cv_mean };
         break;
       }
       case "steer_applied": {
@@ -444,6 +474,11 @@ export function runItems(run: ChatRunInput): ChatItem[] {
   }
 
   for (const x of exps.values()) x.stage = experimentStage(x, x.phase);
+  // Older engines wrote the executor's "CV …" line oriented (log-loss negated). Errors and losses are never negative,
+  // so a negative value for a lower-is-better metric is an oriented one: show it in the metric's own direction.
+  const runMetric = (task as ChatTask | null)?.metric ?? null;
+  if (runMetric && !greaterIsBetter(runMetric))
+    for (const x of exps.values()) for (const st of x.steps) if (st.role === "executor") st.plain = st.plain.replace(/^(Ran in the sandbox: CV )-(\d)/, "$1$2");
   // The final card counts every LLM call of the run, the Reporter's (which come after run_finished) included.
   let tokIn = 0;
   let tokOut = 0;
@@ -459,7 +494,16 @@ export function runItems(run: ChatRunInput): ChatItem[] {
   }
 
   if (run.status === "failed" || run.status === "cancelled" || run.status === "timed_out")
-    items.push({ kind: "run_end", key: `${rid}:end`, ts: run.finishedAt ?? lastTs ?? "", runId: rid, status: run.status, error: run.error ?? null });
+    items.push({
+      kind: "run_end",
+      key: `${rid}:end`,
+      ts: run.finishedAt ?? lastTs ?? "",
+      runId: rid,
+      status: run.status,
+      error: run.error ?? null,
+      errorCode: run.errorCode ?? null,
+      hint: run.hint ?? null,
+    });
 
   // The report message carries the Reporter's headline; its finished step line would only repeat it.
   const hasReport = items.some((it) => it.kind === "report");

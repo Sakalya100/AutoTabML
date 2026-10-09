@@ -16,6 +16,8 @@ export interface ColumnStats {
   /** Numeric columns only. */
   min?: number;
   max?: number;
+  /** Rows in the rarest value, when there are 2–50 distinct values (class balance for a classification target). */
+  minCount?: number;
 }
 
 const MISSING = new Set(["", "na", "n/a", "nan", "null", "none", "?", "-", "--", "#n/a"]);
@@ -119,7 +121,12 @@ export function profileColumn(name: string, values: string[]): ColumnStats {
   const present = values.filter((v) => !isMissing(v));
   const missing = values.length - present.length;
   const uniq = new Set(present);
-  const base = { name, count: present.length, missing, unique: uniq.size };
+  const base: { name: string; count: number; missing: number; unique: number; minCount?: number } = { name, count: present.length, missing, unique: uniq.size };
+  if (uniq.size >= 2 && uniq.size <= 50) {
+    const freq = new Map<string, number>();
+    for (const v of present) freq.set(v, (freq.get(v) ?? 0) + 1);
+    base.minCount = Math.min(...freq.values());
+  }
   if (!present.length) return { ...base, kind: "empty" };
 
   const allNum = present.every((v) => NUM_RE.test(v.replace(/,/g, "")));
@@ -161,7 +168,12 @@ export function parseTable(text: string, opts: { partial?: boolean; sampleRows?:
   const columns = header.map((c, i) => c || `column_${i + 1}`);
   const width = columns.length;
   const rows = records.map((r) => (r.length >= width ? r.slice(0, width) : [...r, ...Array(width - r.length).fill("")]));
-  const stats = columns.map((c, j) => profileColumn(c, rows.map((r) => r[j])));
+  const stats = columns.map((c, j) =>
+    profileColumn(
+      c,
+      rows.map((r) => r[j]),
+    ),
+  );
   return { delimiter, columns, sample: rows.slice(0, opts.sampleRows ?? 50), parsedRows: rows.length, stats };
 }
 

@@ -19,7 +19,8 @@ export type RunEvent =
   | HpoTrialEvent
   | ReportReady
   | SteerApplied
-  | AssetsReady;
+  | AssetsReady
+  | RunFailed;
 export type RunId = string;
 export type Seq = number;
 export type Ts = string;
@@ -287,17 +288,25 @@ export type Charts = (CurveChart | MatrixChart | ScatterChart | HistogramChart)[
 export type Name2 = string;
 export type Path = string;
 export type Bytes = number;
-export type Kind4 = "model" | "code";
+export type Kind4 = "model" | "code" | "script" | "text" | "json";
 export type ContentType = string;
 export type Files = AssetFile[];
-export type Version = number;
 export type RunId16 = string;
+export type Seq16 = number;
+export type Ts16 = string;
+export type Type16 = "run_failed";
+export type Code1 = string;
+export type Message = string;
+export type Hint = string;
+export type Detail = string;
+export type Version = number;
+export type RunId17 = string;
 export type CreatedAt = string;
 export type Mode = string;
 export type Proposer1 = string;
 export type Id4 = string;
 export type ParentId1 = string | null;
-export type Code1 = string;
+export type Code2 = string;
 export type Diff1 = string;
 export type Reason2 = string;
 export type SelectScore2 = number | null;
@@ -784,12 +793,29 @@ export interface AssetFile {
   content_type: ContentType;
 }
 /**
+ * The last event of a failed run (see autotinker.failures). `message` and `hint` are plain language
+ * for the user; `detail` is the technical reason, never a traceback.
+ *
+ * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
+ * via the `definition` "RunFailed".
+ */
+export interface RunFailed {
+  run_id: RunId16;
+  seq?: Seq16;
+  ts?: Ts16;
+  type?: Type16;
+  code: Code1;
+  message: Message;
+  hint?: Hint;
+  detail?: Detail;
+}
+/**
  * This interface was referenced by `AutoTinkerSchemas`'s JSON-Schema
  * via the `definition` "RunRecord".
  */
 export interface RunRecord {
   version?: Version;
-  run_id: RunId16;
+  run_id: RunId17;
   created_at: CreatedAt;
   mode: Mode;
   proposer: Proposer1;
@@ -819,7 +845,7 @@ export interface ExperimentRecord {
   id: Id4;
   parent_id: ParentId1;
   idea: Idea;
-  code: Code1;
+  code: Code2;
   diff?: Diff1;
   status: Decision;
   reason?: Reason2;

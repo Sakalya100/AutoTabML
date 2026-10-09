@@ -6,6 +6,7 @@
 import type { AnyEvent, EventOf } from "./events";
 import { stopSignals, type StopSignal } from "./run-state";
 import type { Decision, Idea, Metric } from "./schema";
+import { isNewBest } from "./verdict";
 
 export interface FeedAttempt {
   attempt: number;
@@ -103,7 +104,7 @@ export interface ExperimentItem {
     gate: GateSummary;
     bestId: string;
     bestMean: number;
-    /** This experiment became the best solution. */
+    /** Kept because it was better (a simplification replaces the best without being better). */
     newBest: boolean;
   } | null;
 }
@@ -239,7 +240,16 @@ export function buildFeed(events: readonly AnyEvent[]): FeedItem[] {
       }
       case "agent_step_started": {
         const e = ev as EventOf<"agent_step_started">;
-        const line: AgentStepLine = { stepId: e.step_id, role: e.role, plain: "", status: null, model: null, attempt: e.attempt ?? 0, running: true, inputSummary: e.input_summary ?? "" };
+        const line: AgentStepLine = {
+          stepId: e.step_id,
+          role: e.role,
+          plain: "",
+          status: null,
+          model: null,
+          attempt: e.attempt ?? 0,
+          running: true,
+          inputSummary: e.input_summary ?? "",
+        };
         if (e.exp_id) holder(e.exp_id).steps.push(line);
         else {
           const item: AgentStepItem = { kind: "agent_step", key: `step-${e.step_id || e.seq}`, seq: e.seq, ...line };
@@ -342,7 +352,7 @@ export function buildFeed(events: readonly AnyEvent[]): FeedItem[] {
             gate: parseGateReason(e.reason),
             bestId: e.best_exp_id,
             bestMean: e.best_cv_mean,
-            newBest: e.decision === "keep" && e.best_exp_id === e.exp_id,
+            newBest: e.best_exp_id === e.exp_id && isNewBest(e.decision, e.reason),
           };
           x.stage = "decided";
         }

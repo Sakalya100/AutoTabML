@@ -11,6 +11,7 @@ import { coerceEvent, type AnyEvent } from "@/lib/events";
 import { activeAgentStep, roleDoing } from "@/lib/feed";
 import { EQUIV_NOTE, equivCost, fmtCost, fmtInt } from "@/lib/format";
 import { EXAMPLES } from "@/lib/ingest/examples";
+import { etaText, liveEtaSeconds } from "@/lib/ingest/guards";
 import { formatScore, metricInfo } from "@/lib/metrics";
 import { buildView } from "@/lib/run-state";
 import type { MessageRow, SessionPayload } from "@/lib/session-types";
@@ -19,6 +20,7 @@ import { plainIdea } from "@/lib/story";
 import { SurveyPanel } from "../survey-panel";
 import { ChatLog } from "./chat";
 import { SetupPane, useRunDraft } from "./draft";
+import { RunEndActionsCtx, type RunEndActions } from "./run-end";
 import { SignInPrompt, useSignedIn } from "../auth";
 import { useShell } from "./shell";
 import { ContourField, RevealTitle } from "./fx/hero";
@@ -153,6 +155,8 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
         events: events[r.row.id] ?? [],
         status: m?.status ?? r.row.status,
         error: m?.error ?? null,
+        errorCode: m?.errorCode ?? null,
+        hint: m?.hint ?? null,
         finishedAt: m?.finishedAt ?? r.row.finished_at,
       };
     }),
@@ -165,6 +169,25 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
   const metric = view.metric;
 
   const activeEvents = activeId ? events[activeId] : undefined;
+  // A clock for the live ETA in the header (ticks only while a run is active).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!activeId) return;
+    const t = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(t);
+  }, [activeId]);
+  const eta = (() => {
+    if (!activeId || !activeEvents?.length) return null;
+    const ms = (ts: string) => Date.parse(ts);
+    const first = activeEvents.find((e) => e.type === "experiment_started");
+    if (activeEvents.some((e) => e.type === "stopped" || e.type === "run_finished")) return null;
+    const decisions = activeEvents
+      .filter((e) => e.type === "decision")
+      .map((e) => ms(e.ts))
+      .filter(Number.isFinite);
+    const planned = runs.find((r) => r.row.id === activeId)?.row.max_experiments ?? null;
+    return etaText(liveEtaSeconds(first ? ms(first.ts) : null, decisions, planned, Math.max(now, ...decisions)));
+  })();
   const typing = (() => {
     if (!activeId) return null;
     const st = statusOf(activeId);
@@ -297,6 +320,50 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
     }
   };
 
+  /* ---- a run that didn't finish: Retry (same settings, this session) / Edit setup (the setup, prefilled) ---- */
+  const runEndActions: RunEndActions = {
+    sourceOf: (runId) => {
+      const m = metas[runId];
+      if (m?.source === "file" || (!m?.sourceUrl && m?.fileName)) return "file";
+      return m?.sourceUrl ? "url" : null;
+    },
+    enabled: (runId) => !activeId && runs.at(-1)?.row.id === runId && liveEnabled,
+    retry: async (runId) => {
+      const m = metas[runId];
+      if (!m?.sourceUrl) return "This run's settings aren't available; use Edit setup instead.";
+      const n = Math.min(m.maxExperiments, maxExperiments);
+      try {
+        const res = await fetch("/api/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: m.sourceUrl,
+            target: m.target,
+            metric: m.metric,
+            goal: m.description ?? "",
+            maxExperiments: n,
+            csvFormat: m.csvFormat,
+            sessionId,
+            sentence: `Retry: predict ${m.target}${m.fileName ? ` in ${m.fileName}` : ""}, over at most ${n} experiments.`,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { id?: string; sessionId?: string; error?: string };
+        if (!res.ok || !body.id) return body.error ?? "Something went wrong starting the run.";
+        refreshSessions();
+        if (body.sessionId && body.sessionId !== sessionId) router.replace(`/s/${body.sessionId}`);
+        else await load();
+        return null;
+      } catch {
+        return "Couldn't reach the server. Check your connection and try again.";
+      }
+    },
+    edit: (runId) => {
+      const m = metas[runId];
+      if (m?.sourceUrl) void draft.previewLink(m.sourceUrl, m.description ?? "");
+      else fileRef.current?.click();
+    },
+  };
+
   /** A link or file is being read or set up: the setup form takes over the chat pane until Start. */
   const settingUp = !activeId && draft.state.status !== "idle";
 
@@ -346,6 +413,7 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
                     ? `Experiment ${view.current.index + 1}${planned ? ` of ${planned}` : ""}`
                     : "Working"
                   : "Starting"}
+                {activeStatus === "running" && eta && !stopRequested && <span className="ws-chat-eta"> · {eta}</span>}
                 {stopRequested && " · stopping"}
                 {!connected && " · reconnecting…"}
               </>
@@ -378,19 +446,21 @@ export function SessionView({ sessionId, maxExperiments, liveEnabled }: Props) {
           </div>
         ) : (
           <>
-            <ChatLog
-              items={items}
-              metricOf={(runId) => {
-                const started = events[runId]?.find((e) => e.type === "run_started") as { profile?: { metric?: Metric } } | undefined;
-                return started?.profile?.metric ?? null;
-              }}
-              selected={selectedKey}
-              focusKey={focusKey}
-              onSelect={onChatSelect}
-              typing={typing}
-              tail={null}
-              empty={sessionId ? null : <EmptyNew onExample={(u) => void send(u)} disabled={!liveEnabled} />}
-            />
+            <RunEndActionsCtx.Provider value={runEndActions}>
+              <ChatLog
+                items={items}
+                metricOf={(runId) => {
+                  const started = events[runId]?.find((e) => e.type === "run_started") as { profile?: { metric?: Metric } } | undefined;
+                  return started?.profile?.metric ?? null;
+                }}
+                selected={selectedKey}
+                focusKey={focusKey}
+                onSelect={onChatSelect}
+                typing={typing}
+                tail={null}
+                empty={sessionId ? null : <EmptyNew onExample={(u) => void send(u)} disabled={!liveEnabled} />}
+              />
+            </RunEndActionsCtx.Provider>
             <Composer
               mode={activeId ? "run" : "draft"}
               text={text}
