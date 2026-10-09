@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, Response
 
 from autotinker_api import auth, db, identity, settings
 from autotinker_api.http import ApiError, error_response, json_ok
-from autotinker_api.routes import preview, runs, sessions
+from autotinker_api.routes import dashboard, preview, runs, sessions
 
 settings.load_env_files()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
@@ -116,3 +116,4 @@ async def health() -> JSONResponse:
 app.include_router(sessions.router)
 app.include_router(runs.router)
 app.include_router(preview.router)
+app.include_router(dashboard.router)

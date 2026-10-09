@@ -7,6 +7,7 @@
  */
 import { ClerkProvider, Show, SignInButton, UserButton, useAuth, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useMagnetic } from "@/components/chrome/magnetic";
 import { AUTH_ENABLED } from "@/lib/auth-flag";
@@ -46,11 +47,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 /** Header controls: "Sign in" when signed out, the account menu when signed in. */
 export function AuthControls() {
+  const pathname = usePathname();
   if (!AUTH_ENABLED) return null;
+  // Signing in from the header lands on the dashboard, except inside the workspace, where you stay put.
+  const to = /^\/s(\/|$)/.test(pathname ?? "") ? undefined : "/dashboard";
   return (
     <>
       <Show when="signed-out">
-        <SignInButton mode="modal">
+        <SignInButton mode="modal" forceRedirectUrl={to} signUpForceRedirectUrl={to}>
           <SignInPill />
         </SignInButton>
       </Show>

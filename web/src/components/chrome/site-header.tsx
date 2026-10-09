@@ -9,13 +9,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { AuthControls } from "@/components/auth";
+import { AuthControls, useSignedIn } from "@/components/auth";
 import { GITHUB_URL } from "@/lib/links";
 import { isAppRoute } from "./routes";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const app = isAppRoute(pathname);
+  const { signedIn } = useSignedIn();
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -66,6 +67,11 @@ export function SiteHeader() {
           Auto<span className="site-logo-tinker">Tinker</span>
         </Link>
         <nav className="site-nav" aria-label="Site">
+          {signedIn ? (
+            <Link href="/dashboard" className="site-nav-link" aria-current={pathname === "/dashboard" ? "page" : undefined}>
+              Dashboard
+            </Link>
+          ) : null}
           <Link href="/replays" className="site-nav-link" aria-current={pathname?.startsWith("/replays") ? "page" : undefined}>
             Replays
           </Link>
