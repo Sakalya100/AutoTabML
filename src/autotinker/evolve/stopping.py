@@ -1,4 +1,4 @@
-"""Ceiling detection (ROADMAP §3.4): stop when the remaining gains are indistinguishable from noise.
+"""Ceiling detection (BUILD_PLAN_v2 §3.4): stop when the remaining gains are indistinguishable from noise.
 
 Signals (all applicable ones must fire, and only after `min_experiments`):
   noise_floor   the last `noise_k` kept gains within the last `noise_window` experiments were each below the

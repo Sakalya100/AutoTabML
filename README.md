@@ -106,7 +106,7 @@ Results go to [`benchmarks/results/`](benchmarks/results/).
 What this does and doesn't show:
 - **Evolving beats the starter on every dataset**, on a test split the loop never saw.
 - **The ceiling rule used 104 experiments in total instead of 200 (48% fewer).** Its test scores matched or nearly matched the 40-experiment statistical-gate runs.
-- **The statistical gate does *not* yet beat the naive gate.** Naive wins on 3 of 5 datasets. With a heuristic proposer that mostly makes small hyperparameter tweaks, the naive gate builds up many small gains that the strict gate rejects. On datasets this small, single-split test scores are themselves noisy, which is also why many optimism gaps are negative. The proper test of the gate needs larger datasets (OpenML), several seeds, and an LLM proposer. That is next on the [roadmap](docs/ROADMAP.md) (Phase 3.5).
+- **The statistical gate does *not* yet beat the naive gate.** Naive wins on 3 of 5 datasets. With a heuristic proposer that mostly makes small hyperparameter tweaks, the naive gate builds up many small gains that the strict gate rejects. On datasets this small, single-split test scores are themselves noisy, which is also why many optimism gaps are negative. The proper test of the gate needs larger datasets (OpenML), several seeds, and an LLM proposer. That is Phase 3 of the [roadmap](docs/ROADMAP.md).
 
 Reproduce: `uv run python benchmarks/run.py --llm heuristic --max-experiments 40` (about 25 min on a laptop CPU).
 

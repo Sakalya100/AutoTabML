@@ -1,4 +1,4 @@
-"""The experiment loops (ROADMAP §1.4 and §3.1).
+"""The experiment loops (BUILD_PLAN_v2 §1.4 and §3.1).
 
 run_single: draft -> evaluate -> up to N repairs -> final                       (mode "run")
 evolve:     baseline (starter, e000) -> hill-climb: propose+implement from the current best -> evaluate ->
