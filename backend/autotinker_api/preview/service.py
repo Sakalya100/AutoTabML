@@ -24,7 +24,7 @@ from autotinker_api.preview.suggest import Suggestion, metric_fits, suggest, sug
 PREVIEW_MAX_BYTES = 2 * 1024 * 1024
 ENGINE_MAX_BYTES = 50 * 1024 * 1024  # DEFAULT_MAX_BYTES in the engine's fetch.py
 _REDIRECTS = {301, 302, 303, 307, 308}
-USER_AGENT = "autotinker-preview/0.1 (+https://github.com/Sakalya100/AutoTabML)"
+USER_AGENT = "autotinker-preview/0.1 (+https://github.com/Sakalya100/AutoTinker)"
 
 Resolver = urlguard.Resolver
 

@@ -2,47 +2,69 @@
   "replays": [
     {
       "name": "housing",
-      "title": "Housing \u2014 offline heuristic proposer (no LLM)",
+      "title": "Housing \u2014 AI agents (gemini-3.5-flash-lite on Gemini, gpt-oss-120b on Groq, gemini-3.1-flash-lite on Gemini)",
       "dataset": "housing (545 rows, 12 features)",
       "metric": "rmse",
-      "proposer": "heuristic",
-      "n_experiments": 19,
-      "stop_reason": "ceiling",
+      "proposer": "agentic:groq+gemini",
+      "n_experiments": 14,
+      "stop_reason": "max_experiments",
       "fixture": false,
-      "blurb": "Real engine run: 19 experiments, 2 kept, stopped by 'ceiling'."
+      "blurb": "Real engine run: 14 experiments, 4 kept, stopped by 'max_experiments'.",
+      "models": [
+        "gemini-3.5-flash-lite on Gemini",
+        "gpt-oss-120b on Groq",
+        "gemini-3.1-flash-lite on Gemini"
+      ]
     },
     {
       "name": "breast_cancer",
-      "title": "Breast Cancer \u2014 offline heuristic proposer (no LLM)",
+      "title": "Breast Cancer \u2014 AI agents (gemini-3.5-flash-lite on Gemini, gpt-oss-120b on Groq, gemini-3.1-flash-lite on Gemini)",
       "dataset": "breast_cancer (569 rows, 30 features, 2 classes)",
       "metric": "roc_auc",
-      "proposer": "heuristic",
-      "n_experiments": 37,
+      "proposer": "agentic:groq+gemini",
+      "n_experiments": 13,
       "stop_reason": "ceiling",
       "fixture": false,
-      "blurb": "Real engine run: 37 experiments, 4 kept, stopped by 'ceiling'."
+      "blurb": "Real engine run: 13 experiments, 3 kept, stopped by 'ceiling'.",
+      "models": [
+        "gemini-3.5-flash-lite on Gemini",
+        "gpt-oss-120b on Groq",
+        "gemini-3.1-flash-lite on Gemini"
+      ]
     },
     {
       "name": "iris_with_missing",
-      "title": "Iris With Missing \u2014 offline heuristic proposer (no LLM)",
+      "title": "Iris With Missing \u2014 AI agents (gemini-3.5-flash-lite on Gemini, gpt-oss-120b on Groq, gemini-3.1-flash-lite on Gemini)",
       "dataset": "iris_with_missing (150 rows, 4 features, 3 classes)",
       "metric": "log_loss",
-      "proposer": "heuristic",
-      "n_experiments": 21,
+      "proposer": "agentic:groq+gemini",
+      "n_experiments": 8,
       "stop_reason": "ceiling",
       "fixture": false,
-      "blurb": "Real engine run: 21 experiments, 3 kept, stopped by 'ceiling'."
+      "blurb": "Real engine run: 8 experiments, 2 kept, stopped by 'ceiling'.",
+      "models": [
+        "gemini-3.5-flash-lite on Gemini",
+        "gpt-oss-120b on Groq",
+        "gemini-3.1-flash-lite on Gemini"
+      ],
+      "selection": "One of 2 recorded runs on this dataset: in the other, no idea beat the starting model; this is the one where the agents found an improvement."
     },
     {
       "name": "wine",
-      "title": "Wine \u2014 offline heuristic proposer (no LLM)",
+      "title": "Wine \u2014 AI agents (gemini-3.5-flash-lite on Gemini, gpt-oss-120b on Groq, gemini-3.1-flash-lite on Gemini)",
       "dataset": "wine (178 rows, 13 features, 3 classes)",
-      "metric": "log_loss",
-      "proposer": "heuristic",
-      "n_experiments": 15,
+      "metric": "accuracy",
+      "proposer": "agentic:groq+gemini",
+      "n_experiments": 7,
       "stop_reason": "ceiling",
       "fixture": false,
-      "blurb": "Real engine run: 15 experiments, 2 kept, stopped by 'ceiling'."
+      "blurb": "Real engine run: 7 experiments, 2 kept, stopped by 'ceiling'.",
+      "models": [
+        "gemini-3.5-flash-lite on Gemini",
+        "gpt-oss-120b on Groq",
+        "gemini-3.1-flash-lite on Gemini"
+      ],
+      "selection": "One of 4 recorded runs on this dataset: in the other 3, no idea beat the starting model; this is the one where the agents found an improvement."
     }
   ]
 }

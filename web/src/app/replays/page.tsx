@@ -32,6 +32,7 @@ export default async function ReplaysPage() {
         test: view.final ? displayScore(view.metric, view.final.testScore) : null,
         metricLabel: metricInfo(view.metric ?? info.metric).label,
         nExperiments: view.experiments.length,
+        selection: info.selection ?? null,
       },
     });
   }

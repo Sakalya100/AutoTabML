@@ -80,7 +80,7 @@ describe("slimView", () => {
 describe("surveySummary", () => {
   it("describes the map for screen readers", () => {
     const s = surveySummary(full);
-    expect(s).toMatch(/^Survey of 37 probes, \d+ kept/);
+    expect(s).toMatch(/^Survey of 13 probes, 3 kept/);
     expect(s).toContain("test");
     expect(surveySummary(buildView([], null))).toMatch(/not landed a probe/);
   });

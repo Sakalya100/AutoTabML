@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { RunView } from "@/components/run-view";
 import { listReplays, loadReplay } from "@/lib/replays";
-import { humanName } from "@/lib/story";
+import { buildView } from "@/lib/run-state";
+import { agentModels, humanName, proposerNote } from "@/lib/story";
 
 export async function generateStaticParams() {
   return (await listReplays()).map((r) => ({ name: r.name }));
@@ -29,7 +30,16 @@ export default async function ReplayPage({ params, searchParams }: PageProps<"/r
       initialSimulate={sp.simulate !== undefined}
       title={humanName(info.name)}
       kicker="A recorded run"
-      note={info.fixture ? "A hand-written example, not a recorded engine run." : undefined}
+      note={
+        info.fixture ? (
+          "A hand-written example, not a recorded engine run."
+        ) : info.selection ? (
+          // The model note the page would show anyway, then how this run was picked from several recordings.
+          <>
+            {proposerNote(record.proposer ?? info.proposer, agentModels(buildView(events, record)))} {info.selection}
+          </>
+        ) : undefined
+      }
       others={others}
     />
   );

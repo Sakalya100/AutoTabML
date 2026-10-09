@@ -7,7 +7,7 @@ import { activeAgentStep, buildFeed } from "@/lib/feed";
 import { formatScore } from "@/lib/metrics";
 import { buildView, type RunView as View } from "@/lib/run-state";
 import type { RunRecord } from "@/lib/schema";
-import { proposerNote } from "@/lib/story";
+import { agentModels, proposerNote } from "@/lib/story";
 import { EASE, MagneticLink } from "./landing/primitives";
 import { Journey } from "./replay/journey";
 import { RevealHeading, ScrambleNumber } from "./replay/motion";
@@ -184,7 +184,7 @@ export function RunView({
               kicker={simulating ? "Replaying a recorded run" : live ? "Live run" : kicker}
               view={view}
               total={liveActive ? planned : totalExps}
-              note={live ? null : proposerNote(view.proposer)}
+              note={live ? null : proposerNote(view.proposer, agentModels(full ?? view))}
               controls={
                 simulating ? (
                   <SimulationControls

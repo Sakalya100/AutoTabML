@@ -1,0 +1,73 @@
+# Publish the `autotinker` engine package to PyPI when a GitHub release is published.
+# Uses PyPI Trusted Publishing (OIDC): no API token is stored anywhere. One-time setup: docs/RELEASING.md.
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - run: uv run ruff check src tests benchmarks
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy
+      - run: uv run pytest -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Tag matches the package version
+        run: |
+          version=$(uv run --no-project python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "::error::release tag '${GITHUB_REF_NAME}' does not match pyproject version '${version}'"
+            exit 1
+          fi
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+      - name: Smoke-test the wheel in a fresh venv
+        run: |
+          uv venv /tmp/at-wheel
+          uv pip install -p /tmp/at-wheel dist/*.whl
+          /tmp/at-wheel/bin/autotinker --help
+          /tmp/at-wheel/bin/python -c "import autotinker; print(autotinker.__version__)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/autotinker/
+    permissions:
+      id-token: write  # Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

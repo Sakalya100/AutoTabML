@@ -16,19 +16,19 @@ const facts = landingFacts("breast_cancer", "breast cancer", events, record);
 
 describe("landing facts (real breast_cancer replay)", () => {
   it("counts match the run", () => {
-    expect(facts.nExperiments).toBe(37);
-    expect(facts.nKept).toBe(4);
-    expect(facts.nKept + facts.nDiscarded + facts.nCrashed).toBe(37);
+    expect(facts.nExperiments).toBe(13);
+    expect(facts.nKept).toBe(3);
+    expect(facts.nKept + facts.nDiscarded + facts.nCrashed).toBe(13);
     expect(facts.nRows).toBe(569);
-    expect(facts.proposer).toBe("heuristic");
+    expect(facts.proposer).toBe("agentic:groq+gemini");
   });
 
   it("the growth sequence runs from an empty seabed, one experiment per step, to the stop", () => {
     const g = facts.growth;
-    expect(g).toHaveLength(1 + 37 + 1);
+    expect(g).toHaveLength(1 + 13 + 1);
     expect(g[0]).toMatchObject({ n: 0, kept: 0, best: null });
     for (let i = 1; i < g.length; i++) expect(g[i].cursor).toBeGreaterThan(g[i - 1].cursor);
-    expect(g.at(-1)).toMatchObject({ n: 37, kept: 4 });
+    expect(g.at(-1)).toMatchObject({ n: 13, kept: 3 });
     expect(buildView(events.slice(0, g.at(-1)!.cursor)).phase).toBe("stopped");
     expect(buildView(events.slice(0, g[1].cursor)).experiments).toHaveLength(1);
     expect(facts.end).toBe(events.length);
@@ -37,7 +37,7 @@ describe("landing facts (real breast_cancer replay)", () => {
 
   it("the live best score is the run's own best", () => {
     const best = facts.growth.map((s) => s.best).filter((b): b is number => b != null);
-    expect(best).toHaveLength(38); // 37 decisions + the stop
+    expect(best).toHaveLength(14); // 13 decisions + the stop
     const finalBest = record.experiments?.find((e) => e.id === record.best_exp_id)?.cv as { mean?: number } | undefined;
     expect(best.at(-1)).toBeCloseTo(finalBest?.mean ?? NaN, 10);
   });
@@ -46,15 +46,15 @@ describe("landing facts (real breast_cancer replay)", () => {
     expect(facts.stop?.reason).toBe("ceiling");
     expect(facts.stop?.signals).toBeGreaterThan(0);
     expect(facts.stop?.fired).toBe(facts.stop?.signals);
-    expect(facts.final?.test).toBeCloseTo(0.99363, 4);
-    expect(facts.final?.gapText).toMatch(/no optimism/);
+    expect(facts.final?.test).toBeCloseTo(0.9919, 4);
+    expect(facts.final?.gapText).toMatch(/select was optimistic/);
   });
 
   it("survey numbers: baseline, mist (best SE) and the fitted ceiling come from the replay", () => {
-    expect(facts.survey.baseline).toBeCloseTo(0.9921945578231293, 12);
-    expect(facts.survey.best).toBeCloseTo(0.9979319727891156, 12);
-    expect(facts.survey.bestSe).toBeCloseTo(0.0009291298479550506, 12);
-    expect(facts.survey.ceiling).toBeCloseTo(0.9979319727891156 + 0.0008808720433843842, 12);
+    expect(facts.survey.baseline).toBeCloseTo(0.9891833450621628, 12);
+    expect(facts.survey.best).toBeCloseTo(0.9959471264367815, 12);
+    expect(facts.survey.bestSe).toBeCloseTo(0.00191750429270086, 12);
+    expect(facts.survey.ceiling).toBeCloseTo(0.9959471264367815 + 3.321275108270072e-6, 12);
   });
 });
 

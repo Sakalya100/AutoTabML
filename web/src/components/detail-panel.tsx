@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { roleLabel } from "@/lib/feed";
 import { fmtCost, fmtDuration, fmtInt } from "@/lib/format";
 import { fmtNum, formatScore, formatSe, scoreDelta, toRaw } from "@/lib/metrics";
 import { parentOf, type ExpView, type RunView } from "@/lib/run-state";
@@ -8,7 +9,7 @@ import { plainGateReason } from "@/lib/verdict";
 import { CategoryChip, RadicalBadge, StatusBadge } from "./badges";
 import { CodeView, DiffView } from "./code-view";
 
-type Tab = "overview" | "diff" | "code" | "error" | "llm";
+type Tab = "overview" | "agents" | "diff" | "code" | "error" | "llm";
 
 export function DetailPanel({ view, exp, live }: { view: RunView; exp: ExpView | null; live?: boolean }) {
   const [tab, setTab] = useState<Tab>("overview");
@@ -23,6 +24,7 @@ export function DetailPanel({ view, exp, live }: { view: RunView; exp: ExpView |
   const lastFail = [...exp.attempts].reverse().find((a) => !a.ok);
   const tabs: { id: Tab; label: string; show: boolean }[] = [
     { id: "overview", label: "Overview", show: true },
+    { id: "agents", label: `Agent steps (${exp.steps.length})`, show: exp.steps.length > 0 },
     { id: "diff", label: "Diff", show: true },
     { id: "code", label: "Code", show: true },
     { id: "error", label: "Error", show: !!lastFail },
@@ -68,6 +70,7 @@ export function DetailPanel({ view, exp, live }: { view: RunView; exp: ExpView |
       </div>
       <div className="p-4">
         {active === "overview" && <Overview view={view} exp={exp} parent={parent} />}
+        {active === "agents" && <AgentSteps exp={exp} />}
         {active === "diff" && (exp.diff !== undefined ? <DiffView diff={exp.diff} /> : noCode)}
         {active === "code" && (exp.code ? <CodeView code={exp.code} /> : noCode)}
         {active === "error" && lastFail && (
@@ -158,6 +161,25 @@ function Folds({ view, exp, parent }: { view: RunView; exp: ExpView; parent: Exp
         <span>{fmtNum(hi)}</span>
       </div>
     </div>
+  );
+}
+
+/** What each agent did for this experiment, in order, in its own words. */
+function AgentSteps({ exp }: { exp: ExpView }) {
+  return (
+    <ol className="space-y-3">
+      {exp.steps.map((st, i) => (
+        <li key={`${st.stepId}-${i}`} className="text-sm">
+          <p className="flex flex-wrap items-baseline gap-x-2 text-[11px] uppercase tracking-[0.08em] text-ink-3">
+            <span className={`font-medium ${st.status === "error" ? "text-crash" : "text-ink-2"}`}>{roleLabel(st.role)}</span>
+            {st.attempt > 0 && <span>retry {st.attempt}</span>}
+            {st.model && <span className="font-mono normal-case tracking-normal">{st.model}</span>}
+            {st.status === "error" && <span className="text-crash">failed</span>}
+          </p>
+          <p className="mt-0.5 leading-relaxed text-ink">{st.plain || (st.status === "running" ? "Working…" : "(no note)")}</p>
+        </li>
+      ))}
+    </ol>
   );
 }
 

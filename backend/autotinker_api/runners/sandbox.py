@@ -42,7 +42,7 @@ log = logging.getLogger("autotinker.runner.sandbox")
 
 WORK = "/vercel/work"  # the universal image's cwd is /vercel
 CONTROL = f"{WORK}/control.jsonl"
-DEFAULT_PACKAGE = "autotinker @ git+https://github.com/Sakalya100/AutoTabML@v2"
+DEFAULT_PACKAGE = "autotinker @ git+https://github.com/Sakalya100/AutoTinker@v2"
 INSTALL_HOSTS = [
     "github.com",
     "codeload.github.com",

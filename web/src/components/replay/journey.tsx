@@ -723,10 +723,22 @@ function TailCard({ store, view, J, onDetails }: CardProps) {
       <p className="rp-kicker">
         Ideas {first + 1}–{J.n} <span className="jn-of">of {J.n}</span>
       </p>
-      <RevealHeading className="lp-h2 jn-tail-h">It kept searching.</RevealHeading>
-      <p className="lp-sub">
-        {J.tailN} more idea{J.tailN === 1 ? "" : "s"} after its last win. None was good enough to keep.
-      </p>
+      {J.keeps.length > 1 ? (
+        <>
+          <RevealHeading className="lp-h2 jn-tail-h">It kept searching.</RevealHeading>
+          <p className="lp-sub">
+            {J.tailN} more idea{J.tailN === 1 ? "" : "s"} after its last win. None was good enough to keep.
+          </p>
+        </>
+      ) : (
+        <>
+          {/* Only the starting model was kept: say so plainly instead of implying an earlier win. */}
+          <RevealHeading className="lp-h2 jn-tail-h">Nothing beat the start.</RevealHeading>
+          <p className="lp-sub">
+            None of the {J.tailN} idea{J.tailN === 1 ? "" : "s"} beat the starting model by more than chance. The simple model was already near the ceiling.
+          </p>
+        </>
+      )}
       <div className="jn-ticker">
         <p className="jn-ticker-k">
           <span>
