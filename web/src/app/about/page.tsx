@@ -63,7 +63,7 @@ export default function AboutPage() {
       <Section title="Who makes it">
         <p>
           AutoTinker is a personal, non-commercial project by Sakalya Mitra. The source code is public on{" "}
-          <a href="https://github.com/Sakalya100/AutoTabML" className="text-ink underline decoration-rule-strong underline-offset-4 hover:decoration-best">
+          <a href="https://github.com/Sakalya100/AutoTinker" className="text-ink underline decoration-rule-strong underline-offset-4 hover:decoration-best">
             GitHub
           </a>
           . Questions or data requests:{" "}

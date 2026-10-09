@@ -35,7 +35,7 @@ otel = ["opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27", "opentelemetry-exp
 autotinker = "autotinker.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/Sakalya100/AutoTabML"
+Homepage = "https://github.com/Sakalya100/AutoTinker"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.6", "mypy>=1.11", "pandas-stubs"]

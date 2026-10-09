@@ -32,7 +32,7 @@ from autotinker.data.urlguard import (
 
 DataKind = Literal["csv", "tsv", "parquet"]
 
-USER_AGENT = "autotinker/0.1 (+https://github.com/Sakalya100/AutoTabML)"
+USER_AGENT = "autotinker/0.1 (+https://github.com/Sakalya100/AutoTinker)"
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024
 _REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
 _SNIFF_BYTES = 8192
