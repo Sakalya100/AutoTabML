@@ -4,6 +4,7 @@
  * defaults and valid sets mirror DEFAULT_METRIC / _VALID_METRICS there. Isomorphic.
  */
 import type { ColumnStats } from "./csv";
+import { targetBlock } from "./guards";
 
 export type ProblemType = "binary" | "multiclass" | "regression";
 export type MetricId = "roc_auc" | "log_loss" | "accuracy" | "f1_macro" | "rmse" | "mae" | "r2";
@@ -45,15 +46,58 @@ export interface Suggestion {
 
 /** Column names that are, on their own, a strong hint "this is the thing to predict". */
 const STRONG = new Set([
-  "target", "label", "labels", "class", "y", "outcome", "survived", "churn", "churned", "exited", "attrition", "diagnosis",
-  "price", "saleprice", "species", "variety", "quality", "default", "fraud", "isfraud", "income", "medv", "charges",
-  "response", "result", "outcome_type", "deposit", "approved", "loan_status", "heartdisease", "disease", "stroke",
-  "diabetes", "malignant", "category", "rating", "score", "salary", "sales", "revenue", "cost", "value", "medhouseval",
+  "target",
+  "label",
+  "labels",
+  "class",
+  "y",
+  "outcome",
+  "survived",
+  "churn",
+  "churned",
+  "exited",
+  "attrition",
+  "diagnosis",
+  "price",
+  "saleprice",
+  "species",
+  "variety",
+  "quality",
+  "default",
+  "fraud",
+  "isfraud",
+  "income",
+  "medv",
+  "charges",
+  "response",
+  "result",
+  "outcome_type",
+  "deposit",
+  "approved",
+  "loan_status",
+  "heartdisease",
+  "disease",
+  "stroke",
+  "diabetes",
+  "malignant",
+  "category",
+  "rating",
+  "score",
+  "salary",
+  "sales",
+  "revenue",
+  "cost",
+  "value",
+  "medhouseval",
 ]);
 const WEAK_TOKENS = /(target|label|class|outcome|churn|surviv|diagnos|price|default|fraud|status|result|grade)/;
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-const words = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+const words = (s: string) =>
+  s
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 2);
 
 /** The engine's problem type for a column, from its profile. Null if the column can't be a target. */
 export function inferProblemType(c: ColumnStats, nRows: number): ProblemType | null {
@@ -77,7 +121,11 @@ export function scoreTargets(stats: ColumnStats[], goal = ""): { name: string; s
     let why = "";
     const n = norm(c.name);
     const cw = words(c.name);
-    if (goal && n.length >= 2 && (goalNorm.includes(n) || (cw.length > 0 && cw.every((w) => goalWords.has(w) || goalWords.has(w + "s") || goalWords.has(w.replace(/s$/, "")))))) {
+    if (
+      goal &&
+      n.length >= 2 &&
+      (goalNorm.includes(n) || (cw.length > 0 && cw.every((w) => goalWords.has(w) || goalWords.has(w + "s") || goalWords.has(w.replace(/s$/, "")))))
+    ) {
       score += 20; // the user's own words beat any naming convention
       why = "named in your sentence";
     }
@@ -116,16 +164,32 @@ export function suggestionFor(stats: ColumnStats[], target: string, why: string,
   const c = stats.find((s) => s.name === target);
   const problemType = (c && inferProblemType(c, nRows)) || "regression";
   const metric = DEFAULT_METRIC[problemType];
-  const metricWhy = { binary: "ROC-AUC ranks yes/no predictions fairly even when one outcome is rare", multiclass: "log-loss rewards confident, correct class probabilities", regression: "RMSE is in the target's own units" }[problemType];
-  return { target, problemType, metric, goalPlain: goalSentence(target, problemType, c), why: `${target}: ${why}; ${metricWhy}.`, source: "heuristic", ambiguous };
+  const metricWhy = {
+    binary: "ROC-AUC ranks yes/no predictions fairly even when one outcome is rare",
+    multiclass: "log-loss rewards confident, correct class probabilities",
+    regression: "RMSE is in the target's own units",
+  }[problemType];
+  return {
+    target,
+    problemType,
+    metric,
+    goalPlain: goalSentence(target, problemType, c),
+    why: `${target}: ${why}; ${metricWhy}.`,
+    source: "heuristic",
+    ambiguous,
+  };
 }
 
-/** Pick the most likely target column and derive the problem type and metric. */
+/** Pick the most likely target column (never a blocked one) and derive the problem type and metric. */
 export function suggest(stats: ColumnStats[], goal = ""): Suggestion | null {
   if (stats.length < 2) return null;
-  const ranked = scoreTargets(stats, goal).sort((a, b) => b.score - a.score);
+  // Columns that can't be learned (IDs, free text, constant, mostly empty) are never suggested.
+  const blocked = new Set(stats.filter((c) => targetBlock(c)).map((c) => c.name));
+  const ranked = scoreTargets(stats, goal)
+    .filter((r) => !blocked.has(r.name))
+    .sort((a, b) => b.score - a.score);
   const [top, second] = ranked;
-  if (top.score < -10) return null;
+  if (!top || top.score < -10) return null;
   const ambiguous = top.score < 6 || (second !== undefined && top.score - second.score <= 2);
   return suggestionFor(stats, top.name, top.why, ambiguous);
 }
@@ -133,4 +197,10 @@ export function suggest(stats: ColumnStats[], goal = ""): Suggestion | null {
 /** True if `metric` is a metric the engine accepts for `ptype`. */
 export function metricFits(ptype: ProblemType, metric: string): metric is MetricId {
   return (VALID_METRICS[ptype] as readonly string[]).includes(metric);
+}
+
+/** `sug` if its target can be learned; otherwise the best allowed column (an LLM/server pick can land on an ID). */
+export function allowedSuggestion(stats: ColumnStats[], sug: Suggestion | null, goal = ""): Suggestion | null {
+  if (sug && !targetBlock(stats.find((c) => c.name === sug.target))) return sug;
+  return suggest(stats, goal);
 }

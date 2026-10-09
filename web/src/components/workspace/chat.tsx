@@ -8,8 +8,10 @@ import { EQUIV_NOTE, equivCost, fmtCost, fmtDuration, fmtInt } from "@/lib/forma
 import { describeGap, formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import type { Metric } from "@/lib/schema";
 import { answerKind, plainIdea, stopPhrase } from "@/lib/story";
+import { plainGateReason, verdictText } from "@/lib/verdict";
 import { CodeView, DiffView } from "../code-view";
 import { AssetsCard } from "./assets";
+import { RunEndCard } from "./run-end";
 import { Num, spotlight, useChangedAfterMount } from "./fx/motion";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -281,17 +283,7 @@ function Item({ it, metric, selected, onSelect }: { it: ChatItem; metric: Metric
     case "run_end":
       return (
         <Enter className="ws-card">
-          <p className={`ws-label ${it.status === "failed" ? "text-[var(--crash)]" : ""}`}>
-            {it.status === "failed" ? "The run failed" : it.status === "timed_out" ? "Timed out" : "Cancelled"}
-          </p>
-          <p className="ws-card-text">
-            {it.error ??
-              (it.status === "failed"
-                ? "The engine stopped with an error."
-                : it.status === "timed_out"
-                  ? "The run timed out before the locked test; every experiment so far is kept."
-                  : "The run was cancelled before the locked test.")}
-          </p>
+          <RunEndCard it={it} />
         </Enter>
       );
   }
@@ -421,6 +413,7 @@ function ExperimentCard({
   const crowned = landed && x.decision?.verdict === "keep" && x.decision.newBest && x.index > 0;
   const active = [...x.steps].reverse().find((s) => s.status === "running");
   const idea = x.idea ? cap(plainIdea(x.idea)) : null;
+  const vt = x.decision ? verdictForCard(x, metric) : null;
   return (
     <motion.article
       data-key={dataKey}
@@ -471,10 +464,28 @@ function ExperimentCard({
           )}
         </span>
       </button>
+      {vt && (vt.why || vt.compare) && (
+        <p className="ws-x-why" data-verdict={x.decision!.verdict}>
+          {vt.why && <span className="ws-x-why-text">{vt.newBest ? `New best — ${vt.why}.` : `${cap(vt.why)}.`}</span>}
+          {vt.compare && <span className="ws-x-why-cmp">{vt.compare}</span>}
+        </p>
+      )}
       {x.steps.length > 0 && <StepLines steps={x.steps} />}
       <DetailsFooter steps={x.steps} x={x} metric={metric} />
     </motion.article>
   );
+}
+
+/** The verdict in plain words and the comparison the gate made (natural metric units, never oriented). */
+function verdictForCard(x: ChatExperiment, metric: Metric | null) {
+  const d = x.decision!;
+  return verdictText({
+    verdict: d.verdict,
+    reason: d.reason,
+    metric,
+    candMean: x.scored?.cvMean ?? null,
+    prev: d.prevBestId != null && d.prevBestMean != null ? { id: d.prevBestId, mean: d.prevBestMean } : null,
+  });
 }
 
 /** One line per agent step: the role in a fixed column, the step's plain one-line summary (full text on hover). */
@@ -656,6 +667,9 @@ function OutputTab({ steps, x }: { steps: ChatStep[]; x?: ChatExperiment }) {
   );
 }
 
+const GATE_RULE =
+  "The rule: kept as a new best only if it beats the best on the same cross-validation folds by more than chance (p < 0.1), by at least half a standard error, and is not worse on the held-out check. A change that scores the same within noise but is clearly simpler or faster is also kept, without being called better.";
+
 function GateTab({ steps, x, metric }: { steps: ChatStep[]; x?: ChatExperiment; metric: Metric | null }) {
   const g = x?.decision?.gate;
   return (
@@ -664,11 +678,13 @@ function GateTab({ steps, x, metric }: { steps: ChatStep[]; x?: ChatExperiment; 
         <section>
           <dl className="ws-row-facts mt-0">
             {x.scored && <Fact k="CV" v={`${formatScore(metric, x.scored.cvMean)} ± ${formatSe(x.scored.cvSe)}`} />}
-            {g?.gainSe != null && <Fact k="gain" v={`${g.gainSe >= 0 ? "+" : "−"}${Math.abs(g.gainSe).toFixed(2)} SE`} />}
+            {x.decision?.prevBestId != null && <Fact k="compared with" v={`${x.decision.prevBestId} · ${formatScore(metric, x.decision.prevBestMean)}`} />}
+            {g?.gainSe != null && <Fact k="vs that best" v={`${Math.abs(g.gainSe).toFixed(2)} SE ${g.gainSe >= 0 ? "better" : "worse"}`} />}
             {g?.p != null && <Fact k="p-value" v={g.p < 0.001 ? "<0.001" : g.p.toFixed(3)} />}
-            {x.decision && <Fact k="best so far" v={`${x.decision.bestId} · ${formatScore(metric, x.decision.bestMean)}`} />}
+            {x.decision && <Fact k="best now" v={`${x.decision.bestId} · ${formatScore(metric, x.decision.bestMean)}`} />}
           </dl>
-          {x.decision?.reason && <p className="ws-gate-reason">{x.decision.reason}</p>}
+          {x.decision?.reason && <p className="ws-gate-reason">{plainGateReason(x.decision.reason, x.decision.verdict, metric)}</p>}
+          {x.decision && x.decision.verdict !== "crash" && <p className="ws-gate-rule">{GATE_RULE}</p>}
         </section>
       )}
       {steps.length > 0 && (

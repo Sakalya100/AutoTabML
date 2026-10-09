@@ -470,7 +470,8 @@ class AgenticRunner(_Runner):
         res = self._evaluate(code, exp.exp_id, attempt)
         last = (res.error_tail or "").strip().splitlines()[-1:] or [res.error_kind or "error"]
         plain = (
-            f"Ran in the sandbox: CV {res.cv.mean:.4f} ± {res.cv.se:.4f}"
+            # Shown to the user: the metric's natural value (log-loss positive), never the oriented one.
+            f"Ran in the sandbox: CV {self.record.profile.metric.to_raw(res.cv.mean):.4f} ± {res.cv.se:.4f}"
             if res.ok and res.cv
             else f"Crashed in the sandbox: {last[0][:160]}"
         )

@@ -244,6 +244,7 @@ class SandboxRunner:
                 out_dir=f"{WORK}/out",
                 control_file=CONTROL,
                 max_time_s=engine_max_time_s(),
+                csv_format=run.get("csv_format"),
             )
             await box.create_process(
                 "bash",

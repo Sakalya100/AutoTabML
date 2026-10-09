@@ -42,11 +42,20 @@ def engine_args(
     metric: str | None = None,
     goal: str | None = None,
     max_time_s: int | None = None,
+    csv_format: dict[str, Any] | None = None,
 ) -> list[str]:
-    """`autotinker run` arguments (after `python -m autotinker`), shared by both runners. argv, never a shell string."""
+    """`autotinker run` arguments (after `python -m autotinker`), shared by both runners. argv, never a shell string.
+    `csv_format` ({delimiter, encoding, decimal} from the preview / upload check) becomes --delimiter / --encoding /
+    --decimal, so the engine parses the file the way the preview did; whatever is missing the engine detects."""
     args = ["run", source, "--target", target]
     if metric:
         args += ["--metric", metric]
+    # AUTOTINKER_PASS_CSV_FORMAT=0 is the escape hatch for an engine that predates the flags (it then detects).
+    fmt = (csv_format or {}) if settings.env("AUTOTINKER_PASS_CSV_FORMAT") != "0" else {}
+    for key in ("delimiter", "encoding", "decimal"):
+        v = fmt.get(key)
+        if isinstance(v, str) and v:
+            args += [f"--{key}", "tab" if v == "\t" else v]
     if goal and settings.env("AUTOTINKER_PASS_DESCRIPTION") != "0":
         args += ["--goal", goal]
     args += ["--max-experiments", str(max_experiments), "--out", out_dir, "--events-stdout"]

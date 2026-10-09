@@ -223,7 +223,7 @@ class AssetFile(BaseModel):
     name: str  # "model.joblib"
     path: str  # relative to the run directory, e.g. "assets/model.joblib"
     bytes: int
-    kind: Literal["model", "code"]
+    kind: Literal["model", "code", "script", "text", "json"]
     content_type: str
 
 
@@ -234,6 +234,17 @@ class AssetsReady(_Base):
     type: Literal["assets_ready"] = "assets_ready"
     charts: list[Chart] = Field(default_factory=list)
     files: list[AssetFile] = Field(default_factory=list)
+
+
+class RunFailed(_Base):
+    """The last event of a failed run (see autotinker.failures). `message` and `hint` are plain language
+    for the user; `detail` is the technical reason, never a traceback."""
+
+    type: Literal["run_failed"] = "run_failed"
+    code: str
+    message: str
+    hint: str = ""
+    detail: str = ""
 
 
 Event = Annotated[
@@ -252,7 +263,8 @@ Event = Annotated[
     | HpoTrialEvent
     | ReportReady
     | SteerApplied
-    | AssetsReady,
+    | AssetsReady
+    | RunFailed,
     Field(discriminator="type"),
 ]
 

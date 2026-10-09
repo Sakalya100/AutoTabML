@@ -8,8 +8,19 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { parseTable, type ColumnKind, type ColumnStats } from "@/lib/ingest/csv";
-import type { Preview } from "@/lib/api-types";
-import { METRIC_LABEL, PROBLEM_LABEL, suggest, suggestionFor, VALID_METRICS, type MetricId, type ProblemType, type Suggestion } from "@/lib/ingest/suggest";
+import type { CsvFormat, Preview } from "@/lib/api-types";
+import { estimateText, setupWarnings, targetBlock } from "@/lib/ingest/guards";
+import {
+  allowedSuggestion,
+  METRIC_LABEL,
+  PROBLEM_LABEL,
+  suggest,
+  suggestionFor,
+  VALID_METRICS,
+  type MetricId,
+  type ProblemType,
+  type Suggestion,
+} from "@/lib/ingest/suggest";
 import { DEFAULT_EXPERIMENTS, MAX_UPLOAD_BYTES, validateRunRequest, validateUrlRunRequest } from "@/lib/upload";
 import { Listbox } from "./listbox";
 import { ScrambleIn, useMagnet } from "./fx/motion";
@@ -38,7 +49,8 @@ export type DraftStatus = "idle" | "loading" | "ready" | "error";
 
 export interface DraftState {
   status: DraftStatus;
-  source: { kind: "link"; url: string } | { kind: "file"; file: File; head: string } | null;
+  /** `format`: how the preview parsed the link, sent with the run so the engine parses it the same way. */
+  source: { kind: "link"; url: string; format?: CsvFormat } | { kind: "file"; file: File; head: string } | null;
   goal: string;
   table: DraftTable | null;
   chips: Chips | null;
@@ -106,7 +118,15 @@ export function useRunDraft(maxExperiments: number) {
   const touched = useRef(false);
 
   const apply = useCallback((sug: Suggestion | null) => {
-    if (!sug) return;
+    if (!sug) {
+      // Every column is an ID, free text, constant or mostly empty: nothing here can be learned.
+      setS((p) => ({
+        ...p,
+        status: "error",
+        error: "None of the columns can be predicted: they are IDs, free text, constant or mostly empty.",
+      }));
+      return;
+    }
     setS((p) => ({
       ...p,
       why: { text: sug.why, source: sug.source },
@@ -168,6 +188,7 @@ export function useRunDraft(maxExperiments: number) {
         setS((p) => ({
           ...p,
           status: "ready",
+          source: { kind: "link", url, format: { delimiter: pv.delimiter, encoding: pv.encoding, decimal: pv.decimal } },
           table: {
             label: fileOf(pv.finalUrl) || "link",
             columns: pv.columns,
@@ -178,7 +199,8 @@ export function useRunDraft(maxExperiments: number) {
             rewritten: pv.rewritten,
           },
         }));
-        apply(body.suggestion ?? suggest(pv.stats, goal));
+        // A server/LLM pick that lands on a column that can't be learned (an ID, free text) is replaced.
+        apply(allowedSuggestion(pv.stats, body.suggestion ?? null, goal));
       } catch (e) {
         if ((e as Error).name === "AbortError" || id !== reqId.current) return;
         setS((p) => ({
@@ -246,7 +268,7 @@ export function useRunDraft(maxExperiments: number) {
   );
 
   const setTarget = (target: string) => {
-    if (!s.table) return;
+    if (!s.table || targetBlock(s.table.stats.find((c) => c.name === target))) return;
     const sug = suggestionFor(s.table.stats, target, "your pick");
     touched.current = true;
     setS((p) => ({
@@ -303,6 +325,11 @@ export function useRunDraft(maxExperiments: number) {
   const start = async (sessionId: string | null): Promise<{ id: string; sessionId: string | null } | null> => {
     if (s.status !== "ready" || !s.chips || !s.table || !s.source || s.starting) return null;
     const { chips, experiments, goal } = s;
+    const blocked = targetBlock(s.table.stats.find((c) => c.name === chips.target));
+    if (blocked) {
+      setS((p) => ({ ...p, startError: `${chips.target} can't be predicted: ${blocked}.` }));
+      return null;
+    }
     const sentence = runSentence(chips, experiments, s.table.label);
     let init: RequestInit;
     if (s.source.kind === "link") {
@@ -329,6 +356,7 @@ export function useRunDraft(maxExperiments: number) {
           metric: chips.metric,
           goal: goal.trim(),
           maxExperiments: experiments,
+          csvFormat: s.source.format,
           sessionId,
           sentence,
         }),
@@ -457,10 +485,10 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
     return (
       <div className="su-pane su-error" role="alert">
         <p className="ws-kicker text-[var(--crash)]">New run · couldn’t read it</p>
-        <p className="su-title">That link didn’t work.</p>
+        <p className="su-title">{s.source?.kind === "file" ? "That file can’t be used." : "That link didn’t work."}</p>
         <p className="su-sub text-[var(--lp-ink-2)]">{s.error}</p>
         <button type="button" onClick={draft.clear} className="ws-start mt-7">
-          <span aria-hidden>←</span> Try another link
+          <span aria-hidden>←</span> {s.source?.kind === "file" ? "Use different data" : "Try another link"}
         </button>
       </div>
     );
@@ -473,7 +501,11 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
     label: c,
     hint: KIND_LABEL[statBy.get(c)?.kind ?? "text"],
     badge: !s.touched && c === chips.target ? "suggested" : undefined,
+    disabled: targetBlock(statBy.get(c)) ?? undefined,
   }));
+  const blocked = targetBlock(statBy.get(chips.target));
+  const warnings = setupWarnings(table.stats, chips.target, table.rows, chips.problemType);
+  const eta = estimateText(table.rows, table.columns.length, s.experiments);
   const metrics = VALID_METRICS[chips.problemType].map((m) => ({
     value: m,
     label: METRIC_LABEL[m],
@@ -566,6 +598,15 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
         </div>
       </div>
 
+      {(blocked || warnings.length > 0) && (
+        <ul className="su-warns" aria-label="Before you start">
+          {blocked && <li className="su-blocked">{`${chips.target} can't be predicted: ${blocked}.`}</li>}
+          {warnings.map((w) => (
+            <li key={w}>{w}</li>
+          ))}
+        </ul>
+      )}
+
       <p className="su-why">
         {s.goalPlain}
         {!s.touched && s.why && <> Why: {s.why.text.replace(/\.$/, "")}.</>}{" "}
@@ -602,7 +643,7 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
 
       <p className="mt-5 text-[13px] text-[var(--lp-ink-3)]">Runs on free Groq and Gemini models; data rows are never sent to Gemini.</p>
       <div className="su-actions">
-        <button ref={startRef} type="button" onClick={onStart} disabled={s.starting} className="ws-start su-start">
+        <button ref={startRef} type="button" onClick={onStart} disabled={s.starting || !!blocked} className="ws-start su-start">
           {s.starting ? "Starting…" : "Start the run"} <span aria-hidden>→</span>
         </button>
         <p className="text-[13.5px] leading-snug text-[var(--lp-ink-3)]">
@@ -611,7 +652,17 @@ export function SetupPane({ draft, onStart }: { draft: RunDraft; onStart: () => 
               {s.startError}
             </span>
           ) : (
-            runSentence(chips, s.experiments, table.label).replace(` in ${table.label}`, "")
+            <>
+              {runSentence(chips, s.experiments, table.label).replace(` in ${table.label}`, "")}
+              {eta && (
+                <>
+                  {" "}
+                  <span className="su-eta" title="From the table's size and the number of experiments; includes starting the sandbox.">
+                    {eta}
+                  </span>
+                </>
+              )}
+            </>
           )}
         </p>
       </div>

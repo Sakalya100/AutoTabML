@@ -4,6 +4,7 @@ SSE resume, steering/stop routing, the watchdog and rate limits."""
 from __future__ import annotations
 
 import json
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -386,3 +387,38 @@ def test_without_a_database(app: Any, monkeypatch: pytest.MonkeyPatch) -> None:
         assert r.status_code == 503 and r.json()["sessions"] == []
         assert c.get("/api/sessions/s-abcdefabcdef").status_code == 503
         assert c.post("/api/runs", json={"url": "https://data.example/a.csv", "target": "y"}).status_code == 503
+
+
+def test_blocked_targets_are_rejected(client: TestClient, fake_runner: FakeRunner) -> None:
+    """IDs, free text, constant and mostly-empty columns can't be the column to predict (mirrors the setup form)."""
+    rows = [
+        f"{i},Passenger number {i} with a long unique name {i * 7919},1,{'' if i % 3 else f'v{i}'},{i % 2}"
+        for i in range(40)
+    ]
+    csv = "PassengerId,Name,const,sparse,y\n" + "\n".join(rows) + "\n"
+    for target, why in (
+        ("PassengerId", "ID column"),
+        ("Name", "Free text"),
+        ("const", "Constant"),
+        ("sparse", "Mostly missing"),
+    ):
+        r = client.post("/api/runs", data={"target": target}, files={"file": ("d.csv", csv.encode(), "text/csv")})
+        assert r.status_code == 400, (target, r.text)
+        assert r.json()["field"] == "target" and why in r.json()["error"], r.json()
+    r = client.post("/api/runs", data={"target": "y"}, files={"file": ("d.csv", csv.encode(), "text/csv")})
+    assert r.status_code == 201, r.text
+
+
+def test_blocked_target_from_cached_link_preview(client: TestClient, fake_runner: FakeRunner) -> None:
+    url = "https://example.com/t.csv"
+    stats = [
+        {"name": "PassengerId", "kind": "id", "count": 891, "missing": 0, "unique": 891},
+        {"name": "Survived", "kind": "boolean", "count": 891, "missing": 0, "unique": 2, "minCount": 342},
+    ]
+    preview_service._cache[url] = (time.monotonic(), {"stats": stats})
+    try:
+        r = client.post("/api/runs", json={"url": url, "target": "PassengerId"})
+        assert r.status_code == 400 and "ID column" in r.json()["error"]
+        assert client.post("/api/runs", json={"url": url, "target": "Survived"}).status_code == 201
+    finally:
+        preview_service._cache.pop(url, None)

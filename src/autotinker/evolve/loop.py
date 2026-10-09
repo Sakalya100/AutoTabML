@@ -485,8 +485,13 @@ class _Runner:
         if best is None:
             return
         try:
+            cfg = getattr(self.record, "config", None)
             ev = build_assets_event(
-                self.run_id, self.run_dir, best.code, getattr(self.h, "test_outputs", None)
+                self.run_id,
+                self.run_dir,
+                best.code,
+                getattr(self.h, "test_outputs", None),
+                csv_format=cfg.get("csv_format") if isinstance(cfg, dict) else None,
             )
             self.emitter.emit(ev)
         except Exception as e:  # noqa: BLE001 - assets must never fail a run

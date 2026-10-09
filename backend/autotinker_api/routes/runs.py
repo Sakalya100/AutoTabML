@@ -8,19 +8,34 @@ import hmac
 import json
 import logging
 import secrets
+import tempfile
 import time
+import zipfile
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from starlette.datastructures import UploadFile
 
-from autotinker_api import assets, background, blob, db, ratelimit, repo, settings, urlguard, validation, watchdog
+from autotinker_api import (
+    assets,
+    background,
+    blob,
+    db,
+    failures,
+    ratelimit,
+    repo,
+    settings,
+    urlguard,
+    validation,
+    watchdog,
+)
 from autotinker_api.events import parse_lines
 from autotinker_api.http import ApiError, json_ok, owner_of, public_base, read_json
-from autotinker_api.preview.service import PreviewError, check_url
+from autotinker_api.preview.service import PreviewError, check_url, peek_preview
 from autotinker_api.runners import get_runner
 from autotinker_api.runners.base import StartRequest, exit_status
 
@@ -41,6 +56,19 @@ def sha256(s: str) -> str:
 # ------------------------------------------------------------------------------------------------------- start
 
 
+def _check_url_target(url: str, target: str) -> None:
+    """Reject a target that can't be learned, from the link preview's column stats when this instance has them cached
+    (the setup form previews the link just before Start). No refetch: without a cached preview the engine profiles
+    the file itself."""
+    preview = peek_preview(url)
+    if not preview:
+        return
+    try:
+        validation.check_target(preview["stats"], target)
+    except validation.Invalid as e:
+        raise ApiError(400, e.error, field=e.field) from None
+
+
 async def _parse_start(request: Request) -> tuple[dict[str, Any], validation.RunOptions, bytes | None, str | None, str]:
     """(source fields, options, csv, sessionId, sentence) from JSON {url, ...} or multipart {file, ...}."""
     ctype = (request.headers.get("content-type") or "").lower()
@@ -50,6 +78,7 @@ async def _parse_start(request: Request) -> tuple[dict[str, Any], validation.Run
         sentence = body.get("sentence")
         try:
             url = validation.validate_url(str(body.get("url") or ""))
+            csv_format = validation.validate_csv_format(body.get("csvFormat"))
             opts = validation.validate_run_options(
                 target=str(body.get("target") or ""),
                 goal=str(body.get("goal") or ""),
@@ -63,11 +92,13 @@ async def _parse_start(request: Request) -> tuple[dict[str, Any], validation.Run
             await check_url(resolved)
         except PreviewError as e:
             raise ApiError(400, e.message, field="url") from None
+        _check_url_target(resolved, opts.target)
         source = {
             "source": "url",
             "source_url": resolved,
             "file_name": validation.file_name_from_url(resolved),
             "file_bytes": 0,
+            "csv_format": csv_format,
         }
         return (
             source,
@@ -93,10 +124,17 @@ async def _parse_start(request: Request) -> tuple[dict[str, Any], validation.Run
             max_experiments=str(form.get("maxExperiments") or validation.DEFAULT_EXPERIMENTS),
             columns=columns,
         )
+        validation.validate_upload_target(data, opts.target)
     except validation.Invalid as e:
         raise ApiError(400, e.error, field=e.field) from None
     sid = form.get("sessionId")
-    source = {"source": "file", "source_url": None, "file_name": (file.filename or "")[:200], "file_bytes": len(data)}
+    source = {
+        "source": "file",
+        "source_url": None,
+        "file_name": (file.filename or "")[:200],
+        "file_bytes": len(data),
+        "csv_format": validation.detect_csv_format(data),  # the server reads the whole upload: no need to trust a hint
+    }
     return source, opts, data, str(sid) if sid else None, str(form.get("sentence") or "")[:600]
 
 
@@ -319,9 +357,12 @@ async def list_assets(run_id: str, request: Request) -> JSONResponse:
 
 
 @router.get("/api/runs/{run_id}/assets/{name}", response_model=None)
-async def download_asset(run_id: str, name: str, request: Request) -> Response:
+async def download_asset(run_id: str, name: str, request: Request, inline: int = 0) -> Response:
     """Blob: 302 to a presigned GET URL valid for a few minutes (the store is private; bytes never pass through this
-    function). Local: the file itself, as an attachment."""
+    function). Local: the file itself, as an attachment.
+
+    `?inline=1` (small text assets only: kinds code/script/text/json up to 1 MB): the bytes themselves, read here and
+    served same-origin as text/plain or application/json, so the web previews work without the Blob origin's CORS."""
     from autotinker_api.runners.local import data_root
 
     async with db.connection() as conn:
@@ -331,6 +372,8 @@ async def download_asset(run_id: str, name: str, request: Request) -> Response:
         raise ApiError(404, NO_FILE)
     if row["storage"] == "skipped":
         raise ApiError(404, row["note"] or NO_FILE)
+    if inline:
+        return await _inline_asset(run_id, row, data_root())
     if row["storage"] == "local":
         path = assets.local_file(data_root(), row)
         if path is None:
@@ -347,6 +390,94 @@ async def download_asset(run_id: str, name: str, request: Request) -> Response:
         log.error("[run %s] download link for %s failed: %s", run_id, name, e)
         raise ApiError(503, "The download link couldn't be created. Try again in a minute.") from None
     return RedirectResponse(url, status_code=302, headers={"Cache-Control": "no-store"})
+
+
+ZIP_CHUNK = 1024 * 1024
+
+
+async def _inline_asset(run_id: str, row: dict[str, Any], root: Any) -> Response:
+    if not assets.inline_ok(row):
+        raise ApiError(415, "Only small text files can be previewed here; download it instead.")
+    if row["storage"] == "local":
+        path = assets.local_file(root, row)
+        if path is None:
+            raise ApiError(404, "That file is no longer on this server.")
+        data = await asyncio.to_thread(path.read_bytes)
+    else:
+        try:
+            data = await assets.read_blob(row)
+        except (blob.BlobError, httpx.HTTPError) as e:
+            log.error("[run %s] inline read of %s failed: %s", run_id, row["name"], type(e).__name__)
+            raise ApiError(503, "The file couldn't be read right now. Try again in a minute.") from None
+    if len(data) > assets.INLINE_MAX_BYTES:
+        raise ApiError(415, "Only small text files can be previewed here; download it instead.")
+    return Response(
+        data,
+        media_type=assets.inline_media_type(row),
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "sandbox; default-src 'none'",
+            "Content-Disposition": "inline",
+        },
+    )
+
+
+@router.get("/api/runs/{run_id}/assets.zip", response_model=None)
+async def download_assets_zip(run_id: str, request: Request) -> Response:
+    """Every available file of the run in one zip, unpacking into autotinker-<run id>/ (model.joblib, predict.py,
+    requirements.txt, model_card.json, pipeline.py). Owner-checked; built in a spooled temp file (large models spill
+    to disk) and streamed out in 1 MB chunks. Files that can't be read are left out; none at all is a 404/503."""
+    from autotinker_api.runners.local import data_root
+
+    async with db.connection() as conn:
+        await _owned(conn, run_id, request)
+        rows = await repo.list_assets(conn, run_id)
+    rows = [r for r in rows if r["storage"] in ("local", "blob") and assets.valid_name(r["name"])]
+    if not rows:
+        raise ApiError(404, "This run has no files to download yet.")
+    folder = assets.zip_folder(run_id)
+    spool = tempfile.SpooledTemporaryFile(max_size=32 * 1024 * 1024)  # noqa: SIM115 - closed by the stream
+    added = 0
+    with zipfile.ZipFile(spool, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for row in rows:
+            arc = f"{folder}/{row['name']}"
+            if row["storage"] == "local":
+                path = assets.local_file(data_root(), row)
+                if path is None:
+                    continue
+                await asyncio.to_thread(zf.write, path, arc)
+            else:
+                try:
+                    data = await assets.read_blob(row)
+                except (blob.BlobError, httpx.HTTPError) as e:
+                    log.error("[run %s] zip: %s could not be read: %s", run_id, row["name"], type(e).__name__)
+                    continue
+                await asyncio.to_thread(zf.writestr, arc, data)
+            added += 1
+    if not added:
+        spool.close()
+        raise ApiError(503, "The files couldn't be read right now. Try again in a minute, or download them one by one.")
+    size = spool.tell()
+    spool.seek(0)
+
+    async def chunks() -> AsyncIterator[bytes]:
+        try:
+            while chunk := await asyncio.to_thread(spool.read, ZIP_CHUNK):
+                yield chunk
+        finally:
+            spool.close()
+
+    return StreamingResponse(
+        chunks(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{folder}.zip"',
+            "Content-Length": str(size),
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 # ------------------------------------------------------------------------------------------------------ ingest
@@ -395,10 +526,20 @@ async def ingest(run_id: str, request: Request) -> JSONResponse:
         if kind == "exit":
             code = body.get("exit_code")
             tail = settings.redact(str(body.get("stderr_tail") or ""))[-4000:]
-            status, error = exit_status(
-                code=code if isinstance(code, int) else None, cancelled=False, has_record=run["record"] is not None
+            exit_code = code if isinstance(code, int) else None
+            status, error = exit_status(code=exit_code, cancelled=False, has_record=run["record"] is not None)
+            why = None
+            if status == "failed":
+                why = failures.describe(await repo.last_event(conn, run_id, "run_failed"), code=exit_code, tail=tail)
+            await repo.finish_run(
+                conn,
+                run_id,
+                status,
+                error=why.message if why else error,
+                error_tail=tail if status == "failed" else None,
+                error_code=why.code if why else None,
+                error_hint=why.hint if why else None,
             )
-            await repo.finish_run(conn, run_id, status, error=error, error_tail=tail if status == "failed" else None)
             # Nothing inside the VM can stop it; this final post is the hook.
             if run["runner"] == "sandbox" and run["runner_ref"]:
                 await get_runner("sandbox").cancel(run)

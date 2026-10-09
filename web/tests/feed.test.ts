@@ -49,7 +49,7 @@ describe("buildFeed on the breast_cancer replay", () => {
       exps(items)
         .filter((x) => x.decision?.newBest)
         .map((x) => x.id),
-    ).toEqual(["e000", "e003", "e005", "e012"]);
+    ).toEqual(["e005", "e012"]); // the baseline and the e003 simplification replace the best without being better
   });
 
   it("closes with the stop signals and the locked test", () => {

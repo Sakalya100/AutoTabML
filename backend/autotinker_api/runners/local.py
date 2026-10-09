@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from autotinker_api import assets, background, db, repo, settings
+from autotinker_api import assets, background, db, failures, repo, settings
 from autotinker_api.events import JsonlDecoder
 from autotinker_api.runners.base import ControlCommand, StartRequest, engine_args, exit_status
 
@@ -116,6 +116,7 @@ class LocalRunner:
             max_experiments=run["max_experiments"],
             out_dir=str(out_dir),
             control_file=str(control),
+            csv_format=run.get("csv_format"),
         )
         cmd = [*python_command(), "-m", "autotinker", *args]
         log.info("[run %s] spawn: %s", run_id, shlex.join(cmd))  # argv only, never the env
@@ -188,9 +189,11 @@ class LocalRunner:
                     await repo.touch_seen(conn, run_id)
 
             beat = asyncio.create_task(heartbeat())
+            timed_out = False
             try:
                 await asyncio.wait_for(asyncio.gather(read_stdout(), read_stderr(), proc.wait()), timeout=max_s)
             except TimeoutError:
+                timed_out = True
                 log.warning("[run %s] exceeded %ss, killing", run_id, max_s)
                 _signal(proc.pid, signal.SIGKILL)
                 await proc.wait()
@@ -210,8 +213,22 @@ class LocalRunner:
             status, error = exit_status(
                 code=proc.returncode, cancelled=run_id in _cancelled, has_record=record is not None
             )
+            why = None
+            if status == "failed":
+                why = failures.describe(
+                    await repo.last_event(conn, run_id, "run_failed"),
+                    code=proc.returncode,
+                    tail=error_tail,
+                    timed_out=timed_out,
+                )
             await repo.finish_run(
-                conn, run_id, status, error=error, error_tail=error_tail if status == "failed" else None
+                conn,
+                run_id,
+                status,
+                error=why.message if why else error,
+                error_tail=error_tail if status == "failed" else None,
+                error_code=why.code if why else None,
+                error_hint=why.hint if why else None,
             )
             log.info("[run %s] %s (exit %s)", run_id, status, proc.returncode)
         except Exception:

@@ -19,6 +19,7 @@ import {
 import { CATEGORY_LABEL, fmtCost, fmtDuration, fmtValue, SIGNAL_LABEL } from "@/lib/format";
 import { describeGap, formatScore, formatSe, metricInfo } from "@/lib/metrics";
 import { answerKind, plainIdea, plainVerdict, stopPhrase } from "@/lib/story";
+import { plainGateReason } from "@/lib/verdict";
 import type { Metric } from "@/lib/schema";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -156,7 +157,9 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
             {items.map((it) => (
               <li key={it.key} className="border-t border-[var(--lp-hair)] first:border-t-0">
                 {it.kind === "run_started" && <RunStartedMsg item={it} />}
-                {it.kind === "experiment" && <ExperimentMsg item={it} metric={metric} selected={it.id === selectedId} live={it === flying && streaming} onSelect={onSelect} />}
+                {it.kind === "experiment" && (
+                  <ExperimentMsg item={it} metric={metric} selected={it.id === selectedId} live={it === flying && streaming} onSelect={onSelect} />
+                )}
                 {it.kind === "stopped" && <StoppedMsg item={it} />}
                 {it.kind === "finished" && <FinishedMsg item={it} metric={metric} />}
                 {it.kind === "agent_step" && <RunStepMsg item={it} />}
@@ -178,14 +181,14 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
                       activity && !activity.expId
                         ? `${roleDoing(activity.role)}…`
                         : items.length === 0
-                        ? (emptyHint ?? "Reading the data")
-                        : activity
-                          ? `${roleDoing(activity.role)}…`
-                          : last?.kind === "stopped"
-                          ? "Running the one final test, on data it has never seen"
-                          : heuristic
-                            ? "Choosing the next idea"
-                            : "Thinking of the next idea"
+                          ? (emptyHint ?? "Reading the data")
+                          : activity
+                            ? `${roleDoing(activity.role)}…`
+                            : last?.kind === "stopped"
+                              ? "Running the one final test, on data it has never seen"
+                              : heuristic
+                                ? "Choosing the next idea"
+                                : "Thinking of the next idea"
                     }
                   />
                 </motion.li>
@@ -223,7 +226,12 @@ export function StepFeed({ items, metric, selectedId, focusId, onSelect, streami
 function Enter({ children, className, delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   const animate = useEnter();
   return (
-    <motion.div className={className} initial={animate ? { opacity: 0, y: 6 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36, ease: EASE, delay }}>
+    <motion.div
+      className={className}
+      initial={animate ? { opacity: 0, y: 6 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.36, ease: EASE, delay }}
+    >
       {children}
     </motion.div>
   );
@@ -306,8 +314,7 @@ function RunStartedMsg({ item }: { item: RunStartedItem }) {
       {item.nRows != null && (
         <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">
           From {item.nCols != null ? `${Math.max(0, item.nCols - 1)} columns of ` : ""}
-          {item.nRows.toLocaleString("en-US")} rows. It only sees a summary and a few sample rows, and a slice of the data stays locked away for one
-          final test.
+          {item.nRows.toLocaleString("en-US")} rows. It only sees a summary and a few sample rows, and a slice of the data stays locked away for one final test.
         </p>
       )}
       <p className="mt-2 font-mono text-[11.5px] leading-relaxed text-ink-3 tabular">
@@ -317,7 +324,11 @@ function RunStartedMsg({ item }: { item: RunStartedItem }) {
       </p>
       {item.flagged.length > 0 && (
         <p className="mt-1 font-mono text-[11.5px] text-best">
-          flagged: {item.flagged.slice(0, 3).map((f) => `${f.name} (${f.flags[0].replace(/_/g, " ")})`).join(", ")}
+          flagged:{" "}
+          {item.flagged
+            .slice(0, 3)
+            .map((f) => `${f.name} (${f.flags[0].replace(/_/g, " ")})`)
+            .join(", ")}
         </p>
       )}
     </Moment>
@@ -337,7 +348,10 @@ function StoppedMsg({ item }: { item: StoppedItem }) {
       <ul className="mt-2.5 space-y-1">
         {item.signals.map((s) => (
           <li key={s.key} className="grid grid-cols-[auto_1fr_auto] items-baseline gap-x-2 font-mono text-[11.5px] text-ink-3 tabular">
-            <span aria-hidden className={`size-1.5 translate-y-[-1px] rounded-full ${s.fired === true ? "bg-best" : s.fired === false ? "border border-ink-3" : "border border-dashed border-ink-3"}`} />
+            <span
+              aria-hidden
+              className={`size-1.5 translate-y-[-1px] rounded-full ${s.fired === true ? "bg-best" : s.fired === false ? "border border-ink-3" : "border border-dashed border-ink-3"}`}
+            />
             <span className={s.fired ? "text-ink-2" : ""}>
               {(SIGNAL_LABEL[s.key]?.title ?? s.key.replace(/_/g, " ")).toLowerCase()} · {s.fired === true ? "yes" : s.fired === false ? "no" : "n/a"}
             </span>
@@ -367,11 +381,12 @@ function FinishedMsg({ item, metric }: { item: FinishedItem; metric: Metric | nu
       }
     >
       <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">
-        {item.gap > 0 ? "A little below its own estimate" : item.gap < 0 ? "Better than its own estimate" : "Exactly its own estimate"}: {describeGap(metric, item.gap)}.
+        {item.gap > 0 ? "A little below its own estimate" : item.gap < 0 ? "Better than its own estimate" : "Exactly its own estimate"}:{" "}
+        {describeGap(metric, item.gap)}.
       </p>
       <p className="mt-2 font-mono text-[11.5px] text-ink-3 tabular">
-        dev CV {formatScore(metric, item.devCvMean)} · select {formatScore(metric, item.select)} · test {formatScore(metric, item.test)} · best {item.bestId} · {item.nExperiments} ideas ·{" "}
-        {fmtDuration(item.wallTimeS)} · {fmtCost(item.costUsd)}
+        dev CV {formatScore(metric, item.devCvMean)} · select {formatScore(metric, item.select)} · test {formatScore(metric, item.test)} · best {item.bestId} ·{" "}
+        {item.nExperiments} ideas · {fmtDuration(item.wallTimeS)} · {fmtCost(item.costUsd)}
       </p>
     </Moment>
   );
@@ -490,7 +505,9 @@ function ExperimentMsg({
         {item.logs.length > 0 && (
           <details className="group/log mt-1.5 text-[12px]" onClick={(e) => e.stopPropagation()}>
             <summary className="cursor-pointer list-none font-mono text-[11px] text-ink-3 marker:hidden">
-              <span className="underline decoration-[var(--lp-hair)] underline-offset-4">sandbox log · {item.logs.length} line{item.logs.length === 1 ? "" : "s"}</span>
+              <span className="underline decoration-[var(--lp-hair)] underline-offset-4">
+                sandbox log · {item.logs.length} line{item.logs.length === 1 ? "" : "s"}
+              </span>
             </summary>
             <pre className="mt-1.5 max-h-48 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-ink-3">{item.logs.join("\n")}</pre>
           </details>
@@ -501,11 +518,15 @@ function ExperimentMsg({
             <details className="group/err text-[12.5px]" onClick={(e) => e.stopPropagation()}>
               <summary className="cursor-pointer list-none text-crash marker:hidden">
                 Attempt {a.attempt + 1} failed ({a.errorKind ?? "error"})
-                {a.attempt + 1 < item.attempts.length || (!item.decision && item.attempts.at(-1) === a) ? <span className="text-ink-3">, so it repaired the code</span> : null}
+                {a.attempt + 1 < item.attempts.length || (!item.decision && item.attempts.at(-1) === a) ? (
+                  <span className="text-ink-3">, so it repaired the code</span>
+                ) : null}
                 <span className="ml-1 text-ink-3 underline decoration-[var(--lp-hair)] underline-offset-4 group-open/err:hidden">show error</span>
               </summary>
               {a.errorTail && (
-                <pre className="mt-1.5 max-h-40 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-ink-3">{a.errorTail.split("\n").slice(-8).join("\n")}</pre>
+                <pre className="mt-1.5 max-h-40 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-ink-3">
+                  {a.errorTail.split("\n").slice(-8).join("\n")}
+                </pre>
               )}
             </details>
           </Enter>
@@ -523,7 +544,7 @@ function ExperimentMsg({
             >
               <p className="text-ink">{item.idea.title}</p>
               {item.idea.rationale && <p>{item.idea.rationale}</p>}
-              {item.decision?.reason && <p className="font-mono text-[11px] text-ink-3">gate: {item.decision.reason}</p>}
+              {item.decision?.reason && <p className="text-[12.5px] text-ink-3">{plainGateReason(item.decision.reason, item.decision.verdict, metric)}</p>}
             </motion.div>
           )}
         </AnimatePresence>
@@ -560,10 +581,17 @@ function Running({ repairing, label }: { repairing: boolean; label?: string }) {
 
 /** One agent step as a single line: mono role label, then its plain one-liner. Amber while it runs. */
 function StepLine({ step }: { step: AgentStepLine }) {
-  const text = step.running ? (step.inputSummary ? `working on ${step.inputSummary}` : "working…") : step.plain || (step.status === "error" ? "failed" : "done");
+  const text = step.running
+    ? step.inputSummary
+      ? `working on ${step.inputSummary}`
+      : "working…"
+    : step.plain || (step.status === "error" ? "failed" : "done");
   return (
     <li className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-2 text-[12.5px] leading-snug">
-      <span className={`truncate font-mono text-[10.5px] uppercase tracking-[0.14em] ${step.running ? "animate-pulse text-best" : step.status === "error" ? "text-crash" : "text-ink-3"}`} title={step.model ?? undefined}>
+      <span
+        className={`truncate font-mono text-[10.5px] uppercase tracking-[0.14em] ${step.running ? "animate-pulse text-best" : step.status === "error" ? "text-crash" : "text-ink-3"}`}
+        title={step.model ?? undefined}
+      >
         {roleLabel(step.role)}
         {step.attempt > 0 ? ` ${step.attempt + 1}` : ""}
       </span>
@@ -590,7 +618,9 @@ function ReportMsg({ item }: { item: ReportItem }) {
         <ul className="mt-1 space-y-1 text-[14px] leading-relaxed text-ink-2">
           {xs.map((x, i) => (
             <li key={i} className="grid grid-cols-[0.9rem_minmax(0,1fr)]">
-              <span aria-hidden className="text-ink-3">–</span>
+              <span aria-hidden className="text-ink-3">
+                –
+              </span>
               <span>{x}</span>
             </li>
           ))}

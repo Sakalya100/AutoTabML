@@ -4,6 +4,7 @@ import { useState } from "react";
 import { fmtCost, fmtDuration, fmtInt } from "@/lib/format";
 import { fmtNum, formatScore, formatSe, scoreDelta, toRaw } from "@/lib/metrics";
 import { parentOf, type ExpView, type RunView } from "@/lib/run-state";
+import { plainGateReason } from "@/lib/verdict";
 import { CategoryChip, RadicalBadge, StatusBadge } from "./badges";
 import { CodeView, DiffView } from "./code-view";
 
@@ -99,7 +100,7 @@ function Overview({ view, exp, parent }: { view: RunView; exp: ExpView; parent: 
       <div>
         <Label>Gate decision</Label>
         <p className={`text-sm leading-relaxed ${exp.status === "running" ? "text-ink-3" : "text-ink"}`}>
-          {exp.status === "running" ? "Waiting for the sandbox…" : exp.reason || "(no reason recorded)"}
+          {exp.status === "running" ? "Waiting for the sandbox…" : exp.reason ? plainGateReason(exp.reason, exp.status, view.metric) : "(no reason recorded)"}
         </p>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
@@ -139,7 +140,10 @@ function Folds({ view, exp, parent }: { view: RunView; exp: ExpView; parent: Exp
                   className="absolute top-1/2 h-px bg-ink-3"
                   style={{ left: `${Math.min(pos(v), pos(p[i]))}%`, width: `${Math.abs(pos(v) - pos(p[i]))}%` }}
                 />
-                <div className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-discard bg-paper" style={{ left: `${pos(p[i])}%` }} />
+                <div
+                  className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-discard bg-paper"
+                  style={{ left: `${pos(p[i])}%` }}
+                />
               </>
             )}
             <div

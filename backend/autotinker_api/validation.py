@@ -107,6 +107,59 @@ def split_csv_line(line: str, delimiter: str = ",") -> list[str]:
     return out
 
 
+CSV_DELIMITERS = (",", ";", "\t", "|")
+CSV_ENCODINGS = ("utf-8", "utf-8-sig", "cp1252", "latin-1")
+
+
+def detect_encoding(data: bytes) -> str:
+    """The engine's rule (src/autotinker/data/csvformat.py): BOM, else UTF-8, else cp1252, else Latin-1."""
+    if data.startswith(b"\xef\xbb\xbf"):
+        return "utf-8-sig"
+    for enc in ("utf-8", "cp1252"):
+        try:
+            data.decode(enc)
+            return enc
+        except UnicodeDecodeError:
+            continue
+    return "latin-1"
+
+
+def decode_text(data: bytes) -> str:
+    return data.decode(detect_encoding(data)).removeprefix("\ufeff")
+
+
+def sniff_delimiter(text: str) -> str:
+    from autotinker_api.preview.csvparse import sniff_delimiter as sniff
+
+    return sniff(text)
+
+
+def detect_csv_format(data: bytes) -> dict[str, str]:
+    """{delimiter, encoding, decimal} of an uploaded CSV, by the same rules as the link preview and the engine."""
+    from autotinker_api.preview.csvparse import sniff_decimal
+
+    encoding = detect_encoding(data)
+    head = data[:65536].decode(encoding, errors="replace").removeprefix("\ufeff")
+    delimiter = sniff_delimiter(head)
+    return {"delimiter": delimiter, "encoding": encoding, "decimal": sniff_decimal(head, delimiter)}
+
+
+def validate_csv_format(raw: object) -> dict[str, str] | None:
+    """The optional `csvFormat` of a run request ({delimiter, encoding, decimal}, as the preview detected them).
+    Unknown values are dropped rather than rejected: the engine detects whatever is missing."""
+    if not isinstance(raw, dict):
+        return None
+    out: dict[str, str] = {}
+    d, e, m = raw.get("delimiter"), raw.get("encoding"), raw.get("decimal")
+    if d in CSV_DELIMITERS:
+        out["delimiter"] = str(d)
+    if isinstance(e, str) and e.lower() in CSV_ENCODINGS:
+        out["encoding"] = e.lower()
+    if m in (".", ","):
+        out["decimal"] = str(m)
+    return out or None
+
+
 def validate_upload(*, file_name: str, data: bytes) -> list[str]:
     """An uploaded CSV file; returns its header columns."""
     if not file_name or not file_name.lower().endswith(".csv"):
@@ -121,10 +174,10 @@ def validate_upload(*, file_name: str, data: bytes) -> list[str]:
         )
     if b"\x00" in data[:4096]:
         raise Invalid("file", "This doesn't look like a text CSV file.")
-    text = data.decode("utf-8", errors="replace").removeprefix("﻿")
+    text = decode_text(data)
     lines = re.split(r"\r?\n", text)
     header = lines.pop(0) if lines else ""
-    columns = split_csv_line(header) if header.strip() else []
+    columns = split_csv_line(header, sniff_delimiter(text[:65536])) if header.strip() else []
     if len(columns) < 2:
         raise Invalid("file", "The CSV needs a header row with at least two columns.")
     if any(c == "" for c in columns):
@@ -138,6 +191,48 @@ def validate_upload(*, file_name: str, data: bytes) -> list[str]:
     if rows < MIN_DATA_ROWS:
         raise Invalid("file", f"Need at least {MIN_DATA_ROWS} data rows; found {rows}.")
     return columns
+
+
+# ------------------------------------------------------------------------------------------------- target guard
+
+MAX_TARGET_MISSING = 0.5
+
+
+def target_block(c: dict[str, object] | None) -> str | None:
+    """Why column stats `c` (preview.csvparse.profile_column) can't be the column to predict, or None.
+    Mirrors targetBlock in web/src/lib/ingest/guards.ts."""
+    if not c:
+        return None
+    count, missing, unique = int(c.get("count", 0)), int(c.get("missing", 0)), int(c.get("unique", 0))  # type: ignore[call-overload]
+    kind = c.get("kind")
+    total = count + missing
+    if kind == "empty" or count == 0:
+        return "Empty — no values to learn from"
+    if kind == "id":
+        return "ID column — every row is different"
+    if total > 0 and missing / total > MAX_TARGET_MISSING:
+        return f"Mostly missing — {round(100 * missing / total)}% of rows are empty"
+    if kind == "text":
+        return "Free text — almost every value is different"
+    if unique < 2:
+        return "Constant — the same value in every row"
+    return None
+
+
+def check_target(stats: list[dict[str, object]], target: str) -> None:
+    """Raise Invalid("target") if the chosen column can't be learned (an ID, free text, constant, mostly empty)."""
+    c = next((s for s in stats if s.get("name") == target), None)
+    why = target_block(c)
+    if why:
+        raise Invalid("target", f'"{target}" can\'t be predicted: {why}. Pick another column.')
+
+
+def validate_upload_target(data: bytes, target: str) -> None:
+    """The same target guard for an uploaded CSV (profiles its first 5,000 rows, like the browser does)."""
+    from autotinker_api.preview.csvparse import parse_table
+
+    text = data.decode("utf-8", errors="replace").removeprefix("\ufeff")
+    check_target(parse_table(text, sample_rows=0)["stats"], target)
 
 
 # ------------------------------------------------------------------------------------------------------ messages

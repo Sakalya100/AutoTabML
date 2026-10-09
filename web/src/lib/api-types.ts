@@ -4,6 +4,13 @@
  */
 import type { ColumnStats, Delimiter } from "./ingest/csv";
 
+/** A delimited file's format, as the preview detected it. Sent with POST /api/runs as `csvFormat`. */
+export interface CsvFormat {
+  delimiter?: Delimiter;
+  encoding?: "utf-8" | "utf-8-sig" | "cp1252" | "latin-1";
+  decimal?: "." | ",";
+}
+
 export type RunStatus = "queued" | "starting" | "running" | "finished" | "failed" | "cancelled" | "timed_out";
 /** `timed_out`: the watchdog stopped a run that went quiet or hit its time limit (experiments so far are kept). */
 export const TERMINAL: readonly RunStatus[] = ["finished", "failed", "cancelled", "timed_out"];
@@ -34,6 +41,11 @@ export interface PublicRunMeta {
   error?: string;
   /** Last lines of the engine's stderr, secrets redacted. */
   errorTail?: string;
+  /** Why a failed run failed (src/autotinker/failures.py codes), and what to do about it, in plain language. */
+  errorCode?: string;
+  hint?: string;
+  /** How the file is parsed (from the link preview, or detected on upload); passed to the engine. */
+  csvFormat?: CsvFormat;
   finishedAt?: string;
 }
 
@@ -87,6 +99,9 @@ export interface Preview {
   finalUrl: string;
   rewritten: boolean;
   delimiter: Delimiter;
+  /** How the bytes decoded and the decimal mark: the engine is told to parse the file the same way. */
+  encoding?: CsvFormat["encoding"];
+  decimal?: CsvFormat["decimal"];
   columns: string[];
   stats: ColumnStats[];
   /** Up to 50 rows, for display in the browser only. */

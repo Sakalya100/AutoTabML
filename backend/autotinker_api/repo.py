@@ -126,6 +126,8 @@ _RUN_COLUMNS = {
     "status",
     "error",
     "error_tail",
+    "error_code",
+    "error_hint",
     "record",
     "runner_ref",
     "ingest_token_sha256",
@@ -137,12 +139,14 @@ _RUN_COLUMNS = {
 
 
 async def insert_run(conn: Conn, run: dict[str, Any]) -> None:
+    fmt = run.get("csv_format")
     await conn.execute(
         """insert into runs (id, session_id, status, source_url, file_name, target, metric, goal, max_experiments,
-                             runner, source, file_bytes, deadline_at, last_seen_at)
+                             runner, source, file_bytes, deadline_at, last_seen_at, csv_format)
            values (%(id)s, %(session_id)s, 'queued', %(source_url)s, %(file_name)s, %(target)s, %(metric)s, %(goal)s,
-                   %(max_experiments)s, %(runner)s, %(source)s, %(file_bytes)s, %(deadline_at)s, now())""",
-        run,
+                   %(max_experiments)s, %(runner)s, %(source)s, %(file_bytes)s, %(deadline_at)s, now(),
+                   %(csv_format_json)s::jsonb)""",
+        {**run, "csv_format_json": json.dumps(fmt) if fmt else None},
     )
     await conn.execute(
         "update sessions set last_run_id = %s, updated_at = now() where id = %s", (run["id"], run["session_id"])
@@ -195,9 +199,17 @@ async def update_run(
 
 
 async def finish_run(
-    conn: Conn, run_id: str, status: str, *, error: str | None = None, error_tail: str | None = None
+    conn: Conn,
+    run_id: str,
+    status: str,
+    *,
+    error: str | None = None,
+    error_tail: str | None = None,
+    error_code: str | None = None,
+    error_hint: str | None = None,
 ) -> dict[str, Any] | None:
-    """Move an active run to a terminal status (no-op if it has already ended)."""
+    """Move an active run to a terminal status (no-op if it has already ended). `error_code` / `error_hint`: why a
+    failed run failed, in plain language (see failures.py)."""
     return await update_run(
         conn,
         run_id,
@@ -205,6 +217,8 @@ async def finish_run(
         status=status,
         error=error,
         error_tail=error_tail,
+        error_code=error_code,
+        error_hint=error_hint,
         finished_at=datetime.now(UTC),
     )
 
@@ -243,6 +257,9 @@ def public_meta(run: dict[str, Any]) -> dict[str, Any]:
         ("sourceUrl", "source_url"),
         ("error", "error"),
         ("errorTail", "error_tail"),
+        ("errorCode", "error_code"),
+        ("hint", "error_hint"),
+        ("csvFormat", "csv_format"),
     ):
         if run.get(col):
             out[key] = run[col]
@@ -346,6 +363,15 @@ async def read_events_for_runs(conn: Conn, run_ids: list[str]) -> dict[str, list
     for r in await cur.fetchall():
         out[r["run_id"]].append(r["payload"])
     return out
+
+
+async def last_event(conn: Conn, run_id: str, event_type: str) -> Event | None:
+    """The run's latest event of `event_type` (its payload), or None."""
+    cur = await conn.execute(
+        "select payload from run_events where run_id = %s and type = %s order by seq desc limit 1", (run_id, event_type)
+    )
+    row = await cur.fetchone()
+    return row["payload"] if row else None
 
 
 async def has_event(conn: Conn, run_id: str, event_type: str) -> bool:

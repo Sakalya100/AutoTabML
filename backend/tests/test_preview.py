@@ -217,7 +217,16 @@ def test_column_kinds() -> None:
     assert kind("PassengerId", [str(i + 1) for i in range(30)]) == "id"
     assert kind("empty", ["", "NA", "?"]) == "empty"
     s = profile_column("Survived", ["0", "1", "1", "0", ""])
-    assert s == {"name": "Survived", "count": 4, "missing": 1, "unique": 2, "kind": "boolean", "min": 0, "max": 1}
+    assert s == {
+        "name": "Survived",
+        "count": 4,
+        "missing": 1,
+        "unique": 2,
+        "minCount": 2,
+        "kind": "boolean",
+        "min": 0,
+        "max": 1,
+    }
 
 
 # ------------------------------------------------------------------------------------------------- heuristics

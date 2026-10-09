@@ -3,7 +3,8 @@
 /**
  * A custom single-select dropdown (the native <select> popup can't be styled). Button + listbox popover with the
  * ARIA listbox pattern: arrows / Home / End move, Enter or Space picks, Escape closes, typing jumps to a match,
- * clicking outside closes. Each option can carry a hint (a column's kind, a metric's direction) and a badge.
+ * clicking outside closes. Each option can carry a hint (a column's kind, a metric's direction) and a badge, or be
+ * disabled with a reason (shown in place of the hint).
  */
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
@@ -12,6 +13,8 @@ export interface ListOption<T extends string> {
   label: string;
   hint?: string;
   badge?: string;
+  /** Shown but not pickable; the text says why ("ID column — every row is different"). */
+  disabled?: string;
 }
 
 export function Listbox<T extends string>({
@@ -65,6 +68,7 @@ export function Listbox<T extends string>({
   };
   const pick = (i: number) => {
     const o = options[i];
+    if (o?.disabled) return;
     if (o) onChange(o.value);
     setOpen(false);
     button.current?.focus();
@@ -145,6 +149,9 @@ export function Listbox<T extends string>({
               data-i={i}
               role="option"
               aria-selected={o.value === value}
+              aria-disabled={o.disabled ? true : undefined}
+              data-disabled={o.disabled ? "" : undefined}
+              title={o.disabled}
               data-active={i === active || undefined}
               className="lb-option"
               onPointerMove={() => setActive(i)}
@@ -152,7 +159,7 @@ export function Listbox<T extends string>({
             >
               <span className={`lb-option-label ${mono ? "font-mono tabular-nums" : ""}`}>{o.label}</span>
               {o.badge && <span className="lb-badge">{o.badge}</span>}
-              {o.hint && <span className="lb-hint">{o.hint}</span>}
+              {o.disabled ? <span className="lb-hint lb-why">{o.disabled}</span> : o.hint && <span className="lb-hint">{o.hint}</span>}
               {o.value === value && (
                 <svg viewBox="0 0 12 12" className="lb-check" aria-hidden>
                   <path d="M2.5 6.2 5 8.6 9.5 3.6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

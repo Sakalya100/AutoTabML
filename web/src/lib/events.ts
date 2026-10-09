@@ -14,7 +14,7 @@ export type EventOf<K extends EventType> = Extract<AnyEvent, { type: K }>;
  * Event types the engine emits that the generated schema doesn't describe yet. Typed by hand where they are consumed
  * (src/lib/assets.ts); kept separate from EVENT_TYPES so this compiles before and after schema.ts is regenerated.
  */
-export const EXTRA_EVENT_TYPES = ["assets_ready"] as const;
+export const EXTRA_EVENT_TYPES = ["assets_ready", "run_failed"] as const;
 export type ExtraEventType = (typeof EXTRA_EVENT_TYPES)[number];
 
 export const EVENT_TYPES: readonly EventType[] = [
@@ -54,6 +54,8 @@ const REQUIRED: Record<EventType | ExtraEventType, readonly string[]> = {
   steer_applied: ["text"],
   // Charts and downloadable files, after the report. Unknown chart kinds are skipped where it is read.
   assets_ready: ["charts", "files"],
+  // A failed run's last event: why, in plain language (the failed-run card reads it from the run meta).
+  run_failed: ["code", "message"],
 };
 
 export function isEventType(t: unknown): t is EventType | ExtraEventType {

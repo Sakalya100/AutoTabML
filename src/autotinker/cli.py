@@ -155,6 +155,43 @@ def load_env_file() -> None:
         load_dotenv(path, override=False)
 
 
+class _LastEvent:
+    """Remembers the run id and seq of the last event, so a run_failed event can follow it in the stream."""
+
+    def __init__(self) -> None:
+        self.run_id = ""
+        self.seq = 0
+
+    def chain(self, cb: Any) -> Any:
+        def on_event(ev: Any) -> None:
+            self.run_id, self.seq = ev.run_id, max(self.seq, ev.seq)
+            if cb is not None:
+                cb(ev)
+
+        return on_event
+
+
+def _report_failure(exc: BaseException, seen: _LastEvent, events_stdout: bool) -> None:
+    from rich.markup import escape
+
+    from autotinker.failures import classify
+    from autotinker.obs.events import RunFailed
+
+    f = classify(exc)
+    err.print(
+        "[red]error:[/] " + escape(f"{f.message} {f.hint}".rstrip() + (f" ({f.detail})" if f.detail else "")),
+        soft_wrap=True,
+        markup=True,
+        highlight=False,
+    )
+    if events_stdout:
+        ev = RunFailed(
+            run_id=seen.run_id, seq=seen.seq + 1, code=f.code, message=f.message, hint=f.hint, detail=f.detail
+        )
+        sys.stdout.write(ev.model_dump_json() + "\n")
+        sys.stdout.flush()
+
+
 @app.command()
 def run(
     source: Annotated[
@@ -196,6 +233,17 @@ def run(
         Path | None,
         typer.Option("--control-file", help="poll this append-only JSONL file for control commands"),
     ] = None,
+    delimiter: Annotated[
+        str | None,
+        typer.Option("--delimiter", help="CSV field separator: , ; | or tab (detected if omitted)"),
+    ] = None,
+    encoding: Annotated[
+        str | None,
+        typer.Option("--encoding", help="utf-8, utf-8-sig, cp1252 or latin-1 (detected if omitted)"),
+    ] = None,
+    decimal: Annotated[
+        str | None, typer.Option("--decimal", help="decimal mark: . or , (detected if omitted)")
+    ] = None,
 ) -> None:
     """The agentic AutoML loop: agents profile, plan, code, debug, tune and ensemble until the ceiling.
 
@@ -215,6 +263,12 @@ def run(
         )
         err.print(f"run directory: {res.run_dir}")
         return
+    from autotinker.data.csvformat import CsvFormatError, normalise_format
+
+    try:
+        csv_format = normalise_format(delimiter, encoding, decimal)
+    except CsvFormatError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     load_env_file()
     from autotinker.api import agentic_run
     from autotinker.evolve.control import ControlChannel
@@ -227,6 +281,7 @@ def run(
     elif control_stdin:
         control = ControlChannel.from_stdin()
 
+    seen = _LastEvent()
     try:
         res = _go(
             lambda cb: agentic_run(
@@ -239,15 +294,16 @@ def run(
                 max_time_s=max_time,
                 max_tokens=max_tokens,
                 seed=seed,
-                on_event=cb,
+                on_event=seen.chain(cb),
                 events_stdout=events_stdout,
                 control=control,
+                csv_format=csv_format if any(csv_format.as_dict().values()) else None,
             ),
             events_stdout,
             f"autotinker run {source}",
         )
-    except (RuntimeError, ValueError) as exc:
-        err.print(f"[red]error:[/] {exc}")
+    except Exception as exc:  # every failure ends with one plain-language run_failed event and exit 2
+        _report_failure(exc, seen, events_stdout)
         raise typer.Exit(code=2) from exc
     err.print(f"run directory: {res.run_dir}")
     rep = res.record.report or {}

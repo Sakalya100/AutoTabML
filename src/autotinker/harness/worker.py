@@ -207,13 +207,42 @@ def _test_extras(
         try:
             import joblib
 
-            joblib.dump(est, model_path, compress=3)
+            wrapped = _wrap_model(job, est, out)
+            joblib.dump(wrapped if wrapped is not None else est, model_path, compress=3)
             out["model_path"] = model_path
+            out["model_wrapped"] = wrapped is not None
         except Exception as e:  # noqa: BLE001 - e.g. an unpicklable lambda inside the pipeline
             with contextlib.suppress(OSError):
                 os.unlink(model_path)
             out["model_error"] = f"{type(e).__name__}: {e}"[:500]
     return out
+
+
+# Module name of the label-decoding wrapper class in model.joblib; the run's `assets/predict.py` defines it.
+PREDICT_MODULE = "predict"
+
+
+def _wrap_model(job: dict[str, Any], est: Any, out: dict[str, Any]) -> Any:
+    """`predict.LabelDecodingModel(est, ...)` when the job carries the wrapper spec (`job["wrap"]`), else
+    None.
+    The class is loaded from the template file under the module name `predict`, so the pickle refers to
+    `predict.LabelDecodingModel`, which the shipped predict.py provides."""
+    spec_in = job.get("wrap")
+    if not spec_in:
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location(PREDICT_MODULE, spec_in["template_path"])
+        if spec is None or spec.loader is None:
+            raise RuntimeError("could not load the predict template")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[PREDICT_MODULE] = module
+        spec.loader.exec_module(module)
+        return module.LabelDecodingModel(
+            est, spec_in.get("classes"), spec_in["features"], spec_in["problem_type"]
+        )
+    except Exception as e:  # noqa: BLE001 - fall back to the raw estimator
+        out["wrap_error"] = f"{type(e).__name__}: {e}"[:500]
+        return None
 
 
 def _suggest(trial: Any, name: str, sp: dict[str, Any]) -> Any:

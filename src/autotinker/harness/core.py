@@ -13,13 +13,14 @@ import numpy as np
 import pandas as pd
 
 from autotinker.contracts import DataProfile, ExecResult, HpoTrial, TaskSpec
-from autotinker.data.profiler import profile_dataframe, resolve_task
+from autotinker.data.profiler import jsonsafe, profile_dataframe, resolve_task
 from autotinker.harness import scorer
 from autotinker.harness.sandbox import SandboxResult, run_in_sandbox
 from autotinker.harness.splits import Splits, make_splits, persist_splits
 from autotinker.harness.static_check import allowed_imports, static_check
 
 _SAFE_ID = re.compile(r"[^A-Za-z0-9_.-]")
+PREDICT_TEMPLATE = Path(__file__).resolve().parents[1] / "obs" / "predict_template.py"
 
 
 @dataclass
@@ -37,6 +38,14 @@ class TestOutputs:
     classes: list[Any] | None  # encoded label i == classes[i]
     model_path: Path | None  # joblib dump of the estimator fitted on dev+select (None if it failed)
     model_error: str | None = None
+    # What the downloadable model card and predict.py need (see `obs.assets`):
+    target: str = ""
+    metric: str = ""
+    test_score: float | None = None  # raw (not oriented) locked-test score
+    features: list[dict[str, Any]] = field(default_factory=list)  # name, dtype, kind, required
+    example_row: dict[str, Any] = field(default_factory=dict)
+    dropped_columns: list[str] = field(default_factory=list)  # id-like / constant: optional at predict time
+    model_wrapped: bool = False  # model.joblib is a predict.LabelDecodingModel (else the raw estimator)
 
 
 @dataclass
@@ -247,7 +256,18 @@ class Harness:
             raise RuntimeError("score_test: static check failed:\n" + "\n".join(errors))
         job_dir = self._job_dir("test")
         model_path = job_dir / "model.joblib"
-        res = self._sandbox(code, "test", "test", job_dir=job_dir, extra={"model_path": str(model_path)})
+        features, dropped = self.model_features()
+        wrap = {
+            "template_path": str(PREDICT_TEMPLATE),
+            "classes": (
+                [jsonsafe(c) for c in self._splits.classes] if self._splits.classes is not None else None
+            ),
+            "features": features,
+            "problem_type": self.task.problem_type.value if self.task.problem_type else "",
+        }
+        res = self._sandbox(
+            code, "test", "test", job_dir=job_dir, extra={"model_path": str(model_path), "wrap": wrap}
+        )
         if not res.ok or res.preds_path is None:
             raise RuntimeError(f"score_test: solution failed ({res.error_kind}):\n{res.error_tail}")
         preds = self._load_preds(res.preds_path)
@@ -266,6 +286,36 @@ class Harness:
             proba=preds["test"] if scorer.needs_proba(self.task.metric) else preds.get("test_proba"),
             classes=list(self._splits.classes) if self._splits.classes is not None else None,
             model_path=model_path if model_path.is_file() else None,
-            model_error=payload.get("model_error"),
+            model_error=payload.get("model_error") or payload.get("wrap_error"),
+            target=self.task.target,
+            metric=self.task.metric.value,
+            test_score=self.task.metric.to_raw(test),
+            features=features,
+            example_row=self.example_row(),
+            dropped_columns=dropped,
+            model_wrapped=bool(payload.get("model_wrapped")),
         )
         return test
+
+    def model_features(self) -> tuple[list[dict[str, Any]], list[str]]:
+        """The model's input columns (training order and dtypes) and the id-like / constant ones among them,
+        which predict.py treats as optional (filled with missing values when absent)."""
+        kinds = {c.name: c.kind.value for c in self.profile.columns}
+        optional = {"id", "constant"}
+        features = [
+            {
+                "name": str(name),
+                "dtype": str(dtype),
+                "kind": kinds.get(str(name), ""),
+                "required": kinds.get(str(name)) not in optional,
+            }
+            for name, dtype in self._splits.X_dev.dtypes.items()
+        ]
+        return features, [str(f["name"]) for f in features if not f["required"]]
+
+    def example_row(self) -> dict[str, Any]:
+        """One real input row (from the dev split, without the target), JSON-safe."""
+        if len(self._splits.X_dev) == 0:
+            return {}
+        row = self._splits.X_dev.iloc[0]
+        return {str(k): jsonsafe(v) for k, v in row.items()}
