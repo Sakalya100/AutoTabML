@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from "next/font/google";
-import Link from "next/link";
-import { AuthControls, AuthProvider } from "@/components/auth";
+import { AuthProvider } from "@/components/auth";
+import { Atmosphere } from "@/components/chrome/atmosphere";
+import { SiteFooter } from "@/components/chrome/site-footer";
+import { SiteHeader } from "@/components/chrome/site-header";
 import { SmoothScroll } from "@/components/smooth-scroll";
-import { GITHUB_URL, DOCS_URL } from "@/lib/links";
 import "./globals.css";
 
 const display = Instrument_Serif({ variable: "--font-display-serif", subsets: ["latin"], weight: "400", style: ["normal", "italic"] });
@@ -24,37 +25,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         <AuthProvider>
           <SmoothScroll>
-            <header className="border-b border-rule">
-              <div className="flex items-center gap-6 px-4 py-3">
-                <Link href="/" className="font-display text-[1.6rem] leading-none tracking-tight">
-                  Auto<span className="italic text-best">Tinker</span>
-                </Link>
-                <nav className="ml-auto flex items-center gap-1 text-sm sm:gap-2">
-                  <Link href="/replays" className="rounded px-2 py-1.5 text-ink-2 hover:text-ink">
-                    Replays
-                  </Link>
-                  <a href={GITHUB_URL} className="hidden rounded px-2 py-1.5 text-ink-2 hover:text-ink sm:inline">
-                    GitHub
-                  </a>
-                  <AuthControls />
-                </nav>
-              </div>
-            </header>
+            <SiteHeader />
             <div className="flex-1">{children}</div>
-            <footer className="border-t border-rule">
-              <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-6 text-sm text-ink-3 sm:px-6">
-                <span>AutoTinker v2 · MIT</span>
-                <a href={GITHUB_URL} className="hover:text-ink">
-                  Source
-                </a>
-                <a href={DOCS_URL} className="hover:text-ink">
-                  Roadmap &amp; design notes
-                </a>
-                <Link href="/privacy" className="hover:text-ink">
-                  Privacy
-                </Link>
-              </div>
-            </footer>
+            <SiteFooter />
+            <Atmosphere />
           </SmoothScroll>
         </AuthProvider>
       </body>

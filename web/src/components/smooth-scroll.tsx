@@ -10,9 +10,8 @@ import { ReactLenis, useLenis, type LenisRef } from "lenis/react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { gsap, ScrollTrigger } from "@/lib/motion/gsap";
+import { isAppRoute } from "./chrome/routes";
 import "lenis/dist/lenis.css";
-
-const APP_ROUTES = /^\/(s|sign-in|sign-up)(\/|$)/;
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -42,7 +41,7 @@ export function SmoothScroll({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
   const reduced = useReducedMotion();
   const ref = useRef<LenisRef>(null);
-  const enabled = !reduced && !APP_ROUTES.test(pathname);
+  const enabled = !reduced && !isAppRoute(pathname);
 
   useEffect(() => {
     if (!enabled) return;

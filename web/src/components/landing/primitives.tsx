@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "motion/react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { gsap, prefersReducedMotion, useGSAP } from "@/lib/motion/gsap";
 import { useOpenSignIn, useSignedIn } from "../auth";
 
 export const EASE = [0.22, 1, 0.36, 1] as const;
@@ -64,7 +65,29 @@ export function Ticker({ value, format, className }: { value: number | null; for
   return <motion.span className={className}>{text as MotionValue<string>}</motion.span>;
 }
 
-/** CTA that leans toward the cursor. */
+/** A fixed real number that resolves out of scrambled digits as it appears (mono, same length: no layout shift). */
+export function ScrambleIn({ text, className }: { text: string; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useGSAP(
+    () => {
+      const el = ref.current;
+      if (!el || prefersReducedMotion()) return;
+      const t = gsap.to(el, { duration: 0.75, delay: 0.06, ease: "none", scrambleText: { text, chars: "0123456789", speed: 0.9, tweenLength: false } });
+      return () => {
+        t.kill();
+        el.textContent = text;
+      };
+    },
+    { dependencies: [text] },
+  );
+  return (
+    <span ref={ref} className={className}>
+      {text}
+    </span>
+  );
+}
+
+/** CTA that leans toward the cursor; the primary one also carries a soft light that follows the pointer. */
 export function MagneticLink({
   href,
   children,
@@ -88,6 +111,8 @@ export function MagneticLink({
   const onMove = (e: React.PointerEvent) => {
     if (reduce || e.pointerType !== "mouse" || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
+    ref.current.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    ref.current.style.setProperty("--my", `${e.clientY - r.top}px`);
     x.set((e.clientX - (r.left + r.width / 2)) * 0.28);
     y.set((e.clientY - (r.top + r.height / 2)) * 0.38);
   };
