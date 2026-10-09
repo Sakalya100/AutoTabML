@@ -1,7 +1,7 @@
 import { SignUp } from "@clerk/nextjs";
 import { notFound } from "next/navigation";
 import { AuthStage, authCardAppearance } from "@/app/sign-in/auth-stage";
-import { AUTH_ENABLED } from "@/lib/auth-flag";
+import { AFTER_SIGN_IN, AUTH_ENABLED } from "@/lib/auth-flag";
 
 export default function SignUpPage() {
   if (!AUTH_ENABLED) notFound();
@@ -13,7 +13,7 @@ export default function SignUpPage() {
         </>
       }
     >
-      <SignUp appearance={authCardAppearance} />
+      <SignUp appearance={authCardAppearance} forceRedirectUrl={AFTER_SIGN_IN} signInForceRedirectUrl={AFTER_SIGN_IN} />
     </AuthStage>
   );
 }

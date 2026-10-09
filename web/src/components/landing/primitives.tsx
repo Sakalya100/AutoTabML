@@ -141,7 +141,7 @@ export function MagneticLink({
       onClick={(e: React.MouseEvent) => {
         if (requireAuth && openSignIn && auth.loaded && !auth.signedIn) {
           e.preventDefault();
-          openSignIn(href);
+          openSignIn();
         }
       }}
     >
