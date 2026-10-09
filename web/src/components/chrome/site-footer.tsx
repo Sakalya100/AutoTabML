@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * The site's close: a quiet line, the links, and the wordmark set huge in the display serif, rising letter by letter
- * through a mask as it scrolls into view. Stays a direct child of <body> (page CSS targets `body > footer`).
+ * The site's close: a quiet line, the links, and the wordmark set huge in the display serif, its letters rising and
+ * sharpening into place as it scrolls into view. No per-letter masks: they are one line tall and clipped the italic
+ * ascenders (the T's bar, the k). Stays a direct child of <body> (page CSS targets `body > footer`).
  * In the workspace (a fixed-height app) it is a single compact row.
  */
 import Link from "next/link";
@@ -20,15 +21,10 @@ export function SiteFooter() {
   useGSAP(
     () => {
       const mark = root.current?.querySelector<HTMLElement>(".site-foot-mark");
-      const rule = root.current?.querySelector<HTMLElement>(".site-foot-rule");
-      if (!mark || !rule || prefersReducedMotion()) return;
-      const split = SplitText.create(mark, { type: "chars", mask: "chars" });
+      if (!mark || prefersReducedMotion()) return;
+      const split = SplitText.create(mark, { type: "chars" });
       const tl = gsap.timeline({ paused: true });
-      tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 1.4, ease: "expo.inOut" }, 0).from(
-        split.chars,
-        { yPercent: 105, duration: 1.3, ease: "expo.out", stagger: 0.045 },
-        0.15,
-      );
+      tl.from(split.chars, { yPercent: 28, opacity: 0, filter: "blur(10px)", duration: 1.3, ease: "expo.out", stagger: 0.045, clearProps: "filter" });
       const st = ScrollTrigger.create({ trigger: mark, start: "top 96%", once: true, onEnter: () => tl.play() });
       return () => {
         st.kill();
@@ -79,7 +75,6 @@ export function SiteFooter() {
             </Link>
           </nav>
         </div>
-        <span className="site-foot-rule" aria-hidden />
         <p className="site-foot-mark" aria-hidden>
           Auto<em>Tinker</em>
         </p>

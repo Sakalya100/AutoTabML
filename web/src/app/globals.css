@@ -376,16 +376,11 @@ html .site-account-card {
   text-transform: uppercase;
   color: var(--ink-3);
 }
-.site-foot-rule {
-  display: block;
-  height: 1px;
-  margin-top: clamp(44px, 6vw, 80px);
-  background: color-mix(in oklch, var(--ink) 14%, transparent);
-  transform-origin: left;
-}
 /* the wordmark, set huge and fading into the ground */
 .site-foot-mark {
-  margin: 0.04em -0.04em 0;
+  /* room above for the italic ascenders, and no rule around it: the footer's top border is the only line */
+  margin: clamp(36px, 5vw, 72px) -0.04em 0;
+  padding-top: 0.06em;
   font-family: var(--font-display);
   font-size: clamp(4.6rem, 25vw, 30rem);
   line-height: 0.96;
@@ -406,7 +401,6 @@ html .site-account-card {
   justify-content: space-between;
   gap: 0.5rem 2rem;
   padding: 18px 0 22px;
-  border-top: 1px solid color-mix(in oklch, var(--ink) 10%, transparent);
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.14em;
