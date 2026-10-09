@@ -1,12 +1,19 @@
 import { SignUp } from "@clerk/nextjs";
 import { notFound } from "next/navigation";
+import { AuthStage, authCardAppearance } from "@/app/sign-in/auth-stage";
 import { AUTH_ENABLED } from "@/lib/auth-flag";
 
 export default function SignUpPage() {
   if (!AUTH_ENABLED) notFound();
   return (
-    <div className="flex flex-1 items-center justify-center px-4 py-16">
-      <SignUp />
-    </div>
+    <AuthStage
+      line={
+        <>
+          Bring a table. Keep only what&apos;s <em>real.</em>
+        </>
+      }
+    >
+      <SignUp appearance={authCardAppearance} />
+    </AuthStage>
   );
 }

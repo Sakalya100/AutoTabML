@@ -3,8 +3,11 @@
 /*
  * The precise record behind the plain-language story: nothing technical is removed, it is moved behind progressive
  * disclosure. One row per question, closed by default; a row's content mounts the first time it opens.
+ * Motion: the heading's lines rise as the record scrolls in, the rows follow in a stagger with their hairlines drawing
+ * in, and an opened row's chart draws its line.
  */
 
+import { useLenis } from "lenis/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DataProfilePanel } from "@/components/data-profile";
@@ -16,6 +19,7 @@ import { EASE } from "@/components/landing/primitives";
 import { STOP_REASON_LABEL } from "@/lib/format";
 import type { RunView } from "@/lib/run-state";
 import { displayScore, plainIdea } from "@/lib/story";
+import { RevealHeading, scrollDocTo, useRevealOnScroll } from "./motion";
 
 type RowId = "idea" | "chart" | "ledger" | "stop" | "test" | "data";
 
@@ -30,11 +34,16 @@ interface Props {
   /** Incremented to open "the selected idea" and bring it into view. */
   reveal?: number;
   defaultOpen?: RowId[];
+  /** Finished runs only: the chart draws itself in and the ledger's rows settle in order when opened. A growing run
+   * leaves this off, so a new point or row appears the moment it arrives. */
+  drawIn?: boolean;
 }
 
-export function TechnicalDetails({ view, domainView, plannedExperiments, selectedId, onSelect, live, reveal = 0, defaultOpen = [] }: Props) {
+export function TechnicalDetails({ view, domainView, plannedExperiments, selectedId, onSelect, live, reveal = 0, defaultOpen = [], drawIn = false }: Props) {
   const [open, setOpen] = useState<Set<RowId>>(() => new Set(defaultOpen));
   const root = useRef<HTMLElement>(null);
+  const lenis = useLenis();
+  useRevealOnScroll(root, ".rv");
   const toggle = (id: RowId) =>
     setOpen((s) => {
       const n = new Set(s);
@@ -51,8 +60,8 @@ export function TechnicalDetails({ view, domainView, plannedExperiments, selecte
   useEffect(() => {
     if (!reveal) return;
     const el = root.current?.querySelector<HTMLElement>('[data-row="idea"]');
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    requestAnimationFrame(() => el?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" }));
+    requestAnimationFrame(() => el && scrollDocTo(el, lenis, -16));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new reveal request scrolls
   }, [reveal]);
 
   const exp = view.experiments.find((x) => x.id === selectedId) ?? null;
@@ -87,7 +96,16 @@ export function TechnicalDetails({ view, domainView, plannedExperiments, selecte
       ) : (
         "No scores yet"
       ),
-      body: <EvolutionChart view={view} domainView={domainView} plannedExperiments={plannedExperiments} selectedId={selectedId} onSelect={onSelect} />,
+      body: (
+        <EvolutionChart
+          view={view}
+          domainView={domainView}
+          plannedExperiments={plannedExperiments}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          drawIn={drawIn}
+        />
+      ),
       show: true,
     },
     {
@@ -111,8 +129,8 @@ export function TechnicalDetails({ view, domainView, plannedExperiments, selecte
       title: "The final test",
       summary: f ? (
         <>
-          dev CV <span className="rp-mono">{displayScore(m, f.devCvMean)}</span> · select <span className="rp-mono">{displayScore(m, f.selectScore)}</span> · test{" "}
-          <span className="rp-mono">{displayScore(m, f.testScore)}</span>
+          dev CV <span className="rp-mono">{displayScore(m, f.devCvMean)}</span> · select <span className="rp-mono">{displayScore(m, f.selectScore)}</span> ·
+          test <span className="rp-mono">{displayScore(m, f.testScore)}</span>
         </>
       ) : (
         "Locked until the run ends, then opened once"
@@ -130,13 +148,13 @@ export function TechnicalDetails({ view, domainView, plannedExperiments, selecte
   ];
 
   return (
-    <section ref={root} className="rp-tx" aria-labelledby="rp-tx-h">
+    <section ref={root} className="rp-tx" aria-labelledby="rp-tx-h" data-draw-rows={drawIn ? "" : undefined}>
       <div className="rp-tx-intro">
-        <p className="rp-kicker">For the curious</p>
-        <h2 id="rp-tx-h" className="rp-tx-h">
+        <p className="rp-kicker rv">For the curious</p>
+        <RevealHeading id="rp-tx-h" className="rp-tx-h" on="view">
           The full record
-        </h2>
-        <p className="rp-tx-sub">Every number the run recorded, exactly as measured.</p>
+        </RevealHeading>
+        <p className="rp-tx-sub rv">Every number the run recorded, exactly as measured.</p>
       </div>
       <ol className="rp-tx-rows">
         {rows
@@ -151,9 +169,23 @@ export function TechnicalDetails({ view, domainView, plannedExperiments, selecte
   );
 }
 
-function Row({ id, title, summary, open, onToggle, children }: { id: string; title: string; summary: ReactNode; open: boolean; onToggle: () => void; children: ReactNode }) {
+function Row({
+  id,
+  title,
+  summary,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string;
+  title: string;
+  summary: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   return (
-    <li className="rp-tx-row" data-row={id} data-open={open ? "" : undefined}>
+    <li className="rp-tx-row rv rv-hair" data-row={id} data-open={open ? "" : undefined}>
       <h3>
         <button type="button" className="rp-tx-toggle" aria-expanded={open} aria-controls={`rp-tx-${id}`} onClick={onToggle}>
           <span className="rp-tx-title">{title}</span>

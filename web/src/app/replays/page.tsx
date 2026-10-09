@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ReplayGallery, type GalleryItem } from "@/components/replay-gallery";
+import { GalleryHead, ReplayGallery, type GalleryItem } from "@/components/replay-gallery";
 import { metricInfo } from "@/lib/metrics";
 import { listReplays, loadReplay } from "@/lib/replays";
 import { buildView } from "@/lib/run-state";
@@ -43,16 +43,19 @@ export default async function ReplaysPage() {
 
   return (
     <main data-terra className="rp-root">
-      <header className="at-head">
-        <p className="rp-kicker">Replays</p>
-        <h1 className="at-h1">
-          Every run leaves a <em>map.</em>
-        </h1>
-        <p className="lp-sub at-sub">
-          {count} real run{items.length === 1 ? "" : "s"}, seen from above. Higher ground is a better model, and the amber trail is the path of ideas each one kept.
-        </p>
-        {shared && <p className="rp-note">{shared}</p>}
-      </header>
+      <GalleryHead
+        sub={
+          <>
+            <p className="lp-sub at-sub">
+              {count} real run{items.length === 1 ? "" : "s"}, seen from above. Higher ground is a better model, and the amber trail is the path of ideas each
+              one kept.
+            </p>
+            {shared && <p className="rp-note">{shared}</p>}
+          </>
+        }
+      >
+        Every run leaves a <em>map.</em>
+      </GalleryHead>
       {items.length ? <ReplayGallery items={items} /> : <p className="rp-wrap lp-sub pb-24">No replays are bundled with this build.</p>}
     </main>
   );

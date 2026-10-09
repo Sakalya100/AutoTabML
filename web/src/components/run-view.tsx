@@ -10,6 +10,7 @@ import type { RunRecord } from "@/lib/schema";
 import { proposerNote } from "@/lib/story";
 import { EASE, MagneticLink } from "./landing/primitives";
 import { Journey } from "./replay/journey";
+import { RevealHeading, ScrambleNumber } from "./replay/motion";
 import { RunStage, SimulateLink } from "./replay/stage";
 import { TechnicalDetails } from "./replay/technical";
 import { SurveyPanel } from "./survey-panel";
@@ -68,7 +69,21 @@ const FIRST_STEP_DELAY = 1500; // let the reader take in the "run started" messa
 const SPEEDS = [1, 2, 4] as const;
 type Speed = (typeof SPEEDS)[number];
 
-export function RunView({ mode, events, record, title, kicker, note, active, liveBar, emptyHint, plannedExperiments, initialSimulate, endedAs, others }: Props) {
+export function RunView({
+  mode,
+  events,
+  record,
+  title,
+  kicker,
+  note,
+  active,
+  liveBar,
+  emptyHint,
+  plannedExperiments,
+  initialSimulate,
+  endedAs,
+  others,
+}: Props) {
   const live = mode === "live";
   const [simulating, setSimulating] = useState(!!initialSimulate && events.length > 0);
   const [cursor, setCursor] = useState(1);
@@ -147,6 +162,7 @@ export function RunView({ mode, events, record, title, kicker, note, active, liv
       onSelect={setPinned}
       live={live}
       reveal={reveal}
+      drawIn={!staging}
     />
   );
 
@@ -155,7 +171,13 @@ export function RunView({ mode, events, record, title, kicker, note, active, liv
       <div ref={top} />
       <AnimatePresence mode="wait" initial={false}>
         {staging ? (
-          <motion.div key="stage" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.15 } }} transition={{ duration: 0.45, ease: EASE }}>
+          <motion.div
+            key="stage"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+            transition={{ duration: 0.45, ease: EASE }}
+          >
             <RunBar
               title={title}
               kicker={simulating ? "Replaying a recorded run" : live ? "Live run" : kicker}
@@ -270,7 +292,23 @@ export function RunView({ mode, events, record, title, kicker, note, active, liv
 }
 
 /** Staging header: the run's name, one plain status line, and the playback controls. */
-function RunBar({ title, kicker, view, total, note, controls, progress }: { title: string; kicker?: string; view: View; total: number | null; note: string | null; controls: ReactNode; progress: number | null }) {
+function RunBar({
+  title,
+  kicker,
+  view,
+  total,
+  note,
+  controls,
+  progress,
+}: {
+  title: string;
+  kicker?: string;
+  view: View;
+  total: number | null;
+  note: string | null;
+  controls: ReactNode;
+  progress: number | null;
+}) {
   const decided = view.experiments.filter((x) => x.status !== "running");
   const kept = decided.filter((x) => x.status === "keep").length;
   const best = view.experiments.find((x) => x.id === view.bestId);
@@ -289,25 +327,35 @@ function RunBar({ title, kicker, view, total, note, controls, progress }: { titl
       <div className="rp-bar-row">
         <div className="min-w-0">
           {kicker && <p className="rp-kicker">{kicker}</p>}
-          <h1 className="rp-bar-title">{title}</h1>
+          <RevealHeading as="h1" className="rp-bar-title" delay={0.1}>
+            {title}
+          </RevealHeading>
         </div>
         {controls}
       </div>
       <div className="rp-bar-row rp-bar-facts">
         <AnimatePresence mode="wait" initial={false}>
-          <motion.p key={status} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={{ duration: 0.22, ease: EASE }} className="rp-bar-status">
+          <motion.p
+            key={status}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.1 } }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className="rp-bar-status"
+          >
             {status}
           </motion.p>
         </AnimatePresence>
         <p className="rp-bar-nums">
+          {/* the counters re-settle only the digits that changed, so a growing run ticks rather than flickers */}
           <span>
-            <b>{decided.length}</b> tried
+            <ScrambleNumber className="rp-bar-n" value={String(decided.length)} duration={0.4} /> tried
           </span>
           <span>
-            <b className="rp-signal">{kept}</b> kept
+            <ScrambleNumber className="rp-bar-n rp-signal" value={String(kept)} duration={0.4} /> kept
           </span>
           <span>
-            best <b className="rp-signal">{best?.cv ? formatScore(view.metric, best.cv.mean) : "—"}</b>
+            best <ScrambleNumber className="rp-bar-n rp-signal" value={best?.cv ? formatScore(view.metric, best.cv.mean) : "—"} duration={0.6} />
           </span>
           {note && <span className="rp-bar-note">{note}</span>}
         </p>

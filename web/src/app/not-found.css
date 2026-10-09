@@ -1,0 +1,259 @@
+/* 404: the edge of the map (./not-found.tsx). Hairlines on the void, one message, one way home. */
+
+.nf-root {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  min-height: calc(100svh - 57px);
+  display: grid;
+  align-items: center;
+  padding: clamp(5rem, 14vh, 9rem) clamp(20px, 6vw, 92px);
+  color: var(--lp-ink);
+  background: var(--lp-void);
+}
+.nf-chart {
+  position: absolute;
+  inset: -3%;
+  width: 106%;
+  height: 106%;
+  z-index: -2;
+}
+.nf-chart path,
+.nf-chart line,
+.nf-chart circle {
+  fill: none;
+}
+/* (no non-scaling-stroke on the drawn paths: it breaks pathLength-based dashes) */
+.nf-chart line {
+  vector-effect: non-scaling-stroke;
+}
+.nf-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lp-ink-3);
+}
+.nf-grat {
+  stroke: oklch(var(--lp-line) / 0.05);
+  stroke-width: 1;
+}
+.nf-tick {
+  fill: oklch(var(--lp-mute) / 0.5);
+  stroke: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+.nf-ring {
+  stroke: oklch(var(--lp-line));
+  stroke-width: 1;
+  stroke-dasharray: 1;
+}
+.nf-edge {
+  stroke: oklch(var(--lp-line) / 0.32);
+  stroke-width: 1;
+  stroke-dasharray: 1;
+}
+/* the route fades as it leaves the known map (its stroke is a gradient in the SVG) */
+.nf-route {
+  stroke: url(#nf-fade);
+  stroke-width: 1.4;
+  stroke-dasharray: 1;
+}
+.nf-fade-a {
+  stop-color: var(--lp-ink);
+  stop-opacity: 0.75;
+}
+.nf-fade-b {
+  stop-color: var(--lp-ink);
+  stop-opacity: 0.12;
+}
+.nf-mark-dot {
+  fill: var(--lp-ink) !important;
+}
+.nf-mark-ring {
+  stroke: oklch(var(--lp-line) / 0.5);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nf-ping 2.8s cubic-bezier(0.16, 1, 0.3, 1) 3.4s infinite both;
+}
+@keyframes nf-ping {
+  from {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.nf-label {
+  text-anchor: end;
+  fill: var(--lp-ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.nf-label-serif {
+  text-anchor: start;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 22px;
+  letter-spacing: 0;
+  text-transform: none;
+  fill: var(--lp-ink-2);
+}
+.nf-serpent {
+  stroke: oklch(var(--lp-line) / 0.55);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nf-water {
+  stroke: oklch(var(--lp-line) / 0.2);
+  stroke-dasharray: 3 5;
+}
+/* the copy sits on a soft darkening, so the chart never fights it */
+.nf-veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgb(var(--lp-page-rgb) / 0.88) 0%, rgb(var(--lp-page-rgb) / 0.55) 34%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 50% 120%, rgb(var(--lp-page-rgb) / 0.9), transparent 70%);
+}
+
+.nf-copy {
+  max-width: 36rem;
+}
+.nf-h1 {
+  margin-top: 1.1rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 6.6vw, 6.4rem);
+  line-height: 0.94;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+.nf-h1 em {
+  font-style: italic;
+  color: var(--lp-signal);
+}
+.nf-sub {
+  margin-top: 1.4rem;
+  max-width: 30rem;
+  font-size: clamp(1.02rem, 1.25vw, 1.18rem);
+  line-height: 1.55;
+  color: var(--lp-ink-2);
+  text-wrap: pretty;
+}
+.nf-sub em {
+  font-family: var(--font-display);
+  font-size: 1.12em;
+  color: var(--lp-ink);
+}
+.nf-fix {
+  margin-top: 1.8rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--lp-hair);
+  display: grid;
+  gap: 0.35rem;
+  max-width: 26rem;
+}
+.nf-fix-k,
+.nf-fix-note {
+  font-size: 12.5px;
+  color: var(--lp-ink-3);
+}
+.nf-fix-v {
+  font-family: var(--font-mono);
+  font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--lp-ink);
+}
+.nf-copy .nf-ctas {
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.nf-compass {
+  position: absolute;
+  top: clamp(1.5rem, 6vh, 3.5rem);
+  right: clamp(20px, 5vw, 76px);
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  width: 88px;
+}
+.nf-compass svg {
+  width: 100%;
+  overflow: visible;
+}
+.nf-c-ring {
+  fill: none;
+  stroke: oklch(var(--lp-line) / 0.28);
+}
+.nf-c-tick {
+  stroke: oklch(var(--lp-line) / 0.35);
+}
+.nf-c-n {
+  fill: var(--lp-ink-2);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+.nf-n-head {
+  fill: var(--lp-ink);
+}
+.nf-n-tail {
+  fill: oklch(var(--lp-mute) / 0.6);
+}
+.nf-c-pin {
+  fill: var(--lp-void);
+  stroke: var(--lp-ink-2);
+}
+.nf-c-k {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--lp-ink-3);
+  animation: nf-blink 2.4s steps(1) infinite;
+}
+@keyframes nf-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (max-width: 767px) {
+  .nf-root {
+    align-items: end;
+    padding: 7rem 20px 3.5rem;
+  }
+  .nf-chart {
+    inset: -4% -60% -4% -40%;
+    width: 200%;
+  }
+  .nf-veil {
+    background: linear-gradient(to top, rgb(var(--lp-page-rgb) / 0.94) 0%, rgb(var(--lp-page-rgb) / 0.7) 55%, rgb(var(--lp-page-rgb) / 0.2) 100%);
+  }
+  .nf-h1 {
+    font-size: clamp(2.6rem, 12vw, 3.4rem);
+  }
+  .nf-compass {
+    width: 64px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nf-mark-ring,
+  .nf-c-k {
+    animation: none;
+  }
+}

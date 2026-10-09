@@ -375,11 +375,21 @@
 }
 .rp-tx-rows {
   margin-top: 2.6rem;
-  border-top: 1px solid var(--lp-hair);
-}
-.rp-tx-row {
   border-bottom: 1px solid var(--lp-hair);
+}
+/* each row's top hairline draws in as it arrives (./motion.css .rv-hair) */
+.rp-tx-row {
   scroll-margin-top: 16px;
+}
+.rp-tx-toggle .rp-tx-title {
+  transition:
+    color 0.25s,
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (hover: hover) {
+  .rp-tx-toggle:hover .rp-tx-title {
+    transform: translateX(6px);
+  }
 }
 .rp-tx-toggle {
   width: 100%;
@@ -486,11 +496,13 @@
   color: var(--lp-ink-3);
   font-variant-numeric: tabular-nums;
 }
-.rp-bar-nums b {
+.rp-bar-nums b,
+.rp-bar-n {
   font-weight: 500;
   color: var(--lp-ink);
 }
-.rp-bar-nums b.rp-signal {
+.rp-bar-nums b.rp-signal,
+.rp-bar-n.rp-signal {
   color: var(--lp-signal);
 }
 .rp-bar-note {
@@ -771,7 +783,20 @@
   text-wrap: pretty;
 }
 .at-stat {
+  position: relative;
   margin-top: 1.5rem;
+  border-top-color: transparent;
+}
+.at-stat::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 1px;
+  background: var(--lp-hair);
+  transform: scaleX(var(--draw, 1));
+  transform-origin: 0 50%;
 }
 .at-asked {
   margin-top: 1rem;
@@ -808,9 +833,34 @@
     filter 0.8s cubic-bezier(0.22, 1, 0.36, 1),
     transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.at-poster:hover .at-tilt > [role="img"] {
-  filter: brightness(1.12);
+.at-poster:hover .at-tilt > [role="img"],
+.at-entry:has(.at-copy a:hover) .at-tilt > [role="img"] {
+  filter: brightness(1.14) saturate(1.06);
   transform: scale(1.35);
+}
+/* a soft lamp that follows the pointer across the land (moved by transform only) */
+.at-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.at-glare::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 56%;
+  aspect-ratio: 1;
+  margin: -28% 0 0 -28%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--lp-ink-rgb) / 0.13), rgb(var(--lp-ink-rgb) / 0.04) 55%, transparent);
+  transform: translate3d(var(--gx, 50%), var(--gy, 50%), 0);
+  opacity: 0;
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.at-poster[data-lit] .at-glare::before {
+  opacity: 1;
 }
 
 @media (max-width: 767px) {
@@ -870,8 +920,7 @@ body:has([data-journey]) > footer {
   pointer-events: none;
   background:
     linear-gradient(to right, rgb(var(--lp-page-rgb) / 0.84) 0%, rgb(var(--lp-page-rgb) / 0.62) 24%, rgb(var(--lp-page-rgb) / 0.2) 40%, transparent 50%),
-    linear-gradient(to bottom, rgb(var(--lp-page-rgb) / 0.55) 0%, transparent 14%),
-    linear-gradient(to top, rgb(var(--lp-page-rgb) / 0.5) 0%, transparent 16%);
+    linear-gradient(to bottom, rgb(var(--lp-page-rgb) / 0.55) 0%, transparent 14%), linear-gradient(to top, rgb(var(--lp-page-rgb) / 0.5) 0%, transparent 16%);
 }
 .jn-fallback {
   position: absolute;
@@ -1273,5 +1322,47 @@ body:has([data-journey]) > footer {
   }
   .jn-tail-h + .lp-sub {
     margin-top: 0.5rem;
+  }
+}
+
+/* ---- the record's chart draws itself in when its row opens (EvolutionChart drawIn) ---- */
+@media (prefers-reduced-motion: no-preference) {
+  [data-draw] .ec-line {
+    stroke-dasharray: 1;
+    animation: ec-draw 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+  }
+  [data-draw] .ec-band {
+    animation: ec-fade 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+  }
+  [data-draw] .ec-dot {
+    animation: ec-dot 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(min(var(--i, 0), 40) * 22ms + 0.1s);
+  }
+}
+@keyframes ec-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ec-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ec-dot {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---- the ledger's rows settle in, in order, when the list opens ---- */
+@media (prefers-reduced-motion: no-preference) {
+  [data-draw-rows] .rp-tx-body .ledger-row {
+    animation: ec-dot 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(min(var(--i, 0), 30) * 18ms);
   }
 }
