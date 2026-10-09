@@ -4,7 +4,7 @@ All notable changes to the `autotinker` package are recorded here. The format fo
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-10-09
+## [0.1.0] - 2026-10-10
 
 First public release of the v2 engine (formerly AutoTabML; a ground-up rewrite of the 2024 v1).
 
