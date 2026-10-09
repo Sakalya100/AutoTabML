@@ -7,10 +7,9 @@
  */
 import { ClerkProvider, Show, SignInButton, UserButton, useAuth, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useMagnetic } from "@/components/chrome/magnetic";
-import { AUTH_ENABLED } from "@/lib/auth-flag";
+import { AFTER_SIGN_IN, AUTH_ENABLED } from "@/lib/auth-flag";
 
 export { AUTH_ENABLED };
 
@@ -42,19 +41,26 @@ const userButtonAppearance = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   if (!AUTH_ENABLED) return <>{children}</>;
-  return <ClerkProvider appearance={appearance}>{children}</ClerkProvider>;
+  return (
+    <ClerkProvider
+      appearance={appearance}
+      signInForceRedirectUrl={AFTER_SIGN_IN}
+      signUpForceRedirectUrl={AFTER_SIGN_IN}
+      signInFallbackRedirectUrl={AFTER_SIGN_IN}
+      signUpFallbackRedirectUrl={AFTER_SIGN_IN}
+    >
+      {children}
+    </ClerkProvider>
+  );
 }
 
 /** Header controls: "Sign in" when signed out, the account menu when signed in. */
 export function AuthControls() {
-  const pathname = usePathname();
   if (!AUTH_ENABLED) return null;
-  // Signing in from the header lands on the dashboard, except inside the workspace, where you stay put.
-  const to = /^\/s(\/|$)/.test(pathname ?? "") ? undefined : "/dashboard";
   return (
     <>
       <Show when="signed-out">
-        <SignInButton mode="modal" forceRedirectUrl={to} signUpForceRedirectUrl={to}>
+        <SignInButton mode="modal" forceRedirectUrl={AFTER_SIGN_IN} signUpForceRedirectUrl={AFTER_SIGN_IN}>
           <SignInPill />
         </SignInButton>
       </Show>
@@ -99,11 +105,11 @@ const useAnonymousState = (): SignedInState => anonymous;
 /** Chosen once per build, so hooks run in the same order on every render. */
 export const useSignedIn: () => SignedInState = AUTH_ENABLED ? useClerkState : useAnonymousState;
 
-/** Opens the sign-in modal and lands on `url` after signing in (or up); null when auth is off. */
-type OpenSignIn = ((url: string) => void) | null;
+/** Opens the sign-in modal; signing in (or up) lands on the dashboard. null when auth is off. */
+type OpenSignIn = (() => void) | null;
 function useClerkOpenSignIn(): OpenSignIn {
   const clerk = useClerk();
-  return (url) => clerk.openSignIn({ forceRedirectUrl: url, signUpForceRedirectUrl: url });
+  return () => clerk.openSignIn({ forceRedirectUrl: AFTER_SIGN_IN, signUpForceRedirectUrl: AFTER_SIGN_IN });
 }
 const useNoSignIn = (): OpenSignIn => null;
 export const useOpenSignIn: () => OpenSignIn = AUTH_ENABLED ? useClerkOpenSignIn : useNoSignIn;
@@ -118,7 +124,7 @@ export function SignInPrompt({ title = "Sign in to start a run." }: { title?: st
         Your sessions and runs are saved to your account. Use Google, or get a one-time code by email: no password.
       </p>
       <div className="mt-7 flex flex-wrap items-center gap-4">
-        <SignInButton mode="modal">
+        <SignInButton mode="modal" forceRedirectUrl={AFTER_SIGN_IN} signUpForceRedirectUrl={AFTER_SIGN_IN}>
           <button type="button" className="ws-start">
             Sign in <span aria-hidden>→</span>
           </button>
