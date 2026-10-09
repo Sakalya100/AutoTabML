@@ -371,7 +371,10 @@
         "kind": {
           "enum": [
             "model",
-            "code"
+            "code",
+            "script",
+            "text",
+            "json"
           ],
           "title": "Kind",
           "type": "string"
@@ -1292,6 +1295,55 @@
       "title": "ReportReady",
       "type": "object"
     },
+    "RunFailed": {
+      "description": "The last event of a failed run (see autotinker.failures). `message` and `hint` are plain language\nfor the user; `detail` is the technical reason, never a traceback.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "default": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "type": {
+          "const": "run_failed",
+          "default": "run_failed",
+          "title": "Type",
+          "type": "string"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "title": "Detail",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "code",
+        "message"
+      ],
+      "title": "RunFailed",
+      "type": "object"
+    },
     "RunFinished": {
       "properties": {
         "run_id": {
@@ -1783,6 +1835,7 @@
       "hpo_trial": "#/$defs/HpoTrialEvent",
       "llm_call": "#/$defs/LLMCall",
       "report_ready": "#/$defs/ReportReady",
+      "run_failed": "#/$defs/RunFailed",
       "run_finished": "#/$defs/RunFinished",
       "run_started": "#/$defs/RunStarted",
       "sandbox_finished": "#/$defs/SandboxFinished",
@@ -1840,6 +1893,9 @@
     },
     {
       "$ref": "#/$defs/AssetsReady"
+    },
+    {
+      "$ref": "#/$defs/RunFailed"
     }
   ]
 }

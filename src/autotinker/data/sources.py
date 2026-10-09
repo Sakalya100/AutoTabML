@@ -20,13 +20,26 @@ from urllib.parse import unquote, urlsplit
 
 import pandas as pd
 
+from autotinker.data.csvformat import CsvFormat, read_delimited
+
 # Strings that mean "missing" in the wild. pandas' defaults already cover most of these ("NA", "", "NaN",
 # "null", ...); we pass them explicitly so behaviour does not drift across pandas versions.
 NA_VALUES = ["", "NA", "N/A", "n/a", "NaN", "nan", "NULL", "null", "None", "#N/A", "?"]
 
 
 class DataSourceError(ValueError):
-    """Raised when a data source spec cannot be resolved or loaded."""
+    """Raised when a data source spec cannot be resolved or loaded.
+
+    `code` is the failure code the CLI reports in its `run_failed` event (see autotinker.failures):
+    ``not_csv`` for content we cannot read as a table, ``download_failed`` for a link that could not be
+    fetched (see FetchError)."""
+
+    code: str = "not_csv"
+
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        super().__init__(message)
+        if code is not None:
+            self.code = code
 
 
 def _normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -46,13 +59,22 @@ def load_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return _normalise_columns(df)
 
 
-def _read_file(path: Path) -> pd.DataFrame:
+def read_text_table(data: bytes, fmt: CsvFormat | None, what: str = "file") -> pd.DataFrame:
+    """Parse CSV/TSV bytes with `fmt` (whatever it leaves open is detected; see csvformat)."""
+    try:
+        return read_delimited(data, fmt, na_values=NA_VALUES)
+    except UnicodeDecodeError as e:
+        raise DataSourceError(f"could not decode the {what} as text: {e}") from e
+    except (pd.errors.ParserError, pd.errors.EmptyDataError) as e:
+        raise DataSourceError(f"could not parse the {what} as CSV: {e}") from e
+
+
+def _read_file(path: Path, fmt: CsvFormat | None = None) -> pd.DataFrame:
     if not path.exists():
-        raise DataSourceError(f"file not found: {path}")
+        raise DataSourceError(f"file not found: {path}", code="file_not_found")
     suffix = path.suffix.lower()
     if suffix in (".csv", ".tsv", ".txt"):
-        sep = "\t" if suffix == ".tsv" else ","
-        return pd.read_csv(path, sep=sep, na_values=NA_VALUES, keep_default_na=True)
+        return read_text_table(path.read_bytes(), fmt)
     if suffix in (".parquet", ".pq"):
         try:
             return pd.read_parquet(path)
@@ -114,33 +136,36 @@ def _load_kaggle(ident: str) -> pd.DataFrame:
     return _read_file(candidates[0])
 
 
-def _load_url(url: str) -> pd.DataFrame:
+def _load_url(url: str, fmt: CsvFormat | None = None) -> pd.DataFrame:
     # Imported lazily: fetch.py imports DataSourceError / NA_VALUES from this module.
     from autotinker.data import fetch
 
-    return fetch.read_fetched(fetch.fetch_url(fetch.rewrite_share_link(url)))
+    return fetch.read_fetched(fetch.fetch_url(fetch.rewrite_share_link(url)), fmt)
 
 
 def _is_url(spec: str) -> bool:
     return re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", spec) is not None
 
 
-def load_source(spec: str | Path) -> pd.DataFrame:
-    """Resolve a data source spec into a DataFrame with whitespace-stripped column names."""
+def load_source(spec: str | Path, csv_format: CsvFormat | None = None) -> pd.DataFrame:
+    """Resolve a data source spec into a DataFrame with whitespace-stripped column names.
+
+    `csv_format` (delimiter / encoding / decimal; any may be None) applies to CSV/TSV files and links;
+    whatever it leaves open is detected from the file."""
     if isinstance(spec, Path):
-        return _normalise_columns(_read_file(spec))
+        return _normalise_columns(_read_file(spec, csv_format))
     spec = spec.strip()
     if _is_url(spec):
         scheme = spec.split(":", 1)[0].lower()
         if scheme != "https":
             raise DataSourceError(f"only https:// links are supported (got {scheme}://)")
-        df = _load_url(spec)
+        df = _load_url(spec, csv_format)
     elif spec.startswith("openml:"):
         df = _load_openml(spec[len("openml:") :])
     elif spec.startswith("kaggle:"):
         df = _load_kaggle(spec[len("kaggle:") :])
     else:
-        df = _read_file(Path(spec).expanduser())
+        df = _read_file(Path(spec).expanduser(), csv_format)
     return _normalise_columns(df)
 
 

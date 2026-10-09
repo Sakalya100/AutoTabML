@@ -18,7 +18,8 @@ from urllib.parse import unquote, urljoin, urlsplit
 import httpx
 import pandas as pd
 
-from autotinker.data.sources import NA_VALUES, DataSourceError
+from autotinker.data.csvformat import CsvFormat
+from autotinker.data.sources import DataSourceError, read_text_table
 from autotinker.data.urlguard import (
     Resolver,
     UrlRejected,
@@ -50,7 +51,10 @@ __all__ = [
 
 
 class FetchError(DataSourceError):
-    """Raised when a URL is rejected or its download fails."""
+    """Raised when a URL is rejected or its download fails (code ``download_failed``), or what it returned
+    is not a data file (code ``not_csv``)."""
+
+    code = "download_failed"
 
 
 @dataclass(frozen=True)
@@ -89,20 +93,23 @@ def _filename(url: str, content_disposition: str | None) -> str:
 
 def _sniff(content: bytes, content_type: str | None, filename: str) -> DataKind:
     if not content:
-        raise FetchError("the link returned an empty file")
+        raise FetchError("the link returned an empty file", code="not_csv")
     if content.startswith(b"PAR1"):
         return "parquet"
     head = content[:_SNIFF_BYTES]
     if looks_like_html(head, content_type):
         raise FetchError(
             "the link returned a web page, not a data file — use a direct/raw download link "
-            "(e.g. the 'Raw' button on GitHub)"
+            "(e.g. the 'Raw' button on GitHub)",
+            code="not_csv",
         )
     lower_name = filename.lower()
     if lower_name.endswith((".parquet", ".pq")):
-        raise FetchError("the link claims to be a parquet file but its contents are not valid parquet")
+        raise FetchError(
+            "the link claims to be a parquet file but its contents are not valid parquet", code="not_csv"
+        )
     if b"\x00" in head:
-        raise FetchError("the link returned a binary file that is not CSV, TSV or parquet")
+        raise FetchError("the link returned a binary file that is not CSV, TSV or parquet", code="not_csv")
     if lower_name.endswith(".tsv") or "tab-separated" in (content_type or "").lower():
         return "tsv"
     lines = head.decode("utf-8", errors="ignore").splitlines()[:20]
@@ -179,26 +186,20 @@ def fetch_url(
     )
 
 
-def read_fetched(res: FetchResult) -> pd.DataFrame:
-    """Parse downloaded bytes into a DataFrame according to the sniffed kind."""
+def read_fetched(res: FetchResult, fmt: CsvFormat | None = None) -> pd.DataFrame:
+    """Parse downloaded bytes into a DataFrame according to the sniffed kind. For CSV/TSV, `fmt` (from the
+    web preview, or `autotinker run --delimiter/--encoding/--decimal`) fixes the format; what it leaves open
+    is detected."""
     if res.kind == "parquet":
         try:
             return pd.read_parquet(io.BytesIO(res.content))
         except ImportError as e:
             raise DataSourceError(
-                "reading parquet needs 'pyarrow' (or 'fastparquet'); install it with `uv add pyarrow`"
+                "reading parquet needs 'pyarrow' (or 'fastparquet'); install it with `uv add pyarrow`",
+                code="unexpected",
             ) from e
         except Exception as e:  # any parser failure becomes a data source error
             raise DataSourceError(f"could not parse the downloaded parquet file: {e}") from e
-    sep = "\t" if res.kind == "tsv" else ","
-    last: Exception | None = None
-    for encoding in ("utf-8-sig", "latin-1"):
-        try:
-            return pd.read_csv(
-                io.BytesIO(res.content), sep=sep, na_values=NA_VALUES, keep_default_na=True, encoding=encoding
-            )
-        except UnicodeDecodeError as e:
-            last = e
-        except (pd.errors.ParserError, pd.errors.EmptyDataError) as e:
-            raise DataSourceError(f"could not parse the downloaded {res.kind.upper()} file: {e}") from e
-    raise DataSourceError(f"could not decode the downloaded file as text: {last}")
+    if fmt is None and res.kind == "tsv":
+        fmt = CsvFormat(delimiter="\t")
+    return read_text_table(res.content, fmt, what=f"downloaded {res.kind.upper()} file")

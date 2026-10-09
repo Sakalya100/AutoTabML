@@ -414,31 +414,41 @@ def agentic_run(
     run_id: str | None = None,
     config: Any = None,
     control: Any = None,
+    csv_format: Any = None,
     **task_kwargs: Any,
 ) -> Run:
     """The agentic loop: intake, profile, baseline, drafts, improve/tune, ensemble, locked test, report.
 
     `backend` is any ChatBackend (default: the provider Router over the keys in the environment).
-    `control` is an optional evolve.control.ControlChannel (live steering / graceful stop)."""
+    `control` is an optional evolve.control.ControlChannel (live steering / graceful stop).
+    `csv_format` is an optional data.csvformat.CsvFormat for CSV/TSV sources (detected when absent).
+    Data problems raise failures.RunError (a code plus a plain-language message and hint)."""
     from autotinker.agent.router import Router
     from autotinker.data.sources import load_dataframe, load_source, source_stem
     from autotinker.evolve.agentic import AgenticConfig, run_agentic, run_intake
+    from autotinker.failures import RunError, check_data
     from autotinker.harness import Harness
 
-    if backend is None:
-        backend = Router()
-        if not backend.providers:
-            raise RuntimeError(
-                "no LLM provider is configured: set GROQ_API_KEY and/or GEMINI_API_KEY (see .env), "
-                "or use `autotinker evolve --llm heuristic` for the offline path"
-            )
+    # The data first: a typo in the target should say so even when no LLM provider is configured.
     if isinstance(source, pd.DataFrame):
         df, stem = load_dataframe(source), "dataframe"
     else:
-        df, stem = load_source(str(source)), source_stem(str(source))
-    if target is not None and target not in df.columns:
-        raise ValueError(f"target column {target!r} not found; columns: {list(df.columns)}")
+        df, stem = load_source(str(source), csv_format), source_stem(str(source))
+    check_data(df, target)
+    if backend is None:
+        backend = Router()
+        if not backend.providers:
+            raise RunError(
+                "llm_unavailable",
+                "No AI model provider is configured on this server.",
+                "Set GROQ_API_KEY and/or GEMINI_API_KEY (see .env), "
+                "or use `autotinker evolve --llm heuristic`.",
+                "no LLM provider is configured: set GROQ_API_KEY and/or GEMINI_API_KEY (see .env), "
+                "or use `autotinker evolve --llm heuristic` for the offline path",
+            )
     intake = run_intake(backend, df, goal=goal, target=target, metric=metric)
+    if target is None:
+        check_data(df, intake.target)
     task = TaskSpec(
         target=intake.target,
         description=goal,
@@ -470,6 +480,7 @@ def agentic_run(
         config={
             "env": {"python": platform.python_version(), "seed": seed},
             "source": str(source) if not isinstance(source, pd.DataFrame) else "dataframe",
+            **({"csv_format": csv_format.as_dict()} if csv_format is not None else {}),
             "intake": {
                 "target": intake.target,
                 "metric": intake.metric.value if intake.metric else None,

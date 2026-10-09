@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -164,7 +165,9 @@ def test_worker_dumps_a_loadable_model_and_probabilities(tmp_path: Path) -> None
     finally:
         sys.path.remove(str(tmp_path / "assets"))
         sys.modules.pop("pipeline", None)
-    assert pred.shape == (5,) and set(pred) <= {0, 1, 2}
+        sys.modules.pop("predict", None)
+    assert pred.shape == (5,) and set(pred) <= {"Setosa", "Versicolor", "Virginica"}  # decoded labels
+    assert set(model.model.predict(h._splits.X_test.head(5))) <= {0, 1, 2}  # the raw estimator is still there
 
 
 def test_unpicklable_model_does_not_fail_the_locked_test(tmp_path: Path) -> None:
@@ -178,8 +181,230 @@ def test_unpicklable_model_does_not_fail_the_locked_test(tmp_path: Path) -> None
     out = h.test_outputs
     assert out is not None and out.model_path is None and out.model_error
     ev = build_assets_event("r", tmp_path, code, out)
-    assert [f.name for f in ev.files] == ["pipeline.py"]
+    assert [f.name for f in ev.files] == ["pipeline.py"]  # no model: no predict.py / card / requirements
     assert {c.id for c in ev.charts} == {"pred_vs_actual", "residuals"}
+
+
+# ---------------------------------------------------------------- predict.py, model card, requirements
+
+
+def _assets_for(tmp_path: Path, df: pd.DataFrame, task: TaskSpec, code: str = STARTER_SOLUTION) -> Path:
+    h = Harness(df, task, tmp_path / "harness")
+    h.score_test(code)
+    ev = build_assets_event("run-1", tmp_path, code, h.test_outputs)
+    assert len(ev.model_dump_json()) < 64 * 1024
+    kinds = {f.name: f.kind for f in ev.files}
+    assert kinds == {
+        "model.joblib": "model",
+        "pipeline.py": "code",
+        "predict.py": "script",
+        "requirements.txt": "text",
+        "model_card.json": "json",
+    }
+    return tmp_path / "assets"
+
+
+def _run_predict(assets_dir: Path, rows: pd.DataFrame, tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    """`python predict.py rows.csv -o out.csv` in a clean process, from another directory."""
+    rows.to_csv(tmp_path / "rows.csv", index=False)
+    return subprocess.run(
+        [
+            sys.executable,
+            str(assets_dir / "predict.py"),
+            str(tmp_path / "rows.csv"),
+            "-o",
+            str(tmp_path / "out.csv"),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
+def _run_ok(assets_dir: Path, rows: pd.DataFrame, tmp_path: Path) -> Path:
+    res = _run_predict(assets_dir, rows, tmp_path)
+    assert res.returncode == 0, res.stderr
+    return tmp_path / "out.csv"
+
+
+def _yes_no(n: int = 240) -> pd.DataFrame:
+    rng = np.random.default_rng(0)
+    x = rng.normal(0, 1, n)
+    city = rng.choice(["Paris", "Lima", "Oslo"], n)
+    return pd.DataFrame(
+        {
+            "customer_id": np.arange(1000, 1000 + n),
+            "x": x,
+            "city": city,
+            "churn": np.where(x + (city == "Lima") + rng.normal(0, 0.5, n) > 0.5, "Yes", "No"),
+        }
+    )
+
+
+def test_predict_script_binary_string_labels(tmp_path: Path) -> None:
+    df = _yes_no()
+    d = _assets_for(tmp_path, df, TaskSpec(target="churn", metric=Metric.roc_auc, cv_folds=3, cv_repeats=1))
+    card = json.loads((d / "model_card.json").read_text())
+    assert card["target"] == "churn" and card["problem_type"] == "binary" and card["metric"] == "roc_auc"
+    assert card["classes"] == ["No", "Yes"] and card["label_decoding"] == "wrapper"
+    assert [f["name"] for f in card["features"]] == ["customer_id", "x", "city"]
+    assert card["dropped_columns"] == ["customer_id"]
+    assert set(card["example_row"]) == {"customer_id", "x", "city"}
+    assert 0 <= card["test_score"] <= 1 and card["run_id"] == "run-1" and card["created_at"]
+    assert {"python", "scikit-learn", "numpy", "pandas", "scipy", "joblib"} <= set(card["versions"])
+
+    # fresh rows: columns shuffled, the target and an extra column present, the id column missing
+    rows = df.drop(columns=["customer_id"]).head(20)[["city", "churn", "x"]].assign(note="extra")
+    res = _run_predict(d, rows, tmp_path)
+    assert res.returncode == 0, res.stderr
+    out = pd.read_csv(tmp_path / "out.csv")
+    assert list(out.columns) == ["prediction", "proba_No", "proba_Yes"]
+    assert set(out["prediction"]) <= {"Yes", "No"} and len(out) == 20
+    assert np.allclose(out["proba_No"] + out["proba_Yes"], 1.0)
+    assert (out["prediction"] == np.where(out["proba_Yes"] >= 0.5, "Yes", "No")).mean() > 0.9
+
+
+def test_predict_script_multiclass_names_and_python_api(tmp_path: Path) -> None:
+    df = pd.read_csv(DATA / "iris_classification.csv")
+    d = _assets_for(
+        tmp_path, df, TaskSpec(target="variety", metric=Metric.accuracy, cv_folds=3, cv_repeats=1)
+    )
+    res = _run_predict(d, df.sample(15, random_state=1), tmp_path)
+    assert res.returncode == 0, res.stderr
+    out = pd.read_csv(tmp_path / "out.csv")
+    names = ["Setosa", "Versicolor", "Virginica"]
+    assert list(out.columns) == ["prediction", *(f"proba_{c}" for c in names)]
+    assert set(out["prediction"]) <= set(names)
+    # importable too: `from predict import load, predict`
+    code = (
+        "import pandas as pd; from predict import load, predict; "
+        f"df = pd.read_csv({str(DATA / 'iris_classification.csv')!r}).head(3); "
+        "m = load(); print(list(predict(m, df)['prediction'])); print(list(m.predict(df)))"
+    )
+    run = subprocess.run([sys.executable, "-c", code], cwd=d, capture_output=True, text=True, timeout=120)
+    assert run.returncode == 0, run.stderr
+    assert run.stdout.splitlines() == ["['Setosa', 'Setosa', 'Setosa']"] * 2
+
+
+def test_predict_script_regression_and_requirements(tmp_path: Path) -> None:
+    df = pd.read_csv(DATA / "housing_regression.csv")
+    d = _assets_for(tmp_path, df, TaskSpec(target="price", cv_folds=3, cv_repeats=1))
+    card = json.loads((d / "model_card.json").read_text())
+    assert card["problem_type"] == "regression" and card["classes"] is None and card["test_score"] > 0
+    res = _run_predict(d, df.drop(columns=["price"]).head(10), tmp_path)
+    assert res.returncode == 0, res.stderr
+    out = pd.read_csv(tmp_path / "out.csv")
+    assert list(out.columns) == ["prediction"] and out["prediction"].between(1e5, 1e8).all()
+
+    reqs = (d / "requirements.txt").read_text().splitlines()
+    pins = dict(ln.split("==") for ln in reqs if ln and not ln.startswith("#"))
+    import scipy
+    import sklearn
+
+    assert pins["scikit-learn"] == sklearn.__version__ and pins["numpy"] == np.__version__
+    assert pins["pandas"] == pd.__version__ and pins["joblib"] == joblib.__version__
+    assert pins["scipy"] == scipy.__version__ and "lightgbm" not in pins  # not imported by the solution
+
+
+def test_predict_script_missing_column_is_a_clear_error(tmp_path: Path) -> None:
+    df = pd.read_csv(DATA / "iris_classification.csv")
+    d = _assets_for(
+        tmp_path, df, TaskSpec(target="variety", metric=Metric.accuracy, cv_folds=3, cv_repeats=1)
+    )
+    res = _run_predict(d, df.drop(columns=["petal.width", "variety"]).head(5), tmp_path)
+    assert res.returncode == 2
+    assert "missing column(s): petal.width" in res.stderr and "Traceback" not in res.stderr
+    assert not (tmp_path / "out.csv").exists()
+
+
+def _predict_file(d: Path, path: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(d / "predict.py"), str(path), "-o", str(path.with_suffix(".out.csv")), *extra],
+        cwd=path.parent,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
+def test_predict_script_reads_other_delimiters_and_decimal_commas(tmp_path: Path) -> None:
+    df = pd.read_csv(DATA / "iris_classification.csv")
+    d = _assets_for(
+        tmp_path, df, TaskSpec(target="variety", metric=Metric.accuracy, cv_folds=3, cv_repeats=1)
+    )
+    assert json.loads((d / "model_card.json").read_text())["csv_format"] is None  # the run was given none
+    rows = df.sample(12, random_state=4).reset_index(drop=True)
+    expected = pd.read_csv(_run_ok(d, rows, tmp_path))["prediction"].tolist()
+    assert set(expected) <= {"Setosa", "Versicolor", "Virginica"}
+
+    def as_text(sep: str, decimal: str) -> str:
+        return rows.drop(columns=["variety"]).to_csv(index=False, sep=sep, decimal=decimal)
+
+    cp1252 = rows.drop(columns=["variety"]).assign(note="café")  # an extra column, not valid UTF-8 as cp1252
+    cases = {
+        "semicolon_comma.csv": (as_text(";", ","), "utf-8"),
+        "tab.tsv": (as_text("\t", "."), "utf-8"),
+        "pipe_cp1252.csv": (cp1252.to_csv(index=False, sep="|", decimal=","), "cp1252"),
+        "bom_semicolon.txt": ("\ufeff" + as_text(";", "."), "utf-8"),
+    }
+    for name, (text, enc) in cases.items():
+        path = tmp_path / name
+        path.write_bytes(text.encode(enc))
+        res = _predict_file(d, path)
+        assert res.returncode == 0, (name, res.stderr)
+        got = pd.read_csv(path.with_suffix(".out.csv"))
+        assert got["prediction"].tolist() == expected, name
+        assert np.allclose(got.filter(like="proba_").sum(axis=1), 1.0)
+
+    # explicit flags win over detection
+    path = tmp_path / "forced.csv"
+    path.write_text(as_text(";", ","))
+    assert _predict_file(d, path, "--delimiter", ";", "--decimal", ",").returncode == 0
+    assert pd.read_csv(path.with_suffix(".out.csv"))["prediction"].tolist() == expected
+
+
+def test_card_records_the_training_csv_format_and_predict_uses_it(tmp_path: Path) -> None:
+    df = pd.read_csv(DATA / "iris_classification.csv")
+    h = Harness(
+        df, TaskSpec(target="variety", metric=Metric.accuracy, cv_folds=3, cv_repeats=1), tmp_path / "h"
+    )
+    h.score_test(STARTER_SOLUTION)
+    fmt = {"delimiter": ";", "encoding": "cp1252", "decimal": ","}
+    build_assets_event("r", tmp_path, STARTER_SOLUTION, h.test_outputs, csv_format=fmt)
+    d = tmp_path / "assets"
+    assert json.loads((d / "model_card.json").read_text())["csv_format"] == fmt
+    assert assets.clean_csv_format({"delimiter": None, "encoding": "", "decimal": None}) is None
+    assert assets.clean_csv_format({"delimiter": "\t"}) == {
+        "delimiter": "\t",
+        "encoding": None,
+        "decimal": None,
+    }
+    # the card's format (cp1252, ';', decimal comma) is used for a file that fits it
+    rows = df.drop(columns=["variety"]).head(6)
+    path = tmp_path / "new.csv"
+    path.write_bytes(rows.to_csv(index=False, sep=";", decimal=",").encode("cp1252"))
+    res = _predict_file(d, path)
+    assert res.returncode == 0, res.stderr
+    assert set(pd.read_csv(path.with_suffix(".out.csv"))["prediction"]) <= {
+        "Setosa",
+        "Versicolor",
+        "Virginica",
+    }
+    # a comma file still works even though the card says ';' (the card is a hint, not a rule)
+    path2 = tmp_path / "comma.csv"
+    rows.to_csv(path2, index=False)
+    assert _predict_file(d, path2).returncode == 0
+
+
+def test_requirements_pin_boosters_only_when_imported() -> None:
+    assert "lightgbm" not in assets.package_versions(STARTER_SOLUTION)
+    assert assets.solution_imports("import lightgbm as lgb\nfrom xgboost import XGBClassifier\n") >= {
+        "lightgbm",
+        "xgboost",
+    }
+    text = assets.requirements_txt({"scikit-learn": "1.0", "numpy": "2.0"})
+    assert "scikit-learn==1.0\nnumpy==2.0\n" in text and text.startswith("# Exact versions")
 
 
 # ---------------------------------------------------------------- the agentic loop

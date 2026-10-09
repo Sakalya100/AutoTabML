@@ -3,22 +3,38 @@
 Written after the single locked-test run (see `Harness.score_test`, which leaves `TestOutputs` behind):
   * `<run_dir>/assets/model.joblib`  the estimator fitted on dev+select, exactly as scored on the test split
   * `<run_dir>/assets/pipeline.py`   the final solution source (`build_pipeline(profile)`)
+  * `<run_dir>/assets/predict.py`    standalone CLI + module: `python predict.py new.csv -o out.csv` (the
+                                     `predict_template.py` next to this file, copied verbatim)
+  * `<run_dir>/assets/requirements.txt`  exact scikit-learn / numpy / pandas / scipy / joblib versions
+                                         (+ lightgbm / xgboost / catboost when the solution imports them)
+  * `<run_dir>/assets/model_card.json`   target, problem type, metric, classes (encoded order), feature
+                                         columns with dtypes and an example row, dropped (id-like)
+                                         columns, locked-test score, run id, created_at, versions,
+                                         the training file's csv_format (when the run was given one)
 and announced by one `assets_ready` event. Assets are best-effort: any failure is logged as a warning and
 never fails the run.
 
-Loading the model: `joblib.load("model.joblib")` needs the same scikit-learn version; when the solution
-defines its own estimator classes, run it from the assets directory so `pipeline.py` is importable (the
-worker imports the solution under the module name `pipeline`). For classification the model predicts the
-encoded labels 0..k-1, where label i is the i-th class in sorted order (the confusion matrix labels).
+Label decoding: the worker dumps `predict.LabelDecodingModel(estimator, classes, features, problem_type)`, so
+model.joblib predicts the original class names and checks / reorders / coerces input columns itself. Its raw
+estimator (trained on encoded labels 0..k-1, label i == classes[i]) is `.model`. Unpickling needs `predict.py`
+importable as `predict` (and `pipeline.py` as `pipeline` when the solution defines its own classes);
+`predict.load()` arranges both. If wrapping fails the raw estimator is dumped and predict.py wraps it at load
+time from the card
+(`label_decoding: "card"`).
 """
 
 from __future__ import annotations
 
+import ast
+import importlib.metadata
+import json
 import logging
+import platform
 import shutil
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -55,6 +71,14 @@ MAX_EVENT_BYTES = 64 * 1024
 ASSETS_DIR = "assets"
 MODEL_FILE = "model.joblib"
 CODE_FILE = "pipeline.py"
+PREDICT_FILE = "predict.py"
+REQUIREMENTS_FILE = "requirements.txt"
+CARD_FILE = "model_card.json"
+PREDICT_TEMPLATE = Path(__file__).resolve().parent / "predict_template.py"
+CORE_PACKAGES = ("scikit-learn", "numpy", "pandas", "scipy", "joblib")
+OPTIONAL_PACKAGES = ("lightgbm", "xgboost", "catboost")  # pinned only when the solution imports them
+CSV_FORMAT_KEYS = ("delimiter", "encoding", "decimal")
+AssetKind = Literal["model", "code", "script", "text", "json"]
 
 
 def _r(x: float, digits: int = 4) -> float:
@@ -260,9 +284,101 @@ def build_charts(outputs: Any, *, max_points: int = MAX_CURVE_POINTS) -> list[Ch
 # ---------------------------------------------------------------- files + event
 
 
-def write_files(run_dir: Path, code: str, model_path: Path | None) -> list[AssetFile]:
-    """Copy the fitted model and write the solution source into `<run_dir>/assets/`. Each file is
-    independent: one that fails is logged and left out."""
+def _version(dist: str) -> str | None:
+    try:
+        return importlib.metadata.version(dist)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+def solution_imports(code: str) -> set[str]:
+    """Top-level packages the solution source imports."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return set()
+    roots: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            roots.update(a.name.split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            roots.add(node.module.split(".")[0])
+    return roots
+
+
+def package_versions(code: str) -> dict[str, str]:
+    """Exact versions of what loading the model needs: the sandbox runs this same interpreter, so these are
+    versions the model was fitted and pickled with. Boosting libraries only when the solution imports them."""
+    found: dict[str, str] = {}
+    imports = solution_imports(code)
+    for dist in (*CORE_PACKAGES, *(d for d in OPTIONAL_PACKAGES if d in imports)):
+        v = _version(dist)
+        if v is not None:
+            found[dist] = v
+    return found
+
+
+def requirements_txt(versions: dict[str, str]) -> str:
+    py = platform.python_version()
+    lines = [
+        f"# Exact versions this model was trained with (Python {py}).",
+        "# A joblib model loads reliably only with the same scikit-learn:",
+        "# install these into a fresh environment.",
+        *(f"{d}=={v}" for d, v in versions.items()),
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def clean_csv_format(fmt: Any) -> dict[str, str | None] | None:
+    """The training file's format ({delimiter, encoding, decimal}, any of them None = was detected) as the run
+    config recorded it (`data.csvformat.CsvFormat.as_dict()`), or None when nothing was given."""
+    if not isinstance(fmt, dict):
+        return None
+    out = {k: (fmt.get(k) if isinstance(fmt.get(k), str) and fmt.get(k) else None) for k in CSV_FORMAT_KEYS}
+    return out if any(out.values()) else None
+
+
+def model_card(
+    run_id: str, outputs: Any | None, versions: dict[str, str], csv_format: Any = None
+) -> dict[str, Any]:
+    """What predict.py (and a person) needs to use model.joblib. `outputs` is a `harness.core.TestOutputs`."""
+    o = outputs
+    return {
+        "schema_version": 1,
+        "run_id": run_id,
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "target": getattr(o, "target", "") or "",
+        "problem_type": getattr(o, "problem_type", "") or "",
+        "metric": getattr(o, "metric", "") or "",
+        "test_score": getattr(o, "test_score", None),
+        "classes": list(o.classes) if o is not None and o.classes is not None else None,
+        "features": list(getattr(o, "features", []) or []),
+        "example_row": dict(getattr(o, "example_row", {}) or {}),
+        "dropped_columns": list(getattr(o, "dropped_columns", []) or []),
+        "label_decoding": "wrapper" if getattr(o, "model_wrapped", False) else "card",
+        "csv_format": clean_csv_format(csv_format),
+        "versions": {"python": platform.python_version(), **versions},
+        "files": {
+            MODEL_FILE: "the fitted model; predict.load() (or joblib.load with predict.py importable)",
+            PREDICT_FILE: "python predict.py new_rows.csv -o predictions.csv",
+            CODE_FILE: "the training pipeline source: build_pipeline(profile)",
+            REQUIREMENTS_FILE: "pip install -r requirements.txt",
+        },
+    }
+
+
+def write_files(
+    run_dir: Path,
+    code: str,
+    model_path: Path | None,
+    *,
+    run_id: str = "",
+    outputs: Any | None = None,
+    csv_format: Any = None,
+) -> list[AssetFile]:
+    """Copy the fitted model and write the solution source, predict.py, requirements.txt and
+    model_card.json into `<run_dir>/assets/`. Each file is independent: one that fails is logged and left
+    out."""
     out = run_dir / ASSETS_DIR
     out.mkdir(parents=True, exist_ok=True)
     files: list[AssetFile] = []
@@ -295,17 +411,47 @@ def write_files(run_dir: Path, code: str, model_path: Path | None) -> list[Asset
         )
     except OSError as e:
         log.warning("run assets: could not write the solution source: %s", e)
+    if model_path is None:
+        return files  # nothing to predict with: no predict.py / requirements / card
+    versions = package_versions(code)
+    extras: list[tuple[str, str, AssetKind, str]] = [
+        (PREDICT_FILE, PREDICT_TEMPLATE.read_text(encoding="utf-8"), "script", "text/x-python"),
+        (REQUIREMENTS_FILE, requirements_txt(versions), "text", "text/plain"),
+        (
+            CARD_FILE,
+            json.dumps(model_card(run_id, outputs, versions, csv_format), indent=2, default=str) + "\n",
+            "json",
+            "application/json",
+        ),
+    ]
+    for name, text, kind, ctype in extras:
+        try:
+            dest = out / name
+            dest.write_text(text, encoding="utf-8")
+            files.append(
+                AssetFile(
+                    name=name,
+                    path=f"{ASSETS_DIR}/{name}",
+                    bytes=dest.stat().st_size,
+                    kind=kind,
+                    content_type=ctype,
+                )
+            )
+        except (OSError, TypeError, ValueError) as e:
+            log.warning("run assets: could not write %s: %s", name, e)
     return files
 
 
-def build_assets_event(run_id: str, run_dir: Path | None, code: str, outputs: Any | None) -> AssetsReady:
+def build_assets_event(
+    run_id: str, run_dir: Path | None, code: str, outputs: Any | None, *, csv_format: Any = None
+) -> AssetsReady:
     """Write the asset files and build the `assets_ready` event, shrinking curves until it fits in 64 KB."""
     files: list[AssetFile] = []
     if run_dir is not None:
         model = outputs.model_path if outputs is not None else None
         if outputs is not None and model is None and outputs.model_error:
             log.warning("run assets: the fitted model could not be saved: %s", outputs.model_error)
-        files = write_files(run_dir, code, model)
+        files = write_files(run_dir, code, model, run_id=run_id, outputs=outputs, csv_format=csv_format)
     charts: list[Chart] = []
     if outputs is not None:
         try:
