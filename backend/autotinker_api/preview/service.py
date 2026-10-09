@@ -17,7 +17,7 @@ from urllib.parse import urljoin
 import httpx
 
 from autotinker_api import urlguard
-from autotinker_api.preview.csvparse import looks_like_html, parse_table
+from autotinker_api.preview.csvparse import looks_like_html, parse_table, sniff_decimal
 from autotinker_api.preview.llm import llm_suggest
 from autotinker_api.preview.suggest import Suggestion, metric_fits, suggest, suggestion_for
 
@@ -65,12 +65,23 @@ class FetchedHead:
     content_length: int | None
     bytes_read: int
     truncated: bool
+    encoding: str = "utf-8"
 
 
-def _decode(data: bytes) -> str:
-    utf8 = data.decode("utf-8", errors="replace")
-    bad = utf8.count("�")
-    return data.decode("latin-1") if bad > 20 and bad > len(utf8) / 200 else utf8
+def _decode(data: bytes, truncated: bool = False) -> tuple[str, str]:
+    """(text, encoding) by the engine's rule (src/autotinker/data/csvformat.py detect_encoding): a BOM is utf-8-sig,
+    valid UTF-8 is utf-8, else cp1252, else latin-1. A read cut short may split a UTF-8 character at the very end."""
+    if data.startswith(b"\xef\xbb\xbf"):
+        return data.decode("utf-8", errors="replace"), "utf-8-sig"
+    try:
+        return data.decode("utf-8"), "utf-8"
+    except UnicodeDecodeError as e:
+        if truncated and e.start >= len(data) - 3:
+            return data[: e.start].decode("utf-8", errors="replace"), "utf-8"
+    try:
+        return data.decode("cp1252"), "cp1252"
+    except UnicodeDecodeError:
+        return data.decode("latin-1"), "latin-1"
 
 
 async def fetch_head(
@@ -129,8 +140,10 @@ async def fetch_head(
                                 truncated = True
                                 break
                         data = bytes(buf[:max_bytes])
+                        text, encoding = _decode(data, truncated)
                         return FetchedHead(
-                            text=_decode(data),
+                            text=text,
+                            encoding=encoding,
                             final_url=current,
                             content_type=res.headers.get("content-type"),
                             content_length=content_length,
@@ -211,6 +224,9 @@ async def build_preview(url: str, **deps: Any) -> dict[str, Any]:
         "finalUrl": head.final_url,
         "rewritten": resolved != pasted,
         "delimiter": table["delimiter"],
+        # Handed to the engine with the run (csvFormat), so it parses the file exactly as this preview did.
+        "encoding": head.encoding,
+        "decimal": sniff_decimal(head.text, table["delimiter"]),
         "columns": columns,
         "stats": table["stats"],
         "sample": table["sample"],
@@ -236,6 +252,12 @@ async def cached_preview(url: str, **deps: Any) -> dict[str, Any]:
     while len(_cache) > _MAX_ENTRIES:
         _cache.popitem(last=False)
     return preview
+
+
+def peek_preview(url: str) -> dict[str, Any] | None:
+    """The cached preview for `url` if this instance has a fresh one (never fetches)."""
+    hit = _cache.get(urlguard.rewrite_share_link(url.strip()))
+    return hit[1] if hit and time.monotonic() - hit[0] < _TTL_S else None
 
 
 async def suggest_for(

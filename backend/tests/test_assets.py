@@ -76,6 +76,9 @@ class FakeBlob:
             self.stored[pathname] = request.content
             url = f"https://storeabc123.private.blob.vercel-storage.com/{pathname}"
             return httpx.Response(200, json={"url": url, "downloadUrl": url + "?download=1", "pathname": pathname})
+        if request.method == "GET" and "vercel-blob-signature" in request.url.params:  # a presigned download
+            data = self.stored.get(request.url.path.lstrip("/"))
+            return httpx.Response(200, content=data) if data is not None else httpx.Response(404)
         return httpx.Response(404)
 
     def signing_bodies(self) -> list[dict[str, Any]]:
@@ -298,6 +301,99 @@ def test_listing_download_and_owner_checks(client: TestClient, other: TestClient
     assert {f["name"]: f for f in client.get(f"/api/runs/{run_id}/assets").json()["files"]}["pipeline.py"][
         "available"
     ] is False
+
+
+def test_zip_of_all_files(client: TestClient, other: TestClient, data_dir: Path) -> None:
+    import io
+    import zipfile
+
+    run_id = start(client)
+    assert client.get(f"/api/runs/{run_id}/assets.zip").status_code == 404  # nothing yet
+    out = data_dir / "runs" / run_id / "out"
+    run_async(_register(run_id, engine_files(out), out, data_dir))
+    r = client.get(f"/api/runs/{run_id}/assets.zip")
+    assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    assert r.headers["content-disposition"] == f'attachment; filename="autotinker-{run_id}.zip"'
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    folder = f"autotinker-{run_id}"
+    assert sorted(zf.namelist()) == [f"{folder}/model.joblib", f"{folder}/pipeline.py"]  # skipped files left out
+    assert zf.read(f"{folder}/pipeline.py") == b"print('hi')\n"
+    assert other.get(f"/api/runs/{run_id}/assets.zip").json() == {"error": "No such run."}
+
+
+def test_inline_read_of_small_text_assets(client: TestClient, other: TestClient, data_dir: Path) -> None:
+    run_id = start(client)
+    out = data_dir / "runs" / run_id / "out"
+    ev = engine_files(out)
+    a = out / ev["run_id"] / "assets"
+    (a / "model_card.json").write_text('{"target": "Class"}')
+    (a / "page.html").write_text("<script>alert(1)</script>")
+    ev["files"] += [
+        {"name": "model_card.json", "path": "assets/model_card.json", "kind": "json",
+         "content_type": "application/json"},
+        {"name": "page.html", "path": "assets/page.html", "kind": "code", "content_type": "text/html"},
+    ]  # fmt: skip
+    run_async(_register(run_id, ev, out, data_dir))
+
+    r = client.get(f"/api/runs/{run_id}/assets/pipeline.py?inline=1")
+    assert r.status_code == 200 and r.text == "print('hi')\n"
+    assert r.headers["content-type"] == "text/plain; charset=utf-8"
+    assert r.headers["cache-control"] == "private, no-store" and r.headers["x-content-type-options"] == "nosniff"
+    assert "attachment" not in r.headers.get("content-disposition", "")
+    card = client.get(f"/api/runs/{run_id}/assets/model_card.json?inline=1")
+    assert card.headers["content-type"] == "application/json" and card.json() == {"target": "Class"}
+    html = client.get(f"/api/runs/{run_id}/assets/page.html?inline=1")
+    assert html.headers["content-type"] == "text/plain; charset=utf-8"  # never rendered as HTML on our origin
+    assert client.get(f"/api/runs/{run_id}/assets/model.joblib?inline=1").status_code == 415  # not a text kind
+    assert other.get(f"/api/runs/{run_id}/assets/pipeline.py?inline=1").status_code == 404  # owner-checked
+    assert client.get(f"/api/runs/{run_id}/assets/gone.bin?inline=1").status_code == 404
+
+
+def test_inline_read_of_blob_assets(
+    client: TestClient, fake_runner: FakeRunner, fake_blob: FakeBlob, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_id = start(client)
+    auth = token_for(fake_runner, run_id)
+    ingest = f"/api/runs/{run_id}/ingest"
+
+    def register(name: str, kind: str, size: int) -> None:
+        body = {"kind": "asset", "name": name, "assetKind": kind, "contentType": "text/plain", "status": "uploaded",
+                "bytes": size, "pathname": f"runs/{run_id}/{name}"}  # fmt: skip
+        assert client.post(ingest, json=body, headers=auth).json() == {"ok": True}
+
+    fake_blob.stored[f"runs/{run_id}/requirements.txt"] = b"scikit-learn==1.9.1\n"
+    register("requirements.txt", "text", 20)
+    r = client.get(f"/api/runs/{run_id}/assets/requirements.txt?inline=1")
+    assert r.status_code == 200 and r.text == "scikit-learn==1.9.1\n"  # read server-side: no redirect
+    plain = client.get(f"/api/runs/{run_id}/assets/requirements.txt", follow_redirects=False)
+    assert plain.status_code == 302  # downloads stay redirects
+
+    register("big.py", "code", 2 * MB)
+    assert client.get(f"/api/runs/{run_id}/assets/big.py?inline=1").status_code == 415
+    fake_blob.stored.clear()
+    assert client.get(f"/api/runs/{run_id}/assets/requirements.txt?inline=1").status_code == 503
+
+
+def test_zip_reads_blob_files(client: TestClient, fake_runner: FakeRunner, fake_blob: FakeBlob) -> None:
+    import io
+    import zipfile
+
+    run_id = start(client)
+    auth = token_for(fake_runner, run_id)
+    pathname = f"runs/{run_id}/predict.py"
+    fake_blob.stored[pathname] = b"print('predict')\n"
+    client.post(
+        f"/api/runs/{run_id}/ingest",
+        json={"kind": "asset", "name": "predict.py", "assetKind": "script", "contentType": "text/x-python",
+              "status": "uploaded", "bytes": 17, "pathname": pathname},
+        headers=auth,
+    )  # fmt: skip
+    r = client.get(f"/api/runs/{run_id}/assets.zip")
+    assert r.status_code == 200
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    assert zf.read(f"autotinker-{run_id}/predict.py") == b"print('predict')\n"
+    fake_blob.stored.clear()
+    assert client.get(f"/api/runs/{run_id}/assets.zip").status_code == 503  # nothing readable
 
 
 def test_sandbox_upload_flow_and_blob_download(

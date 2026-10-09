@@ -204,3 +204,33 @@ async def download_url(row: dict[str, Any]) -> str:
     # presigned GET accepts the extra parameter is unverified, so it is opt-in (AUTOTINKER_BLOB_DOWNLOAD_PARAM=1).
     download = settings.env("AUTOTINKER_BLOB_DOWNLOAD_PARAM") == "1"
     return blob.presigned_get_url(signed, pathname, row.get("blob_url"), download=download)
+
+
+async def read_blob(row: dict[str, Any]) -> bytes:
+    """A blob asset's bytes, fetched through a fresh presigned GET URL (for the zip of all files). Raises
+    blob.BlobError."""
+    url = await download_url(row)
+    async with blob._client() as client:
+        resp = await client.get(url, follow_redirects=True)
+    if resp.status_code != 200:
+        raise blob.BlobError(f"download failed: HTTP {resp.status_code}")
+    return resp.content
+
+
+def zip_folder(run_id: str) -> str:
+    """The folder the zip of all files unpacks into (predict.py runs from there)."""
+    return f"autotinker-{run_id}"
+
+
+INLINE_KINDS = frozenset({"code", "script", "text", "json"})
+INLINE_MAX_BYTES = 1024 * 1024
+
+
+def inline_ok(row: dict[str, Any]) -> bool:
+    """Small text assets (the solution, predict.py, requirements.txt, model_card.json) can be read same-origin."""
+    return row["kind"] in INLINE_KINDS and 0 <= int(row["bytes"] or 0) <= INLINE_MAX_BYTES
+
+
+def inline_media_type(row: dict[str, Any]) -> str:
+    """Never the engine-reported type as-is (a text/html asset must not render on our origin)."""
+    return "application/json" if row["kind"] == "json" else "text/plain; charset=utf-8"
