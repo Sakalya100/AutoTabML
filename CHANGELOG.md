@@ -4,6 +4,18 @@ All notable changes to the `autotinker` package are recorded here. The format fo
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-10
+
+### Added
+- **Bring your own LLM for `autotinker run`.** `--llm provider:model` (or `AUTOTINKER_LLM`; the flag wins) makes every agent use that one model instead of the free Groq / Gemini pool; `--fast-llm` (or `AUTOTINKER_FAST_LLM`) serves the quick, cheap calls with a second model. Providers: `openai`, `anthropic` (its OpenAI-compatible endpoint), `groq`, `gemini`, `cerebras`, `openrouter`, `together`, `mistral`, `deepseek`, `ollama` (no key; `OLLAMA_BASE_URL`), and `compat:<model>@<base_url>` for any OpenAI-compatible server (key from `AUTOTINKER_LLM_API_KEY`, optional). Keys come from the provider's usual variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, ...); a missing key stops the run before it starts and names the variable. The model must support tool calling. Also in the SDK: `agentic_run(..., llm=..., fast_llm=...)`.
+- `AUTOTINKER_NO_ROWS=1` keeps data rows out of every prompt (schema-only intake and profiling), for any provider. Without it, a model you bring may receive a few sample rows; the built-in pool still never sends rows to Gemini.
+- `autotinker run --max-cost` (SDK: `max_cost_usd`): the actual spend that stops a run (default $0.50; the free tiers cost $0).
+
+### Changed
+- **Breaking:** `autotinker run --llm` no longer selects the legacy single-shot mode; it now picks the agents' model. Use `autotinker run --single-shot --llm <proposer>` (with `--cheap-llm` / `--max-repairs`) for single-shot. `run --llm heuristic` without `--single-shot` is an error that points to `--single-shot` or `autotinker evolve --llm heuristic`, and so are `--cheap-llm` / `--max-repairs` without `--single-shot` (they used to be ignored).
+- README: architecture and agent-role diagrams in Mermaid (rendered as images on PyPI, which can't draw Mermaid), a "bring your own LLM" guide, and an author section in place of the v1 contributor list.
+- `evolve --llm` accepts every keyed provider in the shared endpoint table (adds `gemini`, `cerebras`, `together`, `mistral`, `deepseek`), and sends `max_completion_tokens` to OpenAI.
+
 ## [0.1.0] - 2026-10-10
 
 First public release of the v2 engine (formerly AutoTabML; a ground-up rewrite of the 2024 v1).
@@ -27,5 +39,6 @@ First public release of the v2 engine (formerly AutoTabML; a ground-up rewrite o
 ### Known limitations
 - The benchmark so far is a smoke test: offline heuristic proposer, one seed, five small datasets. There the statistical gate did **not** beat the naive gate. A proper benchmark is Phase 3 of the [roadmap](https://github.com/Sakalya100/AutoTinker/blob/main/docs/ROADMAP.md).
 
-[Unreleased]: https://github.com/Sakalya100/AutoTinker/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Sakalya100/AutoTinker/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Sakalya100/AutoTinker/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Sakalya100/AutoTinker/releases/tag/v0.1.0

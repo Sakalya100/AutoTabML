@@ -83,7 +83,7 @@ def test_evolve_events_stdout_is_pure_jsonl(tmp_path: Path, monkeypatch: pytest.
 
 
 def test_run_without_keys_fails_fast(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    for k in ("GROQ_API_KEY", "GEMINI_API_KEY", "CEREBRAS_API_KEY"):
+    for k in ("GROQ_API_KEY", "GEMINI_API_KEY", "CEREBRAS_API_KEY", "AUTOTINKER_LLM", "AUTOTINKER_FAST_LLM"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.chdir(tmp_path)  # no .env here
     res = runner.invoke(app, ["run", str(DATA), "--target", "variety", "--out", str(tmp_path)])

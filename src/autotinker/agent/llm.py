@@ -17,6 +17,7 @@ from typing import Any, Literal, Protocol, cast
 
 import httpx
 
+from autotinker.agent.providers import ENDPOINTS
 from autotinker.contracts import LLMUsage
 
 Purpose = Literal["draft", "propose", "implement", "repair"]
@@ -238,11 +239,12 @@ class AnthropicLLM:
         return LLMResponse(text=text, usage=usage, stop_reason=stop)
 
 
-_OPENAI_COMPAT: dict[str, tuple[str, str]] = {
-    # provider -> (base_url, api key env var)
-    "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY"),
-    "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY"),
-    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
+# provider -> (base_url, api key env var, max-tokens field), from the one endpoint table in providers.py.
+# Anthropic uses its native Messages API here (AnthropicLLM); keyless endpoints (Ollama) are agentic-only.
+_OPENAI_COMPAT: dict[str, tuple[str, str, str]] = {
+    name: (ep.base_url, ep.key_env, ep.max_tokens_param)
+    for name, ep in ENDPOINTS.items()
+    if ep.key_env and name != "anthropic"
 }
 
 
@@ -256,6 +258,7 @@ class OpenAICompatLLM:
         base_url: str,
         api_key_env: str = "OPENAI_API_KEY",
         api_key: str | None = None,
+        max_tokens_param: str = "max_tokens",
         timeout_s: float = 300.0,
         max_retries: int = 4,
         backoff_s: float = 1.0,
@@ -263,6 +266,7 @@ class OpenAICompatLLM:
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.model = model
+        self.max_tokens_param = max_tokens_param
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key or os.environ.get(api_key_env, "")
         if not self.api_key:
@@ -277,7 +281,7 @@ class OpenAICompatLLM:
     ) -> LLMResponse:
         body = {
             "model": self.model,
-            "max_tokens": max_tokens,
+            self.max_tokens_param: max_tokens,
             "messages": [{"role": "system", "content": system}, *messages],
         }
         headers = {"authorization": f"Bearer {self.api_key}", "content-type": "application/json"}
@@ -341,6 +345,7 @@ class ScriptedLLM:
 def make_llm(spec: str) -> LLM:
     """Build an LLM from "provider:model", e.g. "anthropic:claude-sonnet-5-5", "groq:llama-3.3-70b-versatile",
     "openai:gpt-4o-mini", "openrouter:anthropic/claude-sonnet-5-5". A bare "claude-*" means Anthropic.
+    Any keyed OpenAI-compatible provider in providers.ENDPOINTS works the same way (gemini, together, ...).
     `compat:<model>@<base_url>` targets any OpenAI-compatible server (key from OPENAI_API_KEY)."""
     if ":" not in spec:
         if spec.startswith("claude"):
@@ -351,8 +356,8 @@ def make_llm(spec: str) -> LLM:
     if provider == "anthropic":
         return AnthropicLLM(model or DEFAULT_ANTHROPIC_MODEL)
     if provider in _OPENAI_COMPAT:
-        base, env = _OPENAI_COMPAT[provider]
-        return OpenAICompatLLM(model, base_url=base, api_key_env=env)
+        base, env, max_tokens_param = _OPENAI_COMPAT[provider]
+        return OpenAICompatLLM(model, base_url=base, api_key_env=env, max_tokens_param=max_tokens_param)
     if provider == "compat":
         if "@" not in model:
             raise ValueError("compat spec must look like 'compat:<model>@<base_url>'")

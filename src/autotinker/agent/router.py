@@ -8,9 +8,12 @@ Every agent call goes through `Router.chat(ChatRequest)`:
   * 429 -> honour retry-after / Gemini RetryInfo, fail over; 402 / 401 / 403 / per-day quota -> provider down
     for the rest of the process ("for the day"); 413 -> does not fit that provider, fail over;
     5xx / timeout -> back off and fail over
-  * `privacy=True` (the request contains data rows) -> never routed to a provider that trains on inputs
+  * `privacy=True` (the request contains data rows) -> never routed to a provider that trains on inputs, and
+    never sent at all when AUTOTINKER_NO_ROWS is set
   * per-call usage: provider, model, tokens in/out/cached, latency, would-be cost; actual cost is $0 on
     free tiers
+  * `llm=` / AUTOTINKER_LLM (and `fast_llm=` / AUTOTINKER_FAST_LLM): the user's own model serves every alias
+    instead of the free pool (providers.byo_providers; the module docstring there has the details)
 
 API keys are held privately and never logged, returned or put into errors.
 """
@@ -37,6 +40,9 @@ from autotinker.agent.providers import (
     ModelSpec,
     ProviderSpec,
     available_providers,
+    byo_providers,
+    resolve_llm_specs,
+    rows_allowed,
     would_be_cost,
 )
 
@@ -237,12 +243,18 @@ class _Candidate:
 
 
 class Router:
-    """Implements ChatBackend over real providers. Not thread-safe (the orchestrator is sequential)."""
+    """Implements ChatBackend over real providers. Not thread-safe (the orchestrator is sequential).
+
+    With `llm` (or AUTOTINKER_LLM; the argument wins) and no explicit `providers`, every alias goes to that
+    one model (`fast_llm` / AUTOTINKER_FAST_LLM: a second model for `fast`) and the free pool is not used.
+    A bad spec or a missing key raises providers.LLMSpecError here, before any request is made."""
 
     def __init__(
         self,
         providers: list[ProviderSpec] | None = None,
         *,
+        llm: str | None = None,
+        fast_llm: str | None = None,
         env: dict[str, str] | None = None,
         transport: httpx.BaseTransport | None = None,
         timeout_s: float = 120.0,
@@ -254,8 +266,15 @@ class Router:
         on_wait: Callable[[str, float], None] | None = None,
     ) -> None:
         e = dict(os.environ) if env is None else env
-        self.providers = available_providers(tuple(providers or DEFAULT_PROVIDERS), e)
-        self._keys = {p.name: e[p.key_env] for p in self.providers}
+        self.llm_choice: dict[str, str] | None = None  # {"llm": spec, "fast_llm": spec} for your own model
+        main, fast = resolve_llm_specs(llm, fast_llm, e) if providers is None else (None, None)
+        if main:
+            self.providers = byo_providers(main, fast, e)
+            self.llm_choice = {"llm": main, "fast_llm": fast or main}
+        else:
+            self.providers = available_providers(tuple(providers or DEFAULT_PROVIDERS), e)
+        self._keys = {p.name: e.get(p.key_env, "") if p.key_env else "" for p in self.providers}
+        self.send_rows = rows_allowed(e)  # False: AUTOTINKER_NO_ROWS, no data rows to any provider
         self.client = httpx.Client(timeout=timeout_s, transport=transport)
         self.max_wait_s = max_wait_s
         self.prefer_wait_s = prefer_wait_s
@@ -267,13 +286,19 @@ class Router:
         self.down: dict[str, str] = {}  # provider name -> reason (for the rest of the process)
         self.stats: dict[str, dict[str, Any]] = {}
         self.events: list[str] = []  # human-readable router log (waits, fail-overs, provider down)
+        for p in self.providers if self.llm_choice else []:
+            for m in {m.model_id: m for m in p.models.values()}.values():
+                aliases = "/".join(a for a, x in p.models.items() if x.model_id == m.model_id)
+                self._note(f"your model {p.name}/{m.model_id} serves {aliases}")
+                if not m.price_known:
+                    self._note(f"no list price known for {p.name}/{m.model_id}: its cost is reported as $0")
 
     def __repr__(self) -> str:  # never show keys
         return f"Router(providers={[p.name for p in self.providers]}, down={self.down})"
 
     @property
     def provider_names(self) -> list[str]:
-        return [p.name for p in self.providers]
+        return list(dict.fromkeys(p.name for p in self.providers))
 
     def _bucket(self, c: _Candidate) -> Bucket:
         b = self.buckets.get(c.key)
@@ -296,6 +321,8 @@ class Router:
     # -------------------------------------------------- candidate selection
 
     def candidates(self, req: ChatRequest) -> list[_Candidate]:
+        if req.privacy and not self.send_rows:
+            return []  # AUTOTINKER_NO_ROWS: a request with data rows goes nowhere
         if req.alias == "judge":
             aliases = ["reason", "fast", "code"]
         else:
@@ -348,16 +375,15 @@ class Router:
         effort = req.reasoning_effort or c.model.reasoning_effort
         if c.model.reasoning_format:
             body["reasoning_format"] = "parsed"  # must be parsed/hidden with tools or JSON output
-        if effort and c.provider.name != "gemini":
+        if effort and c.model.accepts_reasoning_effort:
             body["reasoning_effort"] = effort
         return body
 
     def _send(self, c: _Candidate, body: dict[str, Any]) -> httpx.Response:
-        headers = {
-            "authorization": f"Bearer {self._keys[c.provider.name]}",
-            "content-type": "application/json",
-            **c.provider.extra_headers,
-        }
+        headers = {"content-type": "application/json", **c.provider.extra_headers}
+        key = self._keys.get(c.provider.name, "")
+        if key:  # keyless endpoints (Ollama, an open compat server) get no Authorization header
+            headers["authorization"] = f"Bearer {key}"
         return self.client.post(f"{c.provider.base_url}/chat/completions", headers=headers, json=body)
 
     def _record(self, c: _Candidate, *, ok: bool, usage: CallUsage | None = None, error: str = "") -> None:
@@ -374,6 +400,7 @@ class Router:
                 "would_be_cost_usd": 0.0,
                 "cost_usd": 0.0,
                 "latency_s": 0.0,
+                "price_known": c.model.price_known,
                 "roles": {},
                 "error_kinds": {},
             },
@@ -426,6 +453,8 @@ class Router:
     # -------------------------------------------------- main entry
 
     def chat(self, req: ChatRequest) -> ChatResult:
+        if req.privacy and not self.send_rows:
+            raise LLMError("AUTOTINKER_NO_ROWS is set: a request with data rows is not sent to any provider")
         est = estimate_request_tokens(req.system, req.messages, req.tools)
         excluded: set[str] = set()  # candidates that cannot serve *this* request
         fallbacks: list[str] = []
@@ -492,7 +521,8 @@ class Router:
                 continue
             latency = time.perf_counter() - t0
             now = self._clock()
-            bucket.update_from_headers(resp.headers, now)
+            if c.provider.learn_limits:
+                bucket.update_from_headers(resp.headers, now)
             code = resp.status_code
             if code < 400:
                 try:
@@ -528,11 +558,13 @@ class Router:
                 fallbacks.append(f"{c.key}: 429 request too large")
                 continue
             if code == 429:
-                per_day = "perday" in snippet.lower().replace(" ", "") or "per day" in snippet.lower()
-                if per_day:
-                    self.down[c.provider.name] = "daily quota exhausted"
-                    self._note(f"{c.provider.name} daily quota exhausted -> down for the day")
-                    fallbacks.append(f"{c.key}: 429 daily quota -> provider down")
+                low = snippet.lower()
+                per_day = "perday" in low.replace(" ", "") or "per day" in low
+                if per_day or "insufficient_quota" in low:  # OpenAI: no credit left on the account
+                    why = "daily quota exhausted" if per_day else "out of credit (insufficient_quota)"
+                    self.down[c.provider.name] = why
+                    self._note(f"{c.provider.name} {why} -> down for the day")
+                    fallbacks.append(f"{c.key}: 429 {why} -> provider down")
                     continue
                 delay = parse_duration(resp.headers.get("retry-after"))
                 if delay is None:
@@ -564,6 +596,7 @@ class Router:
     def usage_summary(self) -> dict[str, Any]:
         return {
             "providers": self.provider_names,
+            **({"llm": dict(self.llm_choice)} if self.llm_choice else {}),
             "down": dict(self.down),
             "by_model": {k: dict(v) for k, v in self.stats.items()},
             "log": self.events[-200:],

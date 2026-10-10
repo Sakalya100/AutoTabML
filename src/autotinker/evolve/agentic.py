@@ -172,6 +172,12 @@ class IntakeDecision:
     step: AgentStep | None
 
 
+def _row_modes(backend: ChatBackend) -> tuple[bool, ...]:
+    """(True, False): try a prompt with data rows, then schema-only. Schema-only at once when the backend
+    may not send rows at all (Router.send_rows is False under AUTOTINKER_NO_ROWS)."""
+    return (True, False) if getattr(backend, "send_rows", True) else (False,)
+
+
 def run_intake(
     backend: ChatBackend | None,
     df: pd.DataFrame,
@@ -187,7 +193,7 @@ def run_intake(
     step: AgentStep | None = None
     if backend is not None:
         # With rows first (row-safe providers only); if none can serve, retry schema-only so any provider can.
-        for rows in (True, False):
+        for rows in _row_modes(backend):
             try:
                 call = run_role(
                     backend,
@@ -747,7 +753,7 @@ class AgenticRunner(_Runner):
         self.drop_columns = flagged
         out: ProfilerOut | None = None
         # With sample rows first (row-safe providers only); if none can serve, retry schema-only.
-        for rows in (True, False):
+        for rows in _row_modes(self.backend):
             try:
                 call = self._role(
                     specs.PROFILER,

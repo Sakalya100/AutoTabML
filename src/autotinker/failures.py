@@ -24,6 +24,7 @@ Codes:
 from __future__ import annotations
 
 import difflib
+import re
 from dataclasses import dataclass
 
 import pandas as pd
@@ -177,9 +178,13 @@ def classify(exc: BaseException) -> Failure:
 
 
 def llm_unavailable(detail: str) -> Failure:
+    if re.search(r"HTTP 40[13]\b", detail):  # the provider refused the key (e.g. a wrong key for --llm)
+        hint = "The provider refused the API key. Check the key for the model you chose, then retry."
+    else:
+        hint = "They are probably out of quota for the moment. Retry in a few minutes."
     return Failure(
         "llm_unavailable",
         "The AI models that plan the experiments are unavailable right now.",
-        "They are probably out of quota for the moment. Retry in a few minutes.",
+        hint,
         _short(detail),
     )

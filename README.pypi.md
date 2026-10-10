@@ -1,3 +1,5 @@
+<!-- Generated from README.md by tools/readme_assets.py; edit README.md instead. -->
+
 # AutoTinker
 
 [![PyPI](https://img.shields.io/pypi/v/autotinker)](https://pypi.org/project/autotinker/)
@@ -160,45 +162,11 @@ It takes the loop from Karpathy's [autoresearch](https://github.com/karpathy/aut
 
 A locked test split is scored **once**, at the very end. The **optimism gap** (selection score minus test score) shows how much the loop fooled itself.
 
-<!-- alt: The improvement loop: profile, propose, check, sandbox, gate, repeat until the ceiling, then one locked test -->
-```mermaid
-flowchart TD
-    D[("Your table<br/>CSV · link · parquet")] --> P["Profiler<br/>compact profile, no raw rows"]
-    P --> A
-    subgraph LOOP ["The loop"]
-      A["Agents<br/>plan · code · critique"] -- "idea + solution.py" --> C["Static check<br/>allowed imports, no IO, no leaks"]
-      C --> S["Sandbox<br/>isolated, no network, no secrets"]
-      S -- "CV score per fold" --> G{"Gate<br/>corrected paired t-test"}
-      G -- "keep or revert" --> L[("Ledger + idea memory")]
-      L --> A
-    end
-    H[["Harness · read-only to the agents<br/>dev / select / LOCKED test split · repeated k-fold CV"]] -.-> S
-    G -- "ceiling reached" --> F["Score the locked test once"]
-    F --> R["Report · model.joblib · predict.py"]
-```
+![The improvement loop: profile, propose, check, sandbox, gate, repeat until the ceiling, then one locked test](https://raw.githubusercontent.com/Sakalya100/AutoTinker/main/docs/assets/mermaid-1dfdb2f3e9.png)
 
 The agentic `run` splits the agent into roles. Each experiment goes through the same path, and the loop ends with one look at the locked test:
 
-<!-- alt: The agent roles in a run, from intake to the report -->
-```mermaid
-flowchart TD
-    I["Intake<br/>what to predict, which metric"] --> PR["Profiler<br/>columns, risks, leakage flags"]
-    PR --> B["Baseline<br/>the starter pipeline, experiment e000"]
-    B --> PL
-    subgraph EXP ["Every experiment"]
-      PL["Planner<br/>one idea"] --> CO["Coder<br/>edits solution.py"]
-      CO --> EX["Executor<br/>runs it in the sandbox"]
-      EX -- "error" --> DB["Debugger<br/>up to 5 repairs"]
-      DB --> EX
-      EX --> CR["Critic + Judge<br/>leakage and sanity checks"]
-      CR --> GA{"Gate"}
-    end
-    GA -- "next idea" --> PL
-    GA -- "plateau" --> TU["Tuner · Ensembler<br/>hyperparameters, blends"]
-    TU --> PL
-    GA -- "ceiling or budget" --> LT["Locked test, once"]
-    LT --> RE["Reporter<br/>plain-language report"]
-```
+![The agent roles in a run, from intake to the report](https://raw.githubusercontent.com/Sakalya100/AutoTinker/main/docs/assets/mermaid-db0b3aa743.png)
 
 | Part | What it does |
 |---|---|
@@ -212,19 +180,7 @@ flowchart TD
 
 ## The web app (and self-hosting it)
 
-<!-- alt: How the hosted web app is deployed -->
-```mermaid
-flowchart LR
-    U(("You")) --> W["web/<br/>Next.js frontend"]
-    W -- "/api" --> B["backend/<br/>FastAPI on Vercel Functions"]
-    W -. "sign-in" .-> K["Clerk"]
-    B --> DB[("Neon Postgres<br/>sessions · runs · events")]
-    B -- "start, stop, steer" --> SB["Vercel Sandbox microVM<br/>one per run · locked-down egress"]
-    SB -- "events" --> B
-    SB -- "LLM calls<br/>keys added at the network edge" --> LLM["Groq · Gemini"]
-    SB -- "model files" --> BL[("Private Vercel Blob")]
-    B -- "signed download links" --> W
-```
+![How the hosted web app is deployed](https://raw.githubusercontent.com/Sakalya100/AutoTinker/main/docs/assets/mermaid-d507a65ef5.png)
 
 The live site is two Vercel services deployed together from the root `vercel.json`:
 - `web/`: a frontend-only Next.js app. Paste a link to a CSV, watch a live run, steer it and stop it, download the model; or watch a recorded run (score chart with the noise band, the ledger with code diffs, the stop report). Sign-in is Clerk.

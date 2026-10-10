@@ -405,9 +405,12 @@ def agentic_run(
     metric: str | None = None,
     workdir: str | Path = "runs",
     backend: Any = None,
+    llm: str | None = None,
+    fast_llm: str | None = None,
     max_experiments: int = 10,
     max_time_s: float = 40 * 60,
     max_tokens: int = 400_000,
+    max_cost_usd: float | None = None,
     seed: int = 0,
     on_event: Callable[[Any], None] | None = None,
     events_stdout: bool = False,
@@ -420,9 +423,16 @@ def agentic_run(
     """The agentic loop: intake, profile, baseline, drafts, improve/tune, ensemble, locked test, report.
 
     `backend` is any ChatBackend (default: the provider Router over the keys in the environment).
+    `llm` ("provider:model", e.g. "openai:gpt-4o-mini"; default: the AUTOTINKER_LLM env var) makes every agent
+    use that one model instead of the free Groq / Gemini pool; `fast_llm` (default: AUTOTINKER_FAST_LLM, else
+    `llm`) serves the quick, cheap calls. Supported specs, keys and behaviour: agent/providers.py. A bad spec
+    or a missing key raises failures.RunError("llm_unavailable") before any agent runs.
+    `max_cost_usd` stops the run once the actual spend reaches it (default: AgenticConfig's $0.50; the free
+    tiers cost $0, so it matters only for paid models).
     `control` is an optional evolve.control.ControlChannel (live steering / graceful stop).
     `csv_format` is an optional data.csvformat.CsvFormat for CSV/TSV sources (detected when absent).
     Data problems raise failures.RunError (a code plus a plain-language message and hint)."""
+    from autotinker.agent.providers import LLMSpecError
     from autotinker.agent.router import Router
     from autotinker.data.sources import load_dataframe, load_source, source_stem
     from autotinker.evolve.agentic import AgenticConfig, run_agentic, run_intake
@@ -435,14 +445,19 @@ def agentic_run(
     else:
         df, stem = load_source(str(source), csv_format), source_stem(str(source))
     check_data(df, target)
+    if backend is not None and (llm or fast_llm):
+        raise ValueError("pass either `backend` or `llm` / `fast_llm`, not both")
     if backend is None:
-        backend = Router()
+        try:
+            backend = Router(llm=llm, fast_llm=fast_llm)
+        except LLMSpecError as exc:
+            raise RunError("llm_unavailable", str(exc), exc.hint, f"{exc} {exc.hint}".strip()) from exc
         if not backend.providers:
             raise RunError(
                 "llm_unavailable",
                 "No AI model provider is configured on this server.",
-                "Set GROQ_API_KEY and/or GEMINI_API_KEY (see .env), "
-                "or use `autotinker evolve --llm heuristic`.",
+                "Set GROQ_API_KEY and/or GEMINI_API_KEY (see .env), bring your own model with "
+                "--llm provider:model, or use `autotinker evolve --llm heuristic`.",
                 "no LLM provider is configured: set GROQ_API_KEY and/or GEMINI_API_KEY (see .env), "
                 "or use `autotinker evolve --llm heuristic` for the offline path",
             )
@@ -465,6 +480,9 @@ def agentic_run(
     cfg.max_experiments = max_experiments
     cfg.max_time_s = max_time_s
     cfg.max_tokens = max_tokens
+    if max_cost_usd is not None:
+        cfg.max_cost_usd = max_cost_usd
+    llm_choice = getattr(backend, "llm_choice", None)
     record = run_agentic(
         harness,
         backend,
@@ -478,7 +496,11 @@ def agentic_run(
         events_stdout=events_stdout,
         control=control,
         config={
-            "env": {"python": platform.python_version(), "seed": seed},
+            "env": {
+                "python": platform.python_version(),
+                "seed": seed,
+                **({"llm": dict(llm_choice)} if llm_choice else {}),
+            },
             "source": str(source) if not isinstance(source, pd.DataFrame) else "dataframe",
             **({"csv_format": csv_format.as_dict()} if csv_format is not None else {}),
             "intake": {
