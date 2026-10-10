@@ -214,11 +214,40 @@ def run(
     ] = False,
     llm: Annotated[
         str | None,
-        typer.Option("--llm", help="legacy single-shot mode with this proposer (e.g. 'heuristic')"),
+        typer.Option(
+            "--llm",
+            help="bring your own model for every agent, as provider:model: openai:<model>, "
+            "anthropic:<model>, groq:, gemini:, cerebras:, openrouter:, together:, mistral:, deepseek:, "
+            "ollama:<model>, or compat:<model>@<base_url> (needs tool calling). Default: $AUTOTINKER_LLM, "
+            "else the free Groq/Gemini models. With --single-shot: the proposer, e.g. 'heuristic'.",
+        ),
     ] = None,
-    cheap_llm: Annotated[str | None, typer.Option("--cheap-llm", help="legacy single-shot mode only")] = None,
+    fast_llm: Annotated[
+        str | None,
+        typer.Option(
+            "--fast-llm",
+            help="a second model, provider:model, for the quick, cheap calls. "
+            "Default: $AUTOTINKER_FAST_LLM, else the --llm model.",
+        ),
+    ] = None,
+    max_cost: Annotated[
+        float | None,
+        typer.Option(
+            "--max-cost", help="USD of actual spend that stops the run (default 0.50; free tiers: $0)"
+        ),
+    ] = None,
+    single_shot: Annotated[
+        bool,
+        typer.Option(
+            "--single-shot",
+            help="legacy mode: one solution drafted by the --llm proposer, repaired and scored (no agents)",
+        ),
+    ] = False,
+    cheap_llm: Annotated[str | None, typer.Option("--cheap-llm", help="--single-shot only")] = None,
     description: Annotated[str, typer.Option("--description", "-d", help="legacy alias of --goal")] = "",
-    max_repairs: Annotated[int, typer.Option("--max-repairs", help="legacy single-shot mode only")] = 3,
+    max_repairs: Annotated[
+        int | None, typer.Option("--max-repairs", help="--single-shot only (default 3)")
+    ] = None,
     control_stdin: Annotated[
         bool,
         typer.Option(
@@ -247,13 +276,17 @@ def run(
 ) -> None:
     """The agentic AutoML loop: agents profile, plan, code, debug, tune and ensemble until the ceiling.
 
-    Provider keys (GROQ_API_KEY, GEMINI_API_KEY, ...) are read from the environment or ./.env.
-    With --llm, runs the legacy single-shot mode instead (draft one solution, repair, score)."""
+    Provider keys (GROQ_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, ...) are read from the environment or ./.env.
+    By default the agents use the free Groq/Gemini models; --llm provider:model (or AUTOTINKER_LLM) makes
+    every agent use your own model instead. AUTOTINKER_NO_ROWS=1 keeps data rows out of every prompt.
+    With --single-shot, runs the legacy single-shot mode instead (draft one solution, repair, score)."""
     goal = goal or description
-    if llm is not None:
+    if single_shot:
         if target is None:
-            raise typer.BadParameter("--target is required with --llm (legacy single-shot mode)")
-        at = _make(llm, cheap_llm, out, "stat", seed, max_repairs)
+            raise typer.BadParameter("--target is required with --single-shot")
+        if fast_llm is not None or max_cost is not None:
+            raise typer.BadParameter("--fast-llm and --max-cost are for the agentic loop, not --single-shot")
+        at = _make(llm, cheap_llm, out, "stat", seed, 3 if max_repairs is None else max_repairs)
         res = _go(
             lambda cb: at.run(
                 source, target, description=goal, metric=metric, on_event=cb, events_stdout=events_stdout
@@ -263,6 +296,16 @@ def run(
         )
         err.print(f"run directory: {res.run_dir}")
         return
+    if llm is not None and llm.strip().lower() == "heuristic":
+        raise typer.BadParameter(
+            "heuristic has no tool calling, so it can't drive the agents; use "
+            "`autotinker evolve --llm heuristic` or `autotinker run --single-shot --llm heuristic`",
+            param_hint="--llm",
+        )
+    if cheap_llm is not None or max_repairs is not None:
+        raise typer.BadParameter(
+            "--cheap-llm and --max-repairs only apply with --single-shot; use --fast-llm for a second model"
+        )
     from autotinker.data.csvformat import CsvFormatError, normalise_format
 
     try:
@@ -290,9 +333,12 @@ def run(
                 goal=goal,
                 metric=metric,
                 workdir=out,
+                llm=llm,
+                fast_llm=fast_llm,
                 max_experiments=max_experiments,
                 max_time_s=max_time,
                 max_tokens=max_tokens,
+                max_cost_usd=max_cost,
                 seed=seed,
                 on_event=seen.chain(cb),
                 events_stdout=events_stdout,
