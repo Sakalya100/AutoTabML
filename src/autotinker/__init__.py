@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-__version__ = "0.1.1.dev0"
+__version__ = "0.2.0"
 
 if TYPE_CHECKING:
     from autotinker.api import AutoTinker, Run, load_run

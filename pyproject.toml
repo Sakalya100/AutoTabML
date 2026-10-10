@@ -1,8 +1,8 @@
 [project]
 name = "autotinker"
-version = "0.1.1.dev0"
+version = "0.2.0"
 description = "A self-improving agent for tabular ML: evolves readable pipelines in a sandbox until it hits the problem's ceiling."
-readme = "README.md"
+readme = "README.pypi.md"  # generated from README.md by tools/readme_assets.py (PyPI has no mermaid)
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
