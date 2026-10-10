@@ -51,6 +51,7 @@ import {
   type Journey as JourneyFacts,
   type JourneyMsg,
 } from "./journey-facts";
+import { gsap, prefersReducedMotion } from "@/lib/motion/gsap";
 import { RevealHeading, ScrambleNumber, scrollDocTo } from "./motion";
 import { Summary } from "./stage";
 
@@ -472,8 +473,28 @@ function Rail(props: RailProps) {
   const shown = beats.filter((b) => b.kind !== "record");
   const kindOf: BeatKind = climbing ? "climb" : (id as BeatKind);
   const here = shown.findIndex((b) => b.kind === kindOf);
+  // The rail is fixed to the viewport; the site footer scrolls up over it at the very end. Lift the rail away as the
+  // footer rises (as the landing does), so the record pill never sits on the wordmark.
+  const railRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const foot = document.querySelector<HTMLElement>("body > footer");
+    const inner = railRef.current?.querySelector<HTMLElement>(".jn-rail-inner");
+    if (!foot || !inner || getComputedStyle(foot).display === "none") return;
+    const tween = gsap.fromTo(
+      inner,
+      { autoAlpha: 1, y: 0 },
+      prefersReducedMotion()
+        ? { autoAlpha: 0, duration: 0.01, scrollTrigger: { trigger: foot, start: "top 85%", toggleActions: "play none none reverse" } }
+        : { autoAlpha: 0, y: -40, ease: "none", scrollTrigger: { trigger: foot, start: "top bottom", end: "top 70%", scrub: 0.3 } },
+    );
+    return () => {
+      tween.scrollTrigger?.kill();
+      tween.kill();
+      gsap.set(inner, { clearProps: "opacity,visibility,transform" });
+    };
+  }, []);
   return (
-    <div className="jn-rail" data-msg={laid} data-climb={laid === "idea-0" || laid === "tail" ? "" : undefined}>
+    <div ref={railRef} className="jn-rail" data-msg={laid} data-climb={laid === "idea-0" || laid === "tail" ? "" : undefined}>
       <div className="jn-rail-inner">
         {id !== "record" && (
           <ol className="lp-ticks jn-ticks" aria-hidden>
