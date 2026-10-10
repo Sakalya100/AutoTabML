@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -471,12 +472,21 @@ def test_make_llm_shares_the_endpoint_table(monkeypatch: pytest.MonkeyPatch) -> 
 runner = CliRunner()
 
 
+def _plain(output: str) -> str:
+    """CI forces colour (GITHUB_ACTIONS / FORCE_COLOR) and Rich boxes and wraps usage errors: strip the
+    ANSI codes and the box, then join the lines, so a phrase split across a wrap still matches."""
+    text = re.sub(r"\x1b\[[0-9;]*m", "", output)
+    return " ".join(re.sub(r"[│╭╮╰╯─]", " ", text).split())
+
+
 def test_cli_llm_heuristic_points_to_single_shot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
-    res = runner.invoke(app_(), ["run", str(DATA), "--target", "variety", "--llm", "heuristic"])
-    assert res.exit_code == 2 and "--single-shot" in res.output and "no tool calling" in res.output
-    res = runner.invoke(app_(), ["run", str(DATA), "--target", "variety", "--cheap-llm", "x"])
-    assert res.exit_code == 2 and "--single-shot" in res.output
+    env = {"COLUMNS": "200", "NO_COLOR": "1", "TERM": "dumb"}
+    res = runner.invoke(app_(), ["run", str(DATA), "--target", "variety", "--llm", "heuristic"], env=env)
+    out = _plain(res.output)
+    assert res.exit_code == 2 and "--single-shot" in out and "no tool calling" in out
+    res = runner.invoke(app_(), ["run", str(DATA), "--target", "variety", "--cheap-llm", "x"], env=env)
+    assert res.exit_code == 2 and "--single-shot" in _plain(res.output)
 
 
 def test_cli_missing_key_ends_with_run_failed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
